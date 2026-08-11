@@ -1,0 +1,175 @@
+.editor {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  border: 1px solid var(--line);
+  background: var(--panel);
+  border-radius: 4px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.editor .cm-editor {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  font-size: 13.5px;
+}
+
+.editor .cm-scroller { font-family: var(--mono); }
+
+/* Check findings, marked beside the line numbers. */
+.editor .cm-finding-gutter {
+  min-width: 1.85em;
+  padding: 0 0.25em;
+}
+
+.editor .cm-finding {
+  cursor: help;
+  display: inline-block;
+  font-size: 1.55em;
+  font-weight: 700;
+  line-height: 1;
+  vertical-align: -0.12em;
+}
+
+.editor .cm-finding-warn { color: #8a6d1f; }
+.editor .cm-finding-error { color: var(--danger); }
+
+/* Instant hover copy for finding glyphs (replaces delayed native title). */
+.cm-finding-tip {
+  position: fixed;
+  z-index: 50;
+  max-width: min(28rem, calc(100vw - 1.5rem));
+  margin: 0;
+  padding: 0.35rem 0.55rem;
+  border: 1px solid var(--line);
+  border-left: 3px solid #8a6d1f;
+  border-radius: 3px;
+  background: rgba(255, 252, 247, 0.97);
+  box-shadow: 0 2px 8px rgba(28, 27, 25, 0.12);
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  line-height: 1.4;
+  color: var(--ink);
+  white-space: pre-wrap;
+  pointer-events: none;
+}
+
+.cm-finding-tip[hidden] { display: none; }
+
+.cm-finding-tip-error { border-left-color: var(--danger); }
+
+/* Unsaved edits, marked beside the line numbers and revertable per run. */
+.editor .cm-dirty-gutter {
+  min-width: 0.6em;
+  padding: 0;
+  cursor: pointer;
+}
+
+.editor .cm-dirty {
+  font-size: 1em;
+  line-height: inherit;
+  opacity: 0.85;
+}
+
+.editor .cm-dirty:hover { opacity: 1; }
+
+/* Hover preview: what is there now, and what a revert would restore. */
+.cm-dirty-tip {
+  position: fixed;
+  z-index: 60;
+  max-width: min(46rem, 70vw);
+  padding: 0.4rem 0.55rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  box-shadow: 0 6px 18px rgba(28, 27, 25, 0.18);
+  pointer-events: none;
+}
+
+.cm-dirty-tip[hidden] { display: none; }
+
+.cm-dirty-tip-head {
+  margin: 0 0 0.3rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.cm-dirty-tip-block + .cm-dirty-tip-block { margin-top: 0.35rem; }
+
+.cm-dirty-tip-label {
+  margin: 0 0 0.1rem;
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.cm-dirty-tip-code {
+  margin: 0;
+  padding: 0.2rem 0.35rem;
+  max-height: 14rem;
+  overflow: hidden;
+  border-radius: 3px;
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.cm-dirty-tip-now { background: rgba(31, 122, 52, 0.12); }
+.cm-dirty-tip-saved { background: rgba(139, 46, 26, 0.1); }
+.editor .cm-dirty-add { color: #1f7a34; }
+.editor .cm-dirty-change { color: #8a6d1f; }
+.editor .cm-dirty-del { color: var(--danger); }
+
+/* Unified diff of two artifacts, tinted by the leading +/- column. */
+.editor .cm-diff-add { background: rgba(15, 107, 92, 0.12); }
+.editor .cm-diff-del { background: rgba(139, 46, 26, 0.11); }
+
+.editor .cm-diff-meta {
+  background: rgba(212, 207, 196, 0.35);
+  color: var(--muted);
+}
+
+/* Lines behind a dashboard counter, while its badge is active. */
+.editor .cm-stat-line {
+  background: rgba(15, 107, 92, 0.13);
+  box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* Hover tooltip for Shelly/Espruino API identifiers. */
+.cm-shelly-hover {
+  max-width: 420px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.cm-shelly-hover-sig {
+  display: block;
+  white-space: pre-wrap;
+  font-family: var(--mono);
+  color: var(--accent);
+}
+.cm-shelly-hover-doc {
+  margin-top: 4px;
+  white-space: pre-wrap;
+  color: var(--muted);
+}
+.cm-shelly-hover-link {
+  display: inline-block;
+  margin-top: 6px;
+  color: var(--accent);
+  text-decoration: none;
+}
+.cm-shelly-hover-link:hover {
+  text-decoration: underline;
+}

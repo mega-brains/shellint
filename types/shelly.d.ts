@@ -211,3 +211,64 @@ interface HTTPServerStatic {
 }
 
 declare var HTTPServer: HTTPServerStatic;
+
+// ---------------------------------------------------------------------------
+// Virtual components
+// ---------------------------------------------------------------------------
+
+interface VirtualComponentHandle {
+  getValue(): unknown;
+  setValue(value: unknown): void;
+}
+
+interface VirtualStatic {
+  /** `key` is `"<type>:<id>"`, e.g. `"number:200"`. */
+  getHandle(key: string): VirtualComponentHandle;
+}
+
+declare var Virtual: VirtualStatic;
+
+// ---------------------------------------------------------------------------
+// BLE
+// ---------------------------------------------------------------------------
+
+interface BleScanResult {
+  addr: string;
+  address?: string;
+  rssi: number;
+  name?: string | null;
+  /** Keyed by lowercase 4-hex manufacturer id, value is a raw byte string. */
+  manufacturer_data?: { [manufacturerId: string]: string };
+}
+
+type BleScanCallback = (event: number, result: BleScanResult | null) => void;
+
+interface BleScannerStatic {
+  readonly SCAN_RESULT: number;
+  readonly INFINITE_SCAN: number;
+  Start(
+    params: { duration_ms: number; filters?: { addrs?: string[] }[] },
+    callback: BleScanCallback
+  ): boolean;
+}
+
+interface BLEStatic {
+  Scanner: BleScannerStatic;
+}
+
+declare var BLE: BLEStatic;
+
+// ---------------------------------------------------------------------------
+// AES
+// ---------------------------------------------------------------------------
+
+interface AESStatic {
+  /** Returns null on failure. `mode` e.g. `"ECB"`. */
+  encrypt(
+    data: ArrayBuffer,
+    key: ArrayBuffer,
+    options: { mode: string }
+  ): ArrayBuffer | null;
+}
+
+declare var AES: AESStatic;

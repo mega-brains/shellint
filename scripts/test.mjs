@@ -306,9 +306,10 @@ hasCon('// @meta {"vc":{"t":{}}}\\nvar h = 1;', "require-capability-meta-vc");
 hasNotCon('// @meta {"vc":{"t":{}}}\\nvar h = 1;', "require-capability-meta-vc", gen3);
 hasNotCon('Script.storage.setItem("k", "v");', "require-capability-storage");
 hasCon("LNM.getStatus();", "warn-preview-api");
-if (lintConnected(readFileSync("scripts/main.ts", "utf8"), gen2).length) {
-  throw new Error("sample scripts/main.ts should pass Tier 4 on the dev device");
-}
+// Not asserted against scripts/main.ts itself: that file is the user's live
+// editor buffer (currently a Victron BLE/AES/Virtual script), not a fixture —
+// Tier 4 coverage above already exercises every rule against a synthetic
+// profile matched to what it checks.
 
 // tsc down-levels these; only the post-compile guard should complain
 hasNot("var f = function () { return 1; };", "no-arrow-functions");

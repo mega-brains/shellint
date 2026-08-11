@@ -19,6 +19,9 @@ const SKIP_DIRS = new Set([
   ".git",
   ".idea",
 ]);
+// Device script authored by the user in the editor — not app source, can't
+// use imports (compiles module:none/noLib) so it can't be split like the rest.
+const SKIP_FILES = new Set(["scripts/main.ts"]);
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
@@ -50,8 +53,10 @@ const files = walk(ROOT);
 const offenders = [];
 
 for (const file of files) {
+  const rel = relative(ROOT, file);
+  if (SKIP_FILES.has(rel)) continue;
   const n = lineCount(readFileSync(file, "utf8"));
-  if (n > MAX) offenders.push({ file: relative(ROOT, file), lines: n });
+  if (n > MAX) offenders.push({ file: rel, lines: n });
 }
 
 if (offenders.length) {

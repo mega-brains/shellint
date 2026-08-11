@@ -30,6 +30,18 @@
       "doc": "",
       "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/HTTPServer"
     },
+    "Virtual": {
+      "signature": "declare var Virtual: VirtualStatic",
+      "doc": ""
+    },
+    "BLE": {
+      "signature": "declare var BLE: BLEStatic",
+      "doc": ""
+    },
+    "AES": {
+      "signature": "declare var AES: AESStatic",
+      "doc": ""
+    },
     "console.log": {
       "signature": "log(...data: unknown[]): void",
       "doc": "",
@@ -134,6 +146,18 @@
       "signature": "registerEndpoint(\n    endpoint: string,\n    handler: (\n      request: HttpServerRequest,\n      response: HttpServerResponse,\n      userdata?: unknown\n    ) => void,\n    userdata?: unknown\n  ): string",
       "doc": "Max 5 endpoints per script.",
       "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/HTTPServer"
+    },
+    "Virtual.getHandle": {
+      "signature": "getHandle(key: string): VirtualComponentHandle",
+      "doc": "`key` is `\"<type>:<id>\"`, e.g. `\"number:200\"`."
+    },
+    "BLE.Scanner": {
+      "signature": "Scanner: BleScannerStatic",
+      "doc": ""
+    },
+    "AES.encrypt": {
+      "signature": "encrypt(\n    data: ArrayBuffer,\n    key: ArrayBuffer,\n    options: { mode: string }\n  ): ArrayBuffer | null",
+      "doc": "Returns null on failure. `mode` e.g. `\"ECB\"`."
     },
     "Console.log": {
       "signature": "log(...data: unknown[]): void",
@@ -331,6 +355,58 @@
       "signature": "registerEndpoint(\n    endpoint: string,\n    handler: (\n      request: HttpServerRequest,\n      response: HttpServerResponse,\n      userdata?: unknown\n    ) => void,\n    userdata?: unknown\n  ): string",
       "doc": "Max 5 endpoints per script."
     },
+    "VirtualComponentHandle.getValue": {
+      "signature": "getValue(): unknown",
+      "doc": ""
+    },
+    "VirtualComponentHandle.setValue": {
+      "signature": "setValue(value: unknown): void",
+      "doc": ""
+    },
+    "VirtualStatic.getHandle": {
+      "signature": "getHandle(key: string): VirtualComponentHandle",
+      "doc": "`key` is `\"<type>:<id>\"`, e.g. `\"number:200\"`."
+    },
+    "BleScanResult.addr": {
+      "signature": "addr: string",
+      "doc": ""
+    },
+    "BleScanResult.address": {
+      "signature": "address?: string",
+      "doc": ""
+    },
+    "BleScanResult.rssi": {
+      "signature": "rssi: number",
+      "doc": ""
+    },
+    "BleScanResult.name": {
+      "signature": "name?: string | null",
+      "doc": ""
+    },
+    "BleScanResult.manufacturer_data": {
+      "signature": "manufacturer_data?: { [manufacturerId: string]: string }",
+      "doc": "Keyed by lowercase 4-hex manufacturer id, value is a raw byte string."
+    },
+    "BleScannerStatic.SCAN_RESULT": {
+      "signature": "readonly SCAN_RESULT: number",
+      "doc": ""
+    },
+    "BleScannerStatic.INFINITE_SCAN": {
+      "signature": "readonly INFINITE_SCAN: number",
+      "doc": ""
+    },
+    "BleScannerStatic.Start": {
+      "signature": "Start(\n    params: { duration_ms: number; filters?: { addrs?: string[] }[] },\n    callback: BleScanCallback\n  ): boolean",
+      "doc": ""
+    },
+    "BLEStatic.Scanner": {
+      "signature": "Scanner: BleScannerStatic",
+      "doc": ""
+    },
+    "AESStatic.encrypt": {
+      "signature": "encrypt(\n    data: ArrayBuffer,\n    key: ArrayBuffer,\n    options: { mode: string }\n  ): ArrayBuffer | null",
+      "doc": "Returns null on failure. `mode` e.g. `\"ECB\"`."
+    },
     "Object": {
       "signature": "declare var Object: ObjectConstructor",
       "doc": ""
@@ -402,6 +478,14 @@
     "atob": {
       "signature": "declare function atob(b64: string): string",
       "doc": "Base64 decode."
+    },
+    "ArrayBuffer": {
+      "signature": "declare var ArrayBuffer: ArrayBufferConstructor",
+      "doc": ""
+    },
+    "Uint8Array": {
+      "signature": "declare var Uint8Array: Uint8ArrayConstructor",
+      "doc": ""
     },
     "Object.keys": {
       "signature": "keys(o: object): string[]",
@@ -662,6 +746,10 @@
     "DateConstructor.UTC": {
       "signature": "UTC(\n    year: number,\n    monthIndex: number,\n    date?: number,\n    hours?: number,\n    minutes?: number,\n    seconds?: number,\n    ms?: number\n  ): number",
       "doc": ""
+    },
+    "ArrayLike.length": {
+      "signature": "readonly length: number",
+      "doc": ""
     }
   },
   "byBareName": {
@@ -671,6 +759,9 @@
     "Shelly": "Shelly",
     "Script": "Script",
     "HTTPServer": "HTTPServer",
+    "Virtual": "Virtual",
+    "BLE": "BLE",
+    "AES": "AES",
     "log": "console.log",
     "set": "Timer.set",
     "clear": "Timer.clear",
@@ -692,6 +783,9 @@
     "removeRpcHandler": "Script.removeRpcHandler",
     "getVcHandle": "Script.getVcHandle",
     "registerEndpoint": "HTTPServer.registerEndpoint",
+    "getHandle": "Virtual.getHandle",
+    "Scanner": "BLE.Scanner",
+    "encrypt": "AES.encrypt",
     "interval": "TimerInfo.interval",
     "next": "TimerInfo.next",
     "component": "ShellyEventData.component",
@@ -714,6 +808,16 @@
     "body": "HttpServerRequest.body",
     "code": "HttpServerResponse.code",
     "send": "HttpServerResponse.send",
+    "getValue": "VirtualComponentHandle.getValue",
+    "setValue": "VirtualComponentHandle.setValue",
+    "addr": "BleScanResult.addr",
+    "address": "BleScanResult.address",
+    "rssi": "BleScanResult.rssi",
+    "name": "BleScanResult.name",
+    "manufacturer_data": "BleScanResult.manufacturer_data",
+    "SCAN_RESULT": "BleScannerStatic.SCAN_RESULT",
+    "INFINITE_SCAN": "BleScannerStatic.INFINITE_SCAN",
+    "Start": "BleScannerStatic.Start",
     "Object": "Object",
     "Function": "Function",
     "String": "String",
@@ -732,6 +836,8 @@
     "btoh": "btoh",
     "btoa": "btoa",
     "atob": "atob",
+    "ArrayBuffer": "ArrayBuffer",
+    "Uint8Array": "Uint8Array",
     "keys": "Object.keys",
     "prototype": "String.prototype",
     "fromCharCode": "String.fromCharCode",

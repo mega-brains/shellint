@@ -47,6 +47,8 @@ interface IArguments {
   [index: number]: unknown;
   length: number;
 }
+/** Needed by narrowing over union-typed indexers (e.g. record lookups). */
+type Extract<T, U> = T extends U ? T : never;
 /**
  * Declared as a bare type with no constructor and no members on purpose: the
  * device has no RegExp, so a literal or a method call on one must not typecheck.
@@ -119,6 +121,7 @@ interface Array<T> {
   pop(): T | undefined;
   indexOf(searchElement: T, fromIndex?: number): number;
   slice(start?: number, end?: number): T[];
+  join(separator?: string): string;
   [n: number]: T;
 }
 
@@ -226,6 +229,43 @@ declare function btoh(str: string): string;
 declare function btoa(str: string): string;
 /** Base64 decode. */
 declare function atob(b64: string): string;
+
+// ---------------------------------------------------------------------------
+// Typed arrays — confirmed present by `mise run probe` (binary.uint8.* ids).
+// ---------------------------------------------------------------------------
+
+interface ArrayBuffer {
+  readonly byteLength: number;
+}
+
+interface ArrayBufferConstructor {
+  new (byteLength: number): ArrayBuffer;
+}
+
+declare var ArrayBuffer: ArrayBufferConstructor;
+
+interface Uint8Array {
+  readonly length: number;
+  readonly buffer: ArrayBuffer;
+  set(array: ArrayLike<number>, offset?: number): void;
+  fill(value: number, start?: number, end?: number): Uint8Array;
+  subarray(begin?: number, end?: number): Uint8Array;
+  slice(begin?: number, end?: number): Uint8Array;
+  [index: number]: number;
+}
+
+interface ArrayLike<T> {
+  readonly length: number;
+  [index: number]: T;
+}
+
+interface Uint8ArrayConstructor {
+  new (length: number): Uint8Array;
+  new (buffer: ArrayBuffer): Uint8Array;
+  new (array: ArrayLike<number>): Uint8Array;
+}
+
+declare var Uint8Array: Uint8ArrayConstructor;
 
 // Explicitly NOT declared (unsupported on Shelly Espruino):
 // - Promise / async / await

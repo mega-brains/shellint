@@ -203,12 +203,19 @@ const VIRTUAL: Probe[] = [
     id: "virtual.instance.methods",
     group: "device",
     code:
-      '(function () { try { var h = Virtual.getHandle("boolean:200");' +
-      ' if (!h) return "no-handle";' +
-      ' return typeof h.setValue + "/" + typeof h.getValue + "/" + typeof h.getStatus' +
-      ' + "/" + typeof h.getConfig + "/" + typeof h.setConfig + "/" + typeof h.on + "/" + typeof h.off; }' +
-      ' catch (e) { return "throws:" + (e.message || e); } })()',
-    note: 'setValue/getValue/getStatus/getConfig/setConfig/on/off in that order; only reachable when a boolean:200 component exists',
+      '(function(){try{var h=Virtual.getHandle("boolean:200");if(!h)return "none";' +
+      'return typeof h.setValue+"/"+typeof h.getValue+"/"+typeof h.getStatus+"/"+typeof h.getConfig+"/"+typeof h.setConfig;' +
+      '}catch(e){return "throws:"+(e.message||e);}})()',
+    note: 'setValue/getValue/getStatus/getConfig/setConfig in that order; only reachable when a boolean:200 component exists',
+  },
+  {
+    id: "virtual.instance.events",
+    group: "device",
+    code:
+      '(function(){try{var h=Virtual.getHandle("boolean:200");if(!h)return "none";' +
+      'return typeof h.on+"/"+typeof h.off;' +
+      '}catch(e){return "throws:"+(e.message||e);}})()',
+    note: 'on/off in that order; only reachable when a boolean:200 component exists',
   },
 ];
 

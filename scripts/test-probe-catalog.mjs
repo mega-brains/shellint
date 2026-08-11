@@ -72,6 +72,9 @@ const byId = new Map(PROBES.map((p) => [p.id, p]));
     "HTTPServer",
     "Virtual",
   ];
+  // Documented synchronous, no-RPC lookups — safe to call on real hardware,
+  // unlike the rest of the namespaced surface (which is Shelly.call/RPC-backed).
+  const SAFE_NAMESPACE_CALLS = ["Virtual.getHandle"];
 
   for (const p of PROBES) {
     for (const m of p.code.matchAll(/([A-Za-z_$][\w$.]*)\s*\(/g)) {
@@ -80,10 +83,11 @@ const byId = new Map(PROBES.map((p) => [p.id, p]));
       if (hit) fail(`probe "${p.id}" calls ${m[1]}() — "${hit}" is a mutating verb`);
     }
 
-    const nsCall = new RegExp(`\\b(${NAMESPACES.join("|")})\\.?[\\w$.]*\\s*\\(`);
-    const called = nsCall.exec(p.code);
-    if (called) {
-      fail(`probe "${p.id}" calls into ${called[1]} — probes may only read properties`);
+    const nsCall = new RegExp(`\\b(${NAMESPACES.join("|")})\\.?[\\w$.]*\\s*\\(`, "g");
+    for (const m of p.code.matchAll(nsCall)) {
+      const call = m[0].slice(0, -1).trim();
+      if (SAFE_NAMESPACE_CALLS.includes(call)) continue;
+      fail(`probe "${p.id}" calls into ${m[1]} — probes may only read properties`);
     }
 
     const assigned = /[A-Za-z_$][\w$]*(\.[\w$]+)+\s*=[^=]/.exec(p.code);

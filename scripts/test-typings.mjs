@@ -9,6 +9,8 @@ import { join } from "node:path";
 import ts from "typescript";
 import {
   generateTypings,
+  probeOrigin,
+  readProbeReport,
   readProbeVerdicts,
   writeGeneratedTypings,
 } from "../server/probe-typings.ts";
@@ -24,6 +26,14 @@ const eq = (got, want, what) => {
 };
 
 const verdictOf = (verdicts, id) => verdicts.find((v) => v.id === id);
+
+// The committed probe fixture is re-generated from time to time (a different
+// device, IP, and firmware) — read those instead of hardcoding them.
+const probeReport = readProbeReport();
+const probedDeviceIp = probeReport?.deviceIp;
+if (!probedDeviceIp) fail("types/generated-probe.json should have a deviceIp");
+const probedFirmware = probeOrigin(probeReport).match(/fw (\S+),/)?.[1];
+if (!probedFirmware) fail("could not determine the probed firmware version");
 
 // T1 — the repo's real probe answers.
 {
@@ -45,7 +55,7 @@ const verdictOf = (verdicts, id) => verdicts.find((v) => v.id === id);
 
   if (!/advisory/i.test(dts)) fail("the header must say the file is advisory");
   if (!dts.includes("mise run probe")) fail("the header must say how to regenerate");
-  if (!dts.includes("192.168.2.209")) fail("the header must name the probed device");
+  if (!dts.includes(probedDeviceIp)) fail("the header must name the probed device");
 
   if (!/\bmap\b/.test(dts)) fail("map should be declared");
   if (dts.includes("padStart")) fail("an absent API must not be declared");
@@ -68,10 +78,10 @@ const verdictOf = (verdicts, id) => verdicts.find((v) => v.id === id);
   eq(warned.length, 1, "padStart use warns once");
   eq(warned[0].rule, "probe-absent-api", "rule id");
   eq(warned[0].severity, "warn", "advisory severity");
-  if (!warned[0].message.includes("192.168.2.209")) {
+  if (!warned[0].message.includes(probedDeviceIp)) {
     fail("the finding must name the device it came from");
   }
-  if (!warned[0].message.includes("1.7.5")) {
+  if (!warned[0].message.includes(probedFirmware)) {
     fail("the finding must name the firmware it came from");
   }
 

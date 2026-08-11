@@ -30,69 +30,18 @@ import {
   type CheckReport,
   type Finding,
 } from "./check-panel";
+import { el } from "./dom-refs";
+import { api } from "./api";
+import {
+  closeProbeLog,
+  renderProbeLog,
+  setProbeProgress,
+  wireProbeLogToggle,
+} from "./probe-panel";
 
 type Mode = "debug" | "prod";
 type Minify = "min" | "raw";
 type BuildAction = "build" | "check" | "both";
-
-const el = {
-  editor: document.getElementById("editor")!,
-  save: document.getElementById("btnSave") as HTMLButtonElement,
-  autoBuildCheck: document.getElementById("autoBuildCheck") as HTMLInputElement,
-  build: document.getElementById("btnBuild") as HTMLButtonElement,
-  buildLabel: document.getElementById("btnBuildLabel")!,
-  buildMenuBtn: document.getElementById("btnBuildMenu") as HTMLButtonElement,
-  buildMenu: document.getElementById("buildMenu") as HTMLUListElement,
-  buildSplit: document.getElementById("buildSplit") as HTMLDivElement,
-  deploy: document.getElementById("btnDeploy") as HTMLButtonElement,
-  deployMenuBtn: document.getElementById("btnDeployMenu") as HTMLButtonElement,
-  deployMenu: document.getElementById("deployMenu") as HTMLUListElement,
-  deploySplit: document.getElementById("deploySplit") as HTMLDivElement,
-  probe: document.getElementById("btnProbe") as HTMLButtonElement,
-  probeProgress: document.getElementById("probeProgress") as HTMLDivElement,
-  probeProgressFill: document.getElementById("probeProgressFill") as HTMLDivElement,
-  probeSplit: document.getElementById("probeSplit") as HTMLDivElement,
-  probeLogToggle: document.getElementById("btnProbeLog") as HTMLButtonElement,
-  probeLog: document.getElementById("probeLog") as HTMLDivElement,
-  probeLogNote: document.getElementById("probeLogNote")!,
-  probeLogFilter: document.getElementById("probeLogFilter") as HTMLInputElement,
-  probeLogFailBtn: document.getElementById("probeLogFailBtn") as HTMLButtonElement,
-  probeLogList: document.getElementById("probeLogList")!,
-  checkPanel: document.getElementById("checkPanel")!,
-  checkHead: document.getElementById("checkHead")!,
-  checkToggle: document.getElementById("checkToggle")!,
-  checkPeek: document.getElementById("checkPeek")!,
-  checkNote: document.getElementById("checkNote")!,
-  checkRules: document.getElementById("checkRules")!,
-  findingsList: document.getElementById("findingsList")!,
-  copyFindings: document.getElementById("copyFindings") as HTMLButtonElement,
-  status: document.getElementById("statusLine")!,
-  buildPanel: document.getElementById("buildPanel")!,
-  buildHead: document.getElementById("buildHead")!,
-  buildToggle: document.getElementById("buildToggle")!,
-  sizeDebug: document.getElementById("sizeDebug")!,
-  sizeProd: document.getElementById("sizeProd")!,
-  devicePanel: document.getElementById("devicePanel")!,
-  deviceHead: document.getElementById("deviceHead")!,
-  deviceToggle: document.getElementById("deviceToggle")!,
-  devicePeek: document.getElementById("devicePeek")!,
-  deviceBody: document.getElementById("deviceBody")!,
-  deviceMeta: document.getElementById("deviceMeta")!,
-  deviceErr: document.getElementById("deviceErr")!,
-  ecoToggle: document.getElementById("ecoToggle") as HTMLInputElement,
-  dRunning: document.getElementById("dRunning")!,
-  dMem: document.getElementById("dMem")!,
-  dCpu: document.getElementById("dCpu")!,
-  dRam: document.getElementById("dRam")!,
-  dFs: document.getElementById("dFs")!,
-  dLatency: document.getElementById("dLatency")!,
-  dTemp: document.getElementById("dTemp")!,
-  dRssi: document.getElementById("dRssi")!,
-  gMem: document.getElementById("gMem")!,
-  gCpu: document.getElementById("gCpu")!,
-  gRam: document.getElementById("gRam")!,
-  gFs: document.getElementById("gFs")!,
-};
 
 let deployChoice: { mode: Mode; minify: Minify } = {
   mode: "debug",
@@ -160,24 +109,6 @@ function formatSizes(pair: Sizes | undefined): string {
   if (pair.min != null) parts.push(`min ${pair.min} B`);
   if (pair.adv != null) parts.push(`adv ${pair.adv} B`);
   return parts.length ? parts.join(" · ") : "—";
-}
-
-async function api<T>(
-  path: string,
-  init?: RequestInit,
-): Promise<T & { ok: boolean; error?: string }> {
-  const res = await fetch(path, {
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
-    ...init,
-  });
-  const data = (await res.json()) as T & { ok: boolean; error?: string };
-  if (res.status === 401 || data.error === "auth not supported yet") {
-    throw new Error("auth not supported yet");
-  }
-  if (!res.ok || data.ok === false) {
-    throw new Error(data.error || `HTTP ${res.status}`);
-  }
-  return data;
 }
 
 async function toggleScriptRun(running: boolean) {
@@ -405,61 +336,12 @@ async function deployScript(choice = deployChoice) {
   void device.refresh();
 }
 
-type ProbeResult = { id: string; ok: boolean; result?: unknown; error?: string };
-
-let lastProbeResults: ProbeResult[] = [];
-let probeLogFailOnly = false;
-
-/** RPC succeeded but the probed feature reads back as absent — not a pass. */
-function probeAvailable(r: ProbeResult): boolean {
-  if (!r.ok || r.result == null || r.result === "undefined" || r.result === "null" || r.result === "unavailable") return false;
-  return !(typeof r.result === "string" && r.result.startsWith("throws:"));
-}
-
-function renderProbeLogList(results: ProbeResult[]) {
-  const q = el.probeLogFilter.value.trim().toLowerCase();
-  let shown = q ? results.filter((r) => r.id.toLowerCase().includes(q)) : results;
-  if (probeLogFailOnly) shown = shown.filter((r) => !probeAvailable(r));
-  el.probeLogList.innerHTML = "";
-  for (const r of shown) {
-    const li = document.createElement("li");
-    li.className = probeAvailable(r) ? "ok" : "fail";
-    const id = document.createElement("span");
-    id.className = "probe-log-id";
-    id.textContent = r.id;
-    const val = document.createElement("span");
-    val.className = "probe-log-val";
-    val.textContent = r.ok ? JSON.stringify(r.result) : `FAIL ${r.error}`;
-    li.append(id, val);
-    el.probeLogList.append(li);
-  }
-}
-
-function renderProbeLog(scriptId: number, strategy: string, results: ProbeResult[]) {
-  lastProbeResults = results;
-  const passed = results.filter(probeAvailable).length;
-  el.probeLogNote.textContent =
-    `slot ${scriptId} (${strategy}) · ${passed}/${results.length} available`;
-  renderProbeLogList(results);
-}
-
-function closeProbeLog() {
-  el.probeLog.hidden = true;
-  el.probeLogToggle.setAttribute("aria-expanded", "false");
-}
-
-function setProbeProgress(done: number, total: number) {
-  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
-  el.probeProgressFill.style.width = `${pct}%`;
-  setStatus(total > 0 ? `probing… ${done}/${total} (${pct}%)` : "probing…");
-}
-
 async function probeDevice() {
   el.probeProgress.hidden = false;
-  setProbeProgress(0, 0);
+  setProbeProgress(0, 0, setStatus);
   const poll = setInterval(() => {
     void api<{ done: number; total: number }>("/api/probe/progress")
-      .then((p) => setProbeProgress(p.done, p.total))
+      .then((p) => setProbeProgress(p.done, p.total, setStatus))
       .catch(() => {});
   }, 300);
   try {
@@ -573,29 +455,7 @@ async function main() {
   el.build.addEventListener("click", () => withBusy(() => runBuildAction()));
   el.deploy.addEventListener("click", () => withBusy(() => deployScript()));
   el.probe.addEventListener("click", () => withBusy(probeDevice));
-  el.probeLogFilter.addEventListener("input", () => renderProbeLogList(lastProbeResults));
-  el.probeLogFailBtn.addEventListener("click", () => {
-    probeLogFailOnly = !probeLogFailOnly;
-    el.probeLogFailBtn.setAttribute("aria-pressed", probeLogFailOnly ? "true" : "false");
-    renderProbeLogList(lastProbeResults);
-  });
-  el.probeLogToggle.addEventListener("click", (e) => {
-    e.stopPropagation();
-    const willOpen = el.probeLog.hidden;
-    closeAllMenus();
-    if (willOpen) {
-      el.probeLog.hidden = false;
-      el.probeLogToggle.setAttribute("aria-expanded", "true");
-    } else {
-      closeProbeLog();
-    }
-  });
-  document.addEventListener("click", (e) => {
-    if (!el.probeSplit.contains(e.target as Node)) closeProbeLog();
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") closeProbeLog();
-  });
+  wireProbeLogToggle();
 
   createSplitButton(
     { root: el.buildSplit, toggle: el.buildMenuBtn, menu: el.buildMenu },
