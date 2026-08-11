@@ -28,7 +28,13 @@ export type LogsPanelEls = {
   button: HTMLButtonElement;
   note: HTMLElement;
   spark: HTMLElement;
+  chart: HTMLElement;
+  chartHead: HTMLElement;
+  chartToggle: HTMLElement;
+  chartPeek: HTMLElement;
   list: HTMLElement;
+  filter: HTMLInputElement;
+  follow: HTMLInputElement;
 };
 
 type ApiFn = <T>(
@@ -51,7 +57,18 @@ export function createLogsPanel(opts: {
   createCollapsible(els, {
     storageKey: STORAGE_KEY,
     defaultCollapsed: true,
+    // The stream controls live in the head so they work while collapsed;
+    // using them must not fold the panel away underneath the click.
+    ignoreSelector: ".logs-controls",
   });
+
+  createCollapsible(
+    { panel: els.chart, head: els.chartHead, toggle: els.chartToggle },
+    {
+      storageKey: "shelly-devroom.logsChart.collapsed",
+      defaultCollapsed: false,
+    },
+  );
 
   function setPeek(text: string, isError = false) {
     els.peek.textContent = text;
@@ -64,22 +81,45 @@ export function createLogsPanel(opts: {
   let streaming = false;
   let pollTimer: ReturnType<typeof setInterval> | null = null;
 
+  /** Substring match, not a pattern: the device log is noisy and grep-shaped. */
+  function matches(line: LogLine): boolean {
+    const needle = els.filter.value.trim().toLowerCase();
+    if (!needle) return true;
+    return `${fmtClock(line.ts)} ${line.text}`.toLowerCase().includes(needle);
+  }
+
   function renderLines() {
+    // Re-rendering the whole list drops the scroll offset, so it is restored
+    // explicitly whenever the user has chosen to stay put.
+    const keepAt = els.list.scrollTop;
     els.list.replaceChildren();
+    let shown = 0;
     for (const line of lines.slice(-MAX_LINES)) {
+      if (!matches(line)) continue;
+      shown += 1;
       const li = document.createElement("li");
       li.className = `level-${line.level}`;
       if (line.text.includes("#m ")) li.classList.add("metric");
       li.textContent = `${fmtClock(line.ts)} ${line.text}`;
       els.list.appendChild(li);
     }
-    els.list.scrollTop = els.list.scrollHeight;
+    if (shown === 0 && lines.length > 0) {
+      const li = document.createElement("li");
+      li.className = "empty";
+      li.textContent = `no line matches “${els.filter.value.trim()}”`;
+      els.list.appendChild(li);
+    }
+    els.list.scrollTop = els.follow.checked ? els.list.scrollHeight : keepAt;
   }
 
   function renderChart() {
     const chart: SparkSeries[] = [...series.entries()]
       .slice(0, MAX_SERIES)
       .map(([label, points]) => ({ label, points }));
+    // Collapsed, the header still says whether anything is being charted.
+    els.chartPeek.textContent = chart.length
+      ? chart.map((s) => s.label).join(" · ")
+      : "no #m series yet";
     renderSparkline(els.spark, chart, {
       height: 64,
       formatX: (x) => fmtClock(x),
@@ -197,6 +237,17 @@ export function createLogsPanel(opts: {
       els.button.disabled = false;
     }
   }
+
+  // Filtering is view-only: every line stays in `lines`, so clearing the field
+  // brings back what the stream already delivered.
+  els.filter.addEventListener("input", renderLines);
+
+  const FOLLOW_KEY = "shelly-devroom.logsPanel.follow";
+  els.follow.checked = localStorage.getItem(FOLLOW_KEY) !== "off";
+  els.follow.addEventListener("change", () => {
+    localStorage.setItem(FOLLOW_KEY, els.follow.checked ? "on" : "off");
+    if (els.follow.checked) els.list.scrollTop = els.list.scrollHeight;
+  });
 
   els.button.addEventListener("click", (e) => {
     e.stopPropagation();

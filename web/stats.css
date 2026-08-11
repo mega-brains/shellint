@@ -2,7 +2,8 @@
 
 .stat-badges {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(5rem, 1fr));
+  /* Wide enough that the longest label ("console.log") still fits unclipped. */
+  grid-template-columns: repeat(auto-fit, minmax(5.6rem, 1fr));
   gap: 0.3rem;
   margin: 0.35rem 0 0.5rem;
 }
@@ -19,14 +20,14 @@
 
 .stat-badge-value {
   font-family: var(--mono);
-  font-size: 0.95rem;
+  font-size: 1.05rem;
   line-height: 1.15;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 
 .stat-badge-label {
-  font-size: 0.62rem;
+  font-size: 0.7rem;
   letter-spacing: 0.03em;
   color: var(--muted);
   overflow: hidden;
@@ -36,7 +37,7 @@
 
 .stat-badge-hint {
   font-family: var(--mono);
-  font-size: 0.6rem;
+  font-size: 0.68rem;
   color: var(--muted);
 }
 
@@ -44,6 +45,37 @@
   margin: 0.25rem 0 0.35rem;
   font-family: var(--mono);
   font-size: 0.95rem;
+}
+
+.size-mem-body { margin-top: 0.35rem; }
+.size-mem.collapsed .size-mem-body { display: none; }
+
+/* Collapsed header: the estimate, and its share of the measured peak. */
+.mem-peek {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.size-mem:not(.collapsed) .mem-peek { display: none; }
+
+.mem-peek-track {
+  display: inline-block;
+  width: 3.2rem;
+  height: 0.25rem;
+  border-radius: 2px;
+  background: rgba(212, 207, 196, 0.55);
+  overflow: hidden;
+}
+
+.mem-peek-fill {
+  display: block;
+  height: 100%;
+  background: var(--accent);
 }
 
 .mem-bars {

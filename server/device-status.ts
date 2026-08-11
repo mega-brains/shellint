@@ -230,4 +230,31 @@ export async function setEcoMode(eco_mode: boolean): Promise<EcoResult> {
   }
 }
 
+export type ScriptRunResult = { running: boolean | null; scriptId: number };
+
+/**
+ * Start or stop the configured script slot. The device answers `Script.Start`
+ * with `{was_running}`, so the new state is read back rather than assumed —
+ * starting a script that immediately throws leaves it stopped.
+ */
+export async function setScriptRunning(
+  running: boolean,
+): Promise<ScriptRunResult> {
+  const cfg = loadConfig();
+  assertDevroomCompiler(cfg);
+
+  const rpc = new ShellyRpc(cfg.deviceIp);
+  try {
+    await rpc.connect();
+    await rpc.call(running ? "Script.Start" : "Script.Stop", {
+      id: cfg.scriptId,
+    });
+    const status = await softCall(rpc, "Script.GetStatus", { id: cfg.scriptId });
+    const result = (status?.result ?? {}) as Record<string, unknown>;
+    return { running: bool(result.running), scriptId: cfg.scriptId };
+  } finally {
+    rpc.close();
+  }
+}
+
 export { AuthNotSupportedError };

@@ -40,6 +40,7 @@ export function createDashboard(opts: {
     estimate: byId("memEstimate"),
     breakdown: byId("memBreakdown"),
     bullet: byId("memBullet"),
+    memPeek: byId("memPeek"),
     compare: byId("memCompare"),
     minFw: byId("minFirmware"),
   };
@@ -56,6 +57,14 @@ export function createDashboard(opts: {
     },
   );
 
+  createCollapsible(
+    { panel: byId("memBlock"), head: byId("memHead"), toggle: byId("memToggle") },
+    {
+      storageKey: "shelly-devroom.memBlock.collapsed",
+      defaultCollapsed: false,
+    },
+  );
+
   createLogsPanel({
     els: {
       panel: byId("logsPanel"),
@@ -66,7 +75,13 @@ export function createDashboard(opts: {
       button: byId("btnLogs") as HTMLButtonElement,
       note: byId("logsNote"),
       spark: byId("logsSpark"),
+      chart: byId("logsChart"),
+      chartHead: byId("logsChartHead"),
+      chartToggle: byId("logsChartToggle"),
+      chartPeek: byId("logsChartPeek"),
       list: byId("logsList"),
+      filter: byId("logsFilter") as HTMLInputElement,
+      follow: byId("logsFollow") as HTMLInputElement,
     },
     api: opts.api,
     onStatus: opts.onStatus,
@@ -85,6 +100,7 @@ export function createDashboard(opts: {
       estimateEl: els.estimate,
       breakdownEl: els.breakdown,
       bulletEl: els.bullet,
+      memPeekEl: els.memPeek,
       compareEl: els.compare,
       minFwEl: els.minFw,
       stats: state.stats,

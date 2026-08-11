@@ -1,4 +1,7 @@
 import { createCollapsible } from "./collapsible";
+import { createHistory } from "./metric-history";
+import { renderMiniBars } from "./mini-bars";
+import type { SparkPoint } from "./spark";
 
 const STORAGE_KEY = "shelly-devroom.devicePanel.collapsed";
 const POLL_MS = 5_000;
@@ -57,7 +60,6 @@ export type DevicePanelEls = {
   gCpu: HTMLElement;
   gRam: HTMLElement;
   gFs: HTMLElement;
-  gRssi: HTMLElement;
 };
 
 /** dBm window used to turn RSSI into a 0–1 signal-quality share. */
@@ -185,6 +187,35 @@ export function createDevicePanel(
     els.peek.classList.toggle("error", isError);
   }
 
+  // Looked up here rather than passed in, to keep main.ts inside its line cap.
+  const latencyHost = document.getElementById("latencySpark");
+  const rssiHost = document.getElementById("rssiSpark");
+  const latencyHistory = createHistory("latency");
+  const rssiHistory = createHistory("rssi");
+
+  function renderLatency(points: SparkPoint[]) {
+    if (!latencyHost) return;
+    renderMiniBars(latencyHost, points, { unit: "ms", extremeLabel: "peak" });
+  }
+
+  /**
+   * Signal is drawn against the usable dBm window rather than the samples, so a
+   * short bar always means weak signal instead of merely "weakest so far".
+   */
+  function renderRssi(points: SparkPoint[]) {
+    if (!rssiHost) return;
+    renderMiniBars(rssiHost, points, {
+      unit: "dBm",
+      domainMin: RSSI_FLOOR,
+      domainMax: RSSI_CEIL,
+      extreme: "min",
+      extremeLabel: "worst",
+    });
+  }
+
+  renderLatency(latencyHistory.read());
+  renderRssi(rssiHistory.read());
+
   function render(status: DeviceStatus) {
     els.err.hidden = true;
     els.err.textContent = "";
@@ -212,6 +243,7 @@ export function createDevicePanel(
     els.dRam.textContent = fmtPair(status.sys.ram_free, status.sys.ram_size);
     els.dFs.textContent = fmtPair(status.sys.fs_free, status.sys.fs_size);
     els.dLatency.textContent = `${status.latencyMs} ms`;
+    renderLatency(latencyHistory.push(status.latencyMs));
 
     // Script heap has no reported total, so scale used against used + free.
     setGauge(
@@ -238,15 +270,7 @@ export function createDevicePanel(
         : `${status.temperatureC.toFixed(1)} °C`;
     const rssi = status.wifi.rssi;
     els.dRssi.textContent = rssi == null ? "—" : `${rssi} dBm`;
-    const signal =
-      rssi == null
-        ? null
-        : Math.min(
-            1,
-            Math.max(0, (rssi - RSSI_FLOOR) / (RSSI_CEIL - RSSI_FLOOR)),
-          );
-    // Inverted: a short signal bar is the bad case, unlike the usage bars.
-    setGauge(els.gRssi, signal, "wifi signal", signal != null && signal < 0.3);
+    renderRssi(rssi == null ? rssiHistory.read() : rssiHistory.push(rssi));
 
     if (!ecoBusy) {
       els.ecoToggle.disabled = status.eco_mode == null;
@@ -279,7 +303,6 @@ export function createDevicePanel(
         [els.gCpu, "cpu"],
         [els.gRam, "device RAM used"],
         [els.gFs, "filesystem used"],
-        [els.gRssi, "wifi signal"],
       ] as const) {
         setGauge(el, null, label);
       }

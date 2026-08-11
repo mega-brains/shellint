@@ -19,5 +19,9 @@
     "rootDir": "./scripts",
     "outDir": "./.tsc-out"
   },
-  "include": ["scripts/main.ts", "types/**/*.d.ts"]
+  "include": ["scripts/main.ts", "types/**/*.d.ts"],
+  // types/generated.d.ts is probe output from one device on one firmware. It is
+  // advisory — the lint pass reports what the probe found absent — and must not
+  // decide whether a build compiles.
+  "exclude": ["types/generated.d.ts"]
 }

@@ -13,111 +13,125 @@
   <body>
     <header class="top">
       <div class="top-row">
-        <h1>Shelly DevRoom</h1>
+        <div class="title-stack">
+          <p class="device-ip" id="deviceIp"></p>
+          <h1>Shelly DevRoom</h1>
+        </div>
         <p class="sub" id="configLine">loading config…</p>
+        <div class="toolbar">
+          <button
+            type="button"
+            id="btnSave"
+            title="Save editor contents to scripts/main.ts"
+          >
+            Save
+          </button>
+          <button
+            type="button"
+            id="btnBuild"
+            title="Compile TypeScript to ES5 and emit debug/prod raw + minified artifacts under dist/"
+          >
+            Build
+          </button>
+          <div class="split" id="deploySplit">
+            <button
+              type="button"
+              id="btnDeploy"
+              title="Upload the selected build (debug · min) to the Shelly script slot over WebSocket RPC"
+            >
+              Deploy debug · min
+            </button>
+            <button
+              type="button"
+              id="btnDeployMenu"
+              class="split-toggle"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              aria-controls="deployMenu"
+              title="Choose debug/prod and minified/non-minified, then deploy"
+            >
+              ▾
+            </button>
+            <ul class="menu" id="deployMenu" role="menu" hidden>
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-mode="debug"
+                  data-minify="min"
+                  title="Deploy dist/debug.js (meta.env.debug, minified)"
+                >
+                  debug · minified
+                </button>
+              </li>
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-mode="debug"
+                  data-minify="raw"
+                  title="Deploy dist/debug.raw.js (meta.env.debug, readable / non-minified)"
+                >
+                  debug · non-minified
+                </button>
+              </li>
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-mode="prod"
+                  data-minify="min"
+                  title="Deploy dist/prod.js (meta.env.prod, minified)"
+                >
+                  prod · minified
+                </button>
+              </li>
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-mode="prod"
+                  data-minify="raw"
+                  title="Deploy dist/prod.raw.js (meta.env.prod, readable / non-minified)"
+                >
+                  prod · non-minified
+                </button>
+              </li>
+            </ul>
+          </div>
+          <button
+            type="button"
+            id="btnCheck"
+            title="Shelly/Espruino compliance check of scripts/main.ts (and dist artifacts when present). Works offline; adds device capability checks when the device answers."
+          >
+            Check
+          </button>
+          <button
+            type="button"
+            id="btnProbe"
+            title="Run Script.Eval capability checks on the device and write types/generated-probe.json — stored device scripts are never overwritten"
+          >
+            Probe
+          </button>
+        </div>
       </div>
     </header>
 
     <main>
-      <div class="toolbar">
-        <button
-          type="button"
-          id="btnSave"
-          title="Save editor contents to scripts/main.ts"
-        >
-          Save
-        </button>
-        <button
-          type="button"
-          id="btnBuild"
-          title="Compile TypeScript to ES5 and emit debug/prod raw + minified artifacts under dist/"
-        >
-          Build
-        </button>
-        <div class="split" id="deploySplit">
-          <button
-            type="button"
-            id="btnDeploy"
-            title="Upload the selected build (debug · min) to the Shelly script slot over WebSocket RPC"
-          >
-            Deploy debug · min
-          </button>
-          <button
-            type="button"
-            id="btnDeployMenu"
-            class="split-toggle"
-            aria-haspopup="menu"
-            aria-expanded="false"
-            aria-controls="deployMenu"
-            title="Choose debug/prod and minified/non-minified, then deploy"
-          >
-            ▾
-          </button>
-          <ul class="menu" id="deployMenu" role="menu" hidden>
-            <li role="none">
-              <button
-                type="button"
-                role="menuitem"
-                data-mode="debug"
-                data-minify="min"
-                title="Deploy dist/debug.js (meta.env.debug, minified)"
-              >
-                debug · minified
-              </button>
-            </li>
-            <li role="none">
-              <button
-                type="button"
-                role="menuitem"
-                data-mode="debug"
-                data-minify="raw"
-                title="Deploy dist/debug.raw.js (meta.env.debug, readable / non-minified)"
-              >
-                debug · non-minified
-              </button>
-            </li>
-            <li role="none">
-              <button
-                type="button"
-                role="menuitem"
-                data-mode="prod"
-                data-minify="min"
-                title="Deploy dist/prod.js (meta.env.prod, minified)"
-              >
-                prod · minified
-              </button>
-            </li>
-            <li role="none">
-              <button
-                type="button"
-                role="menuitem"
-                data-mode="prod"
-                data-minify="raw"
-                title="Deploy dist/prod.raw.js (meta.env.prod, readable / non-minified)"
-              >
-                prod · non-minified
-              </button>
-            </li>
-          </ul>
-        </div>
-        <button
-          type="button"
-          id="btnCheck"
-          title="Shelly/Espruino compliance check of scripts/main.ts (and dist artifacts when present). Works offline; adds device capability checks when the device answers."
-        >
-          Check
-        </button>
-        <button
-          type="button"
-          id="btnProbe"
-          title="Run Script.Eval capability checks on the device and write types/generated-probe.json — stored device scripts are never overwritten"
-        >
-          Probe
-        </button>
-      </div>
-
       <div class="workspace" id="workspace">
-        <div id="editor" class="editor"></div>
+        <div id="editor" class="editor">
+          <div class="artifact-bar">
+            <span class="artifact-icon" aria-hidden="true">◫</span>
+            <label class="visually-hidden" for="artifactSel">view</label>
+            <select
+              id="artifactSel"
+              title="Show the editable source, or preview a built dist artifact read-only"
+            >
+              <option value="source">source (editable)</option>
+            </select>
+            <p class="artifact-meta" id="artifactMeta"></p>
+          </div>
+        </div>
 
         <div
           class="splitter"
@@ -172,24 +186,40 @@
                   —
                 </p>
               </div>
-              <div class="size-block size-mem">
-                <h2>memory</h2>
-                <p
-                  id="memEstimate"
-                  class="mem-total"
-                  title="Static RAM estimate from an Espruino JsVar cost model — an estimate, not a measurement"
+              <div class="size-block size-mem" id="memBlock">
+                <div
+                  class="panel-head"
+                  id="memHead"
+                  role="button"
+                  tabindex="0"
+                  aria-expanded="true"
+                  aria-controls="memBody"
+                  title="Show or hide the RAM estimate breakdown"
                 >
-                  —
-                </p>
-                <div
-                  id="memBreakdown"
-                  aria-label="Estimated RAM by cost bucket"
-                ></div>
-                <div
-                  id="memBullet"
-                  title="Estimate versus the mem_peak the device reported for the running script"
-                ></div>
-                <p id="memCompare" class="mem-compare"></p>
+                  <span class="panel-toggle" id="memToggle" aria-hidden="true"
+                    >▾</span
+                  >
+                  <h2>memory</h2>
+                  <span class="mem-peek" id="memPeek"></span>
+                </div>
+                <div class="size-mem-body" id="memBody">
+                  <p
+                    id="memEstimate"
+                    class="mem-total"
+                    title="Static RAM estimate from an Espruino JsVar cost model — an estimate, not a measurement"
+                  >
+                    —
+                  </p>
+                  <div
+                    id="memBreakdown"
+                    aria-label="Estimated RAM by cost bucket"
+                  ></div>
+                  <div
+                    id="memBullet"
+                    title="Estimate versus the mem_peak the device reported for the running script"
+                  ></div>
+                  <p id="memCompare" class="mem-compare"></p>
+                </div>
               </div>
               <div class="size-block size-history collapsed" id="historyBlock">
                 <div
@@ -248,6 +278,16 @@
         </aside>
       </div>
 
+      <div
+        class="splitter splitter-h"
+        id="mainSplitter"
+        role="separator"
+        aria-orientation="horizontal"
+        aria-label="Resize editor height — drag, arrow keys, or double-click to reset"
+        title="Drag to resize the editor height · arrow keys to nudge · double-click to reset"
+        tabindex="0"
+      ></div>
+
       <div class="footer">
         <section
           class="device collapsed"
@@ -300,12 +340,24 @@
                 <dd id="dFs">—</dd>
                 <div class="gauge idle" id="gFs"><div class="gauge-fill"></div></div>
               </div>
-              <div><dt>latency</dt><dd id="dLatency">—</dd></div>
+              <div>
+                <dt>latency</dt>
+                <dd id="dLatency">—</dd>
+                <div
+                  class="mini-bars-host"
+                  id="latencySpark"
+                  aria-label="RPC latency, last 5 minutes"
+                ></div>
+              </div>
               <div><dt>temp</dt><dd id="dTemp">—</dd></div>
               <div>
                 <dt>rssi</dt>
                 <dd id="dRssi">—</dd>
-                <div class="gauge idle" id="gRssi"><div class="gauge-fill"></div></div>
+                <div
+                  class="mini-bars-host"
+                  id="rssiSpark"
+                  aria-label="WiFi signal, last 5 minutes"
+                ></div>
               </div>
             </dl>
             <p class="device-err" id="deviceErr" hidden></p>
@@ -324,10 +376,7 @@
           >
             <span class="panel-toggle" id="logsToggle" aria-hidden="true">▸</span>
             <h2>logs</h2>
-            <p class="panel-peek" id="logsPeek">—</p>
-          </div>
-          <div class="device-body" id="logsBody">
-            <div class="logs-toolbar">
+            <div class="logs-controls">
               <button
                 type="button"
                 id="btnLogs"
@@ -335,11 +384,46 @@
               >
                 start stream
               </button>
-              <p class="logs-note" id="logsNote">
-                chart numeric values with print("#m &lt;series&gt; &lt;value&gt;")
-              </p>
+              <input
+                type="search"
+                id="logsFilter"
+                class="logs-filter"
+                placeholder="filter lines…"
+                aria-label="Show only log lines containing this text"
+                title="Show only log lines containing this text (case-insensitive)"
+              />
+              <label class="logs-follow" title="Keep scrolling to the newest line">
+                <input type="checkbox" id="logsFollow" checked />
+                follow
+              </label>
             </div>
-            <div id="logsSpark" aria-label="Numeric series parsed from the debug log"></div>
+            <p class="panel-peek" id="logsPeek">—</p>
+          </div>
+          <div class="device-body" id="logsBody">
+            <p class="logs-note" id="logsNote">
+              chart numeric values with print("#m &lt;series&gt; &lt;value&gt;")
+            </p>
+            <div class="logs-chart" id="logsChart">
+              <div
+                class="panel-head"
+                id="logsChartHead"
+                role="button"
+                tabindex="0"
+                aria-expanded="true"
+                aria-controls="logsSpark"
+                title="Show or hide the chart of #m metric values"
+              >
+                <span class="panel-toggle" id="logsChartToggle" aria-hidden="true"
+                  >▾</span
+                >
+                <h2>metrics</h2>
+                <span class="logs-chart-peek" id="logsChartPeek"></span>
+              </div>
+              <div
+                id="logsSpark"
+                aria-label="Numeric series parsed from the debug log"
+              ></div>
+            </div>
             <ol class="logs-list" id="logsList"></ol>
           </div>
         </section>

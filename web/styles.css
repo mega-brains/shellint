@@ -57,8 +57,40 @@ body {
 .top-row {
   display: flex;
   flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.75rem 1.25rem;
+  /* Centred, not baseline: the buttons are taller than the text beside them. */
+  align-items: center;
+  gap: 0.5rem 1.25rem;
+}
+
+/* The device address rides above the title and dips into it, so the header
+   reads as one block rather than two stacked lines. */
+.title-stack {
+  position: relative;
+  /* Less than the address's own height, which is what makes them overlap. */
+  padding-top: 0.45rem;
+}
+
+.device-ip {
+  position: absolute;
+  top: 0;
+  left: 0.15rem;
+  z-index: 1;
+  margin: 0;
+  /* The stack is only as wide as the title, so the address must be free to
+     run past its right edge instead of wrapping under itself. */
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  color: var(--accent);
+  /* Sits on the title's ascenders; the halo keeps both readable. */
+  text-shadow:
+    0 1px 0 var(--bg),
+    0 -1px 0 var(--bg),
+    1px 0 0 var(--bg),
+    -1px 0 0 var(--bg);
+  pointer-events: none;
 }
 
 .top h1 {
@@ -77,6 +109,50 @@ body {
 
 .sub.warn { color: var(--danger); }
 
+/* Script state as a glyph. Only "running" pulses — a steady glow on a stopped
+   script would read as activity that is not happening. */
+.run-state {
+  font-size: 0.85rem;
+  line-height: 1;
+}
+
+button.run-state {
+  padding: 0 0.25rem;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button.run-state:hover,
+button.run-state:focus-visible { border-color: currentColor; }
+button.run-state:disabled { cursor: default; opacity: 0.5; }
+
+.run-running {
+  color: #2f8f5b;
+  animation: run-glow 2.4s ease-in-out infinite;
+}
+
+.run-stopped { color: #8a6d1f; }
+.run-offline { color: var(--danger); }
+
+@keyframes run-glow {
+  0%,
+  100% {
+    text-shadow: 0 0 0 rgba(47, 143, 91, 0);
+    opacity: 0.75;
+  }
+  50% {
+    text-shadow: 0 0 6px rgba(47, 143, 91, 0.85);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .run-running { animation: none; }
+}
+
 main {
   flex: 1 1 auto;
   display: flex;
@@ -87,12 +163,14 @@ main {
   gap: 0.75rem;
 }
 
+/* Lives in the header, pushed to the right of the title and config line. */
 .toolbar {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
   flex: 0 0 auto;
+  margin-left: auto;
 }
 
 button,
@@ -190,10 +268,34 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 
 .splitter:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
-/* Keep the col-resize cursor while dragging past the handle. */
+/* Horizontal handle: trades height between the editor row and the footer. */
+.splitter-h {
+  flex: 0 0 0.5rem;
+  width: 100%;
+  /* Keeps the 8px grab area while cancelling most of main's row gap. */
+  margin: -0.4rem 0;
+  cursor: row-resize;
+  background:
+    linear-gradient(var(--line), var(--line)) center / 100% 2px no-repeat;
+}
+
+.splitter-h:hover,
+.splitter-h.dragging,
+.splitter-h:focus-visible {
+  background:
+    linear-gradient(var(--accent), var(--accent)) center / 100% 2px no-repeat;
+}
+
+/* Only once the user has dragged: until then the editor fills what is left. */
+main.rows-sized .workspace { flex: 0 0 var(--workspace-h); }
+main.rows-sized .footer { overflow: auto; }
+
+/* Keep the resize cursor while dragging past the handle. */
 body.col-resizing { cursor: col-resize; user-select: none; }
+body.row-resizing { cursor: row-resize; user-select: none; }
 
 .editor {
+  position: relative;
   flex: 1 1 auto;
   min-width: 0;
   min-height: 0;
@@ -213,3 +315,19 @@ body.col-resizing { cursor: col-resize; user-select: none; }
 }
 
 .editor .cm-scroller { font-family: var(--mono); }
+
+/* Check findings, marked beside the line numbers. */
+.editor .cm-finding-gutter {
+  min-width: 1.5em;
+  padding: 0 0.2em;
+}
+
+.editor .cm-finding {
+  cursor: help;
+  font-size: 1.15em;
+  font-weight: 600;
+  line-height: inherit;
+}
+
+.editor .cm-finding-warn { color: #8a6d1f; }
+.editor .cm-finding-error { color: var(--danger); }

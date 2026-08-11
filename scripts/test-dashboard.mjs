@@ -6,7 +6,8 @@
 import { estimateMemory, estimateMemoryFile } from "../server/memory-estimate.ts";
 import { minFirmware } from "../server/min-firmware.ts";
 import { parseMetric, readLogs, startLogStream, stopLogStream } from "../server/debug-log.ts";
-import { sparkPaths } from "../web/spark.ts";
+import { sampleAt, sparkPaths } from "../web/spark.ts";
+import { createHistory, WINDOW_MS } from "../web/metric-history.ts";
 
 function fail(msg) {
   console.error(`FAIL: ${msg}`);
@@ -143,4 +144,45 @@ const eq = (got, want, what) => {
   eq(sparkPaths([{ label: "empty", points: [] }])[0], undefined, "no live points, no path");
 }
 
-console.log("dashboard: memory estimate / min-firmware / debug-log / spark ok");
+// Hover readout: the tooltip must report a real sample, never an interpolation.
+{
+  const b = { xMin: 0, xMax: 10, yMin: 0, yMax: 100 };
+  const series = [
+    { label: "tick", points: [{ x: 0, y: 10 }, { x: 5, y: 50 }, { x: 10, y: 90 }] },
+  ];
+  eq(sampleAt(series, b, 0).readings[0].y, 10, "left edge reads the first sample");
+  eq(sampleAt(series, b, 1).readings[0].y, 90, "right edge reads the last sample");
+  eq(sampleAt(series, b, 0.44).readings[0].y, 50, "the nearest sample wins, not a midpoint");
+
+  const gapped = [{ label: "g", points: [{ x: 0, y: 1 }, { x: 5, y: null }, { x: 10, y: 3 }] }];
+  const readings = sampleAt(gapped, b, 0.5).readings;
+  eq(readings.length, 1, "a dropped sample is never reported as a value");
+  if (readings[0].y === null) fail("hover must skip null points");
+
+  eq(sampleAt([{ label: "none", points: [] }], b, 0.5), null, "no samples, no tooltip");
+}
+
+// Telemetry history is a 5-minute window and nothing longer, by requirement.
+{
+  const t0 = 1_800_000_000_000;
+  const latency = createHistory("test-latency");
+  latency.push(20, t0);
+  latency.push(24, t0 + 60_000);
+  eq(latency.read(t0 + 60_000).length, 2, "samples inside the window are kept");
+
+  // t0 has aged out here; t0+60s has not, so exactly one sample is dropped.
+  const afterWindow = latency.push(30, t0 + WINDOW_MS + 1_000);
+  const live = afterWindow.filter((p) => p.y !== null);
+  eq(live.length, 2, "only samples past the window are dropped on write");
+  eq(live[0].y, 24, "the oldest surviving sample is the one still in window");
+  eq(live[live.length - 1].y, 30, "the newest sample is appended");
+  eq(latency.read(t0 + 3 * WINDOW_MS).length, 0, "an idle window empties itself");
+
+  // Two series must not share a bucket, or RSSI would land in the latency chart.
+  const rssi = createHistory("test-rssi");
+  rssi.push(-58, t0);
+  eq(rssi.read(t0).length, 1, "a second series keeps its own samples");
+  eq(latency.read(t0 + 3 * WINDOW_MS).length, 0, "and does not leak into the first");
+}
+
+console.log("dashboard: memory estimate / min-firmware / debug-log / spark / latency ok");

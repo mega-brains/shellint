@@ -11,7 +11,11 @@ import { SCRIPT_PATH, WEB_DIR, ROOT } from "./paths.ts";
 import { runBuild } from "./build.ts";
 import { deploy, AuthNotSupportedError } from "./deploy.ts";
 import { runProbe } from "./probe.ts";
-import { fetchDeviceStatus, setEcoMode } from "./device-status.ts";
+import {
+  fetchDeviceStatus,
+  setEcoMode,
+  setScriptRunning,
+} from "./device-status.ts";
 import { analyzeScriptFile } from "./script-stats.ts";
 import { appendBuildHistory, readBuildHistory } from "./build-history.ts";
 import { checkBuildArtifacts } from "./dialect-check.ts";
@@ -20,6 +24,9 @@ import { CHECK_CATALOG, CHECK_GROUPS } from "./check-catalog.ts";
 import { estimateMemoryFile } from "./memory-estimate.ts";
 import { minFirmware } from "./min-firmware.ts";
 import { readLogs, startLogStream, stopLogStream } from "./debug-log.ts";
+import { expandLogText, loadLogMap } from "./log-map.ts";
+import { listArtifacts, readArtifact } from "./artifacts.ts";
+import { writeGeneratedTypings } from "./probe-typings.ts";
 
 export function createApp() {
   const app = new Hono();
@@ -145,7 +152,15 @@ export function createApp() {
   app.get("/api/device/logs", (c) => {
     const sinceRaw = Number(c.req.query("since"));
     const since = Number.isFinite(sinceRaw) ? Math.max(0, sinceRaw) : 0;
-    return c.json({ ok: true, stream: readLogs(since) });
+    const stream = readLogs(since);
+    // Prod builds ship shortened log strings; the viewer is the other half of
+    // that trade, so ids become readable again here rather than on the device.
+    const map = loadLogMap();
+    const lines = stream.lines.map((l) => ({
+      ...l,
+      text: expandLogText(l.text, map),
+    }));
+    return c.json({ ok: true, stream: { ...stream, lines } });
   });
 
   app.post("/api/device/logs", async (c) => {
@@ -171,6 +186,18 @@ export function createApp() {
         500,
       );
     }
+  });
+
+  app.get("/api/artifacts", (c) => {
+    return c.json({ ok: true, artifacts: listArtifacts() });
+  });
+
+  app.get("/api/artifact", (c) => {
+    const artifact = readArtifact(c.req.query("name") ?? "");
+    if (!artifact) {
+      return c.json({ ok: false, error: "unknown or unbuilt artifact" }, 404);
+    }
+    return c.json({ ok: true, ...artifact });
   });
 
   app.post("/api/deploy", async (c) => {
@@ -229,7 +256,9 @@ export function createApp() {
   app.post("/api/probe", async (c) => {
     try {
       const report = await runProbe();
-      return c.json({ ok: true, report });
+      // Same as `mise run probe`: fresh answers, freshly generated typings.
+      const typings = writeGeneratedTypings();
+      return c.json({ ok: true, report, typings });
     } catch (e) {
       if (e instanceof AuthNotSupportedError) {
         return c.json({ ok: false, error: "auth not supported yet" }, 401);
@@ -248,6 +277,35 @@ export function createApp() {
     try {
       const status = await fetchDeviceStatus();
       return c.json({ ok: true, status });
+    } catch (e) {
+      if (e instanceof AuthNotSupportedError) {
+        return c.json({ ok: false, error: "auth not supported yet" }, 401);
+      }
+      if (e instanceof CompilerNotWiredError) {
+        return c.json({ ok: false, error: e.message }, 400);
+      }
+      return c.json(
+        { ok: false, error: e instanceof Error ? e.message : String(e) },
+        500,
+      );
+    }
+  });
+
+  app.post("/api/device/script", async (c) => {
+    let body: { running?: unknown };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json(
+        { ok: false, error: "expected JSON body { running: boolean }" },
+        400,
+      );
+    }
+    if (typeof body.running !== "boolean") {
+      return c.json({ ok: false, error: "running must be a boolean" }, 400);
+    }
+    try {
+      return c.json({ ok: true, ...(await setScriptRunning(body.running)) });
     } catch (e) {
       if (e instanceof AuthNotSupportedError) {
         return c.json({ ok: false, error: "auth not supported yet" }, 401);

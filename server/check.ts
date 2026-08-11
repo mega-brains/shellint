@@ -5,6 +5,7 @@ import { lintScriptFile } from "./lint-source.ts";
 import { lintSemanticsFile } from "./lint-semantics.ts";
 import { lintAdvisoriesFile } from "./lint-advisories.ts";
 import { lintConnected } from "./lint-connected.ts";
+import { lintProbe } from "./lint-probe.ts";
 import {
   fetchDeviceProfile,
   readDeviceProfile,
@@ -123,10 +124,10 @@ export async function runCheck(opts: CheckOptions = {}): Promise<CheckReport> {
     opts.connected === true,
   );
   findings.push(...profileNotes);
-  if (profile && existsSync(SCRIPT_PATH)) {
-    findings.push(
-      ...lintConnected(readFileSync(SCRIPT_PATH, "utf8"), profile),
-    );
+  if (existsSync(SCRIPT_PATH)) {
+    const source = readFileSync(SCRIPT_PATH, "utf8");
+    if (profile) findings.push(...lintConnected(source, profile));
+    findings.push(...lintProbe(source));
   }
 
   const { findings: artifactNotes, artifacts } = artifactFindings();

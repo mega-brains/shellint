@@ -10,13 +10,42 @@
 .checks .panel-peek { color: var(--accent); }
 .checks .panel-peek.error { color: var(--danger); }
 
+/* Counts read as badges: the colour carries the severity, not a word. */
+.badge {
+  display: inline-block;
+  padding: 0 0.3rem;
+  border-radius: 0.6rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.badge-warn {
+  background: rgba(214, 158, 46, 0.22);
+  color: #7a5c14;
+}
+
+.badge-fail {
+  background: rgba(176, 58, 46, 0.18);
+  color: var(--danger);
+}
+
+.badge-pass,
+.badge-idle {
+  padding: 0;
+  color: var(--muted);
+}
+
+.badge-pass { color: var(--accent); }
+
 .checks-body { margin-top: 0.35rem; }
 .checks.collapsed .checks-body { display: none; }
 
 .checks-note {
   margin: 0 0 0.35rem;
   font-family: var(--mono);
-  font-size: 0.7rem;
+  font-size: 0.78rem;
   color: var(--muted);
 }
 
@@ -38,7 +67,7 @@
   justify-content: space-between;
   gap: 0.5rem;
   margin: 0;
-  font-size: 0.78rem;
+  font-size: 0.86rem;
   letter-spacing: 0.03em;
   color: var(--ink);
   font-weight: 600;
@@ -47,14 +76,14 @@
 .check-group-meta {
   flex: 0 0 auto;
   font-family: var(--mono);
-  font-size: 0.68rem;
+  font-size: 0.76rem;
   font-weight: 400;
   color: var(--muted);
 }
 
 .check-group-about {
   margin: 0.1rem 0 0.25rem;
-  font-size: 0.68rem;
+  font-size: 0.76rem;
   line-height: 1.3;
   color: var(--muted);
 }
@@ -67,7 +96,7 @@
 
 .check {
   display: grid;
-  grid-template-columns: 0.9rem minmax(0, 1fr) auto;
+  grid-template-columns: 1rem minmax(0, 1fr) auto;
   align-items: baseline;
   gap: 0.1rem 0.4rem;
   padding: 0.15rem 0;
@@ -75,27 +104,27 @@
 
 .check-mark {
   font-family: var(--mono);
-  font-size: 0.75rem;
+  font-size: 0.82rem;
   color: var(--muted);
 }
 
 .check-rule {
   font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: 0.8rem;
   color: var(--ink);
   overflow-wrap: anywhere;
 }
 
 .check-about {
   grid-column: 2 / -1;
-  font-size: 0.68rem;
+  font-size: 0.76rem;
   line-height: 1.3;
   color: var(--muted);
 }
 
 .check-count {
   font-family: var(--mono);
-  font-size: 0.68rem;
+  font-size: 0.76rem;
   color: var(--danger);
 }
 
@@ -112,8 +141,8 @@
   padding: 0;
   list-style: none;
   font-family: var(--mono);
-  font-size: 0.78rem;
-  max-height: 8rem;
+  font-size: 0.86rem;
+  max-height: 9rem;
   overflow: auto;
 }
 
@@ -134,7 +163,7 @@
   flex: 0 0 auto;
   min-width: 3.2rem;
   text-transform: uppercase;
-  font-size: 0.68rem;
+  font-size: 0.76rem;
   letter-spacing: 0.04em;
 }
 
@@ -148,7 +177,24 @@
 .finding-loc {
   flex: 0 0 auto;
   color: var(--muted);
-  font-size: 0.72rem;
+  font-size: 0.8rem;
+}
+
+/* The location doubles as the jump control when a line number is known. */
+button.finding-loc {
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--mono);
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+button.finding-loc:hover,
+button.finding-loc:focus-visible {
+  color: var(--accent);
+  text-decoration-style: solid;
 }
 
 /* Stacked under the editor there is width to spare, so use two columns. */

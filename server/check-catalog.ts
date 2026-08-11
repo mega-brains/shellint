@@ -272,7 +272,7 @@ export const CHECK_CATALOG: CheckSpec[] = [
   {
     rule: "max-anonymous-nesting",
     group: "semantics",
-    about: "anonymous callbacks nested past 2 fail to parse on device",
+    about: "anonymous callbacks nested past 2 (warn) or past 5 (error) — the docs and a probed device disagree",
   },
 
   {
@@ -292,6 +292,11 @@ export const CHECK_CATALOG: CheckSpec[] = [
     group: "connected",
     needs: "profile",
     about: "preview namespaces may change shape between firmware releases",
+  },
+  {
+    rule: "probe-absent-api",
+    group: "connected",
+    about: "the device probe answered \"undefined\" for this API — advisory only",
   },
   ...CAPABILITY_CHECKS,
 

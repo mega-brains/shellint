@@ -3,7 +3,10 @@ import { javascript } from "@codemirror/lang-javascript";
 import { EditorState } from "@codemirror/state";
 import { createDevicePanel, type DeviceIdentity } from "./device-panel";
 import { createCollapsible } from "./collapsible";
-import { createSplitter } from "./splitter";
+import { createLayout } from "./layout";
+import { createArtifactView, readOnlyCompartment } from "./artifact-view";
+import { findingGutter } from "./finding-gutter";
+import { createHeaderLine } from "./header-line";
 import { createDashboard } from "./dashboard";
 import {
   type HistoryRow,
@@ -42,15 +45,11 @@ const el = {
   checkRules: document.getElementById("checkRules")!,
   findingsList: document.getElementById("findingsList")!,
   status: document.getElementById("statusLine")!,
-  workspace: document.getElementById("workspace")!,
-  side: document.getElementById("side")!,
-  splitter: document.getElementById("workspaceSplitter")!,
   buildPanel: document.getElementById("buildPanel")!,
   buildHead: document.getElementById("buildHead")!,
   buildToggle: document.getElementById("buildToggle")!,
   sizeDebug: document.getElementById("sizeDebug")!,
   sizeProd: document.getElementById("sizeProd")!,
-  configLine: document.getElementById("configLine")!,
   devicePanel: document.getElementById("devicePanel")!,
   deviceHead: document.getElementById("deviceHead")!,
   deviceToggle: document.getElementById("deviceToggle")!,
@@ -71,7 +70,6 @@ const el = {
   gCpu: document.getElementById("gCpu")!,
   gRam: document.getElementById("gRam")!,
   gFs: document.getElementById("gFs")!,
-  gRssi: document.getElementById("gRssi")!,
 };
 
 let deployChoice: { mode: Mode; minify: Minify } = {
@@ -104,11 +102,15 @@ function setStatus(msg: string, isError = false) {
   el.status.classList.toggle("error", isError);
 }
 
-function formatSizes(pair: { raw?: number; min?: number } | undefined): string {
+type Sizes = { raw?: number; min?: number; adv?: number };
+
+/** `adv` is absent whenever the tier-3 minifier is unavailable. */
+function formatSizes(pair: Sizes | undefined): string {
   if (!pair) return "—";
   const parts: string[] = [];
   if (pair.raw != null) parts.push(`raw ${pair.raw} B`);
   if (pair.min != null) parts.push(`min ${pair.min} B`);
+  if (pair.adv != null) parts.push(`adv ${pair.adv} B`);
   return parts.length ? parts.join(" · ") : "—";
 }
 
@@ -130,41 +132,27 @@ async function api<T>(
   return data;
 }
 
-const MAX_SCRIPT_NAME = 28;
-
-let configBase = "";
-
-/** Header = static config, plus whatever the last poll learned about the device. */
-function syncConfigLine(id?: DeviceIdentity) {
-  if (!configBase) return;
-  if (!id) {
-    el.configLine.textContent = configBase;
-    return;
-  }
-  const name =
-    id.scriptName && id.scriptName.length > MAX_SCRIPT_NAME
-      ? `${id.scriptName.slice(0, MAX_SCRIPT_NAME - 1)}…`
-      : id.scriptName;
-  const parts = [
-    id.deviceName,
-    name ? `“${name}”` : null,
-    id.state === "unknown" ? null : id.state,
-  ].filter(Boolean);
-  el.configLine.textContent = parts.length
-    ? `${configBase} · ${parts.join(" · ")}`
-    : configBase;
-  el.configLine.classList.toggle(
-    "warn",
-    id.state === "offline" || id.state === "stopped",
+async function toggleScriptRun(running: boolean) {
+  setStatus(running ? "starting script…" : "stopping script…");
+  const data = await api<{ running: boolean | null; scriptId: number }>(
+    "/api/device/script",
+    { method: "POST", body: JSON.stringify({ running }) },
   );
+  const state = data.running === null ? "unknown" : data.running ? "running" : "stopped";
+  setStatus(`script ${data.scriptId} ${state}`, data.running !== running);
+  void device.refresh();
 }
+
+const header = createHeaderLine((running) => {
+  void withBusy(() => toggleScriptRun(running));
+});
 
 /** Drives whether Check refreshes the device profile — see checkScript(). */
 let deviceOnline = false;
 
 function onDeviceIdentity(id: DeviceIdentity) {
   deviceOnline = id.state !== "offline";
-  syncConfigLine(id);
+  header.sync(id);
   dashboard.update({ memPeak: id.memPeak });
 }
 
@@ -192,7 +180,6 @@ const device = createDevicePanel(
     gCpu: el.gCpu,
     gRam: el.gRam,
     gFs: el.gFs,
-    gRssi: el.gRssi,
   },
   api,
   setStatus,
@@ -258,6 +245,7 @@ async function loadHistory(stats?: ScriptStats | null) {
 }
 
 let view: EditorView;
+let artifacts: ReturnType<typeof createArtifactView>;
 
 async function loadScript() {
   const data = await api<{ source: string }>("/api/script");
@@ -279,10 +267,7 @@ async function saveScript() {
 async function buildScript() {
   setStatus("building…");
   const data = await api<{
-    sizes: {
-      debug: { raw?: number; min?: number };
-      prod: { raw?: number; min?: number };
-    };
+    sizes: { debug: Sizes; prod: Sizes };
     stats?: ScriptStats;
     estimate?: MemoryEstimate;
     minFirmware?: MinFirmware | null;
@@ -295,6 +280,7 @@ async function buildScript() {
     minFirmware: data.minFirmware ?? null,
   });
   await loadHistory(data.stats ?? null);
+  await artifacts?.refresh();
   const dialect =
     data.dialect?.flatMap((r) =>
       r.findings.map((f) => ({ ...f, file: `dist/${r.file}` })),
@@ -390,7 +376,7 @@ function busy(on: boolean) {
     el.check,
     el.probe,
   ]) {
-    b.disabled = on;
+    b.disabled = on || (b === el.save && artifacts?.previewing() === true);
   }
   if (on) setMenuOpen(false);
 }
@@ -413,6 +399,8 @@ async function main() {
       extensions: [
         basicSetup,
         javascript({ typescript: true }),
+        readOnlyCompartment.of([]),
+        findingGutter,
         EditorView.lineWrapping,
         EditorView.theme({
           "&": { height: "100%", width: "100%" },
@@ -423,32 +411,18 @@ async function main() {
     parent: el.editor,
   });
 
-  createSplitter(
-    { root: el.workspace, handle: el.splitter, panel: el.side },
-    {
-      storageKey: "shelly-devroom.side.width",
-      cssVar: "--side-w",
-      minPanel: 168,
-      minEditor: 320,
-      onResize: () => view.requestMeasure(),
-    },
-  );
+  createLayout(() => view.requestMeasure());
 
   syncDeployLabel();
 
   try {
     const cfg = await api<{
-      config: {
-        deviceIp: string;
-        scriptId: number;
-        compiler: string;
-      };
+      config: { deviceIp: string; scriptId: number };
     }>("/api/config");
     const c = cfg.config;
-    configBase = `${c.deviceIp} · script ${c.scriptId} · ${c.compiler}`;
-    syncConfigLine();
+    header.setConfig(c.deviceIp, c.scriptId);
   } catch {
-    el.configLine.textContent = "config unavailable";
+    header.fail("config unavailable");
   }
 
   el.save.addEventListener("click", () => withBusy(saveScript));
@@ -481,6 +455,9 @@ async function main() {
   await loadCheckCatalog();
   await loadHistory(await dashboard.loadStats());
   await withBusy(loadScript);
+  // Only offer the preview once the editable buffer holds the real source.
+  const onPreview = () => busy(false);
+  artifacts = createArtifactView({ view, api, onStatus: setStatus, onPreview });
   // Fill the indicator with real verdicts without hijacking the status line.
   void checkScript({ quiet: true }).catch(() => {
     el.checkNote.textContent = "check could not run — press Check for the error";

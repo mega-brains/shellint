@@ -1,6 +1,6 @@
 {
   "probed": true,
-  "at": "2026-08-11T15:41:55.814Z",
+  "at": "2026-08-11T16:47:31.745Z",
   "deviceIp": "192.168.2.209",
   "scriptId": 1,
   "configuredScriptId": 1,
@@ -21,14 +21,374 @@
       "result": "function"
     },
     {
+      "id": "array.forEach",
+      "code": "typeof [].forEach",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "array.filter",
+      "code": "typeof [].filter",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "array.reduce",
+      "code": "typeof [].reduce",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "array.some",
+      "code": "typeof [].some",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "array.every",
+      "code": "typeof [].every",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "array.find",
+      "code": "typeof [].find",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "array.findIndex",
+      "code": "typeof [].findIndex",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "array.includes",
+      "code": "typeof [].includes",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "array.indexOf",
+      "code": "typeof [].indexOf",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "array.lastIndexOf",
+      "code": "typeof [].lastIndexOf",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "array.join",
+      "code": "typeof [].join",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "array.push",
+      "code": "typeof [].push",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "array.pop",
+      "code": "typeof [].pop",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "array.shift",
+      "code": "typeof [].shift",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "array.unshift",
+      "code": "typeof [].unshift",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "array.splice",
+      "code": "typeof [].splice",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "array.slice",
+      "code": "typeof [].slice",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "array.concat",
+      "code": "typeof [].concat",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "array.sort",
+      "code": "typeof [].sort",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "array.reverse",
+      "code": "typeof [].reverse",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "Array.isArray",
+      "code": "typeof Array.isArray",
+      "ok": true,
+      "result": "function"
+    },
+    {
       "id": "string.padStart",
       "code": "typeof \"\".padStart",
       "ok": true,
       "result": "undefined"
     },
     {
+      "id": "string.charAt",
+      "code": "typeof \"\".charAt",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "string.charCodeAt",
+      "code": "typeof \"\".charCodeAt",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "string.indexOf",
+      "code": "typeof \"\".indexOf",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "string.lastIndexOf",
+      "code": "typeof \"\".lastIndexOf",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "string.slice",
+      "code": "typeof \"\".slice",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "string.substring",
+      "code": "typeof \"\".substring",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "string.split",
+      "code": "typeof \"\".split",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "string.replace",
+      "code": "typeof \"\".replace",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "string.trim",
+      "code": "typeof \"\".trim",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "string.toLowerCase",
+      "code": "typeof \"\".toLowerCase",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "string.toUpperCase",
+      "code": "typeof \"\".toUpperCase",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "string.concat",
+      "code": "typeof \"\".concat",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "string.includes",
+      "code": "typeof \"\".includes",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "string.startsWith",
+      "code": "typeof \"\".startsWith",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "string.endsWith",
+      "code": "typeof \"\".endsWith",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "string.repeat",
+      "code": "typeof \"\".repeat",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "String.fromCharCode",
+      "code": "typeof String.fromCharCode",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "string.byteLength",
+      "code": "\"á\".length",
+      "ok": true,
+      "result": "2"
+    },
+    {
+      "id": "JSON.parse",
+      "code": "typeof JSON.parse",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "JSON.stringify",
+      "code": "typeof JSON.stringify",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Object.keys",
+      "code": "typeof Object.keys",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Object.values",
+      "code": "typeof Object.values",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "Object.entries",
+      "code": "typeof Object.entries",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "Object.assign",
+      "code": "typeof Object.assign",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Math",
+      "code": "typeof Math",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Math.round",
+      "code": "typeof Math.round",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Date",
+      "code": "typeof Date",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Date.now",
+      "code": "typeof Date.now",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "parseInt",
+      "code": "typeof parseInt",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "parseFloat",
+      "code": "typeof parseFloat",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "isNaN",
+      "code": "typeof isNaN",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "encodeURIComponent",
+      "code": "typeof encodeURIComponent",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "decodeURIComponent",
+      "code": "typeof decodeURIComponent",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "btoa",
+      "code": "typeof btoa",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "atob",
+      "code": "typeof atob",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "btoh",
+      "code": "typeof btoh",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "ArrayBuffer",
+      "code": "typeof ArrayBuffer",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Uint8Array",
+      "code": "typeof Uint8Array",
+      "ok": true,
+      "result": "function"
+    },
+    {
       "id": "print",
       "code": "typeof print",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "console.log",
+      "code": "typeof console.log",
       "ok": true,
       "result": "function"
     },
@@ -39,10 +399,208 @@
       "result": "undefined"
     },
     {
+      "id": "setInterval",
+      "code": "typeof setInterval",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
       "id": "Timer",
       "code": "typeof Timer",
       "ok": true,
       "result": "function"
+    },
+    {
+      "id": "Timer.set",
+      "code": "typeof Timer.set",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Timer.clear",
+      "code": "typeof Timer.clear",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Timer.getInfo",
+      "code": "typeof Timer.getInfo",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Shelly.call",
+      "code": "typeof Shelly.call",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Shelly.getComponentStatus",
+      "code": "typeof Shelly.getComponentStatus",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Shelly.getComponentConfig",
+      "code": "typeof Shelly.getComponentConfig",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Shelly.getDeviceInfo",
+      "code": "typeof Shelly.getDeviceInfo",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Shelly.getCurrentScriptId",
+      "code": "typeof Shelly.getCurrentScriptId",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Shelly.getUptimeMs",
+      "code": "typeof Shelly.getUptimeMs",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Shelly.emitEvent",
+      "code": "typeof Shelly.emitEvent",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Shelly.addEventHandler",
+      "code": "typeof Shelly.addEventHandler",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Shelly.addStatusHandler",
+      "code": "typeof Shelly.addStatusHandler",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Script.id",
+      "code": "typeof Script.id",
+      "ok": true,
+      "result": "number"
+    },
+    {
+      "id": "Script.storage",
+      "code": "typeof Script.storage",
+      "ok": true,
+      "result": "object"
+    },
+    {
+      "id": "Script.addRpcHandler",
+      "code": "typeof Script.addRpcHandler",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "Script.getVcHandle",
+      "code": "typeof Script.getVcHandle",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "HTTPServer",
+      "code": "typeof HTTPServer",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "MQTT",
+      "code": "typeof MQTT",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "BLE",
+      "code": "typeof BLE",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "AES",
+      "code": "typeof AES",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "nesting.anon.depth1",
+      "code": "(function () { return \"d1\"; })()",
+      "ok": true,
+      "result": "d1"
+    },
+    {
+      "id": "nesting.anon.depth2",
+      "code": "(function () { return (function () { return \"d2\"; })(); })()",
+      "ok": true,
+      "result": "d2"
+    },
+    {
+      "id": "nesting.anon.depth3",
+      "code": "(function () { return (function () { return (function () { return \"d3\"; })(); })(); })()",
+      "ok": true,
+      "result": "d3"
+    },
+    {
+      "id": "nesting.anon.depth4",
+      "code": "(function () { return (function () { return (function () { return (function () { return \"d4\"; })(); })(); })(); })()",
+      "ok": true,
+      "result": "d4"
+    },
+    {
+      "id": "nesting.anon.depth5",
+      "code": "(function () { return (function () { return (function () { return (function () { return (function () { return \"d5\"; })(); })(); })(); })(); })()",
+      "ok": true,
+      "result": "d5"
+    },
+    {
+      "id": "nesting.named.depth3",
+      "code": "(function f2() { return (function f1() { return (function f0() { return \"n3\"; })(); })(); })()",
+      "ok": true,
+      "result": "n3"
+    },
+    {
+      "id": "hoisting.function-decl",
+      "code": "(function () { try { return typeof h; } catch (e) { return \"throws:\" + (e.message || e); } function h() {} })()",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "hoisting.call",
+      "code": "(function () { try { return later(); } catch (e) { return \"throws:\" + (e.message || e); } function later() { return \"called\"; } })()",
+      "ok": true,
+      "result": "throws:\"later\" is not defined"
+    },
+    {
+      "id": "hoisting.var",
+      "code": "(function () { try { return typeof v; } catch (e) { return \"throws:\" + (e.message || e); } var v = 1; })()",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "process",
+      "code": "typeof process",
+      "ok": true,
+      "result": "undefined"
+    },
+    {
+      "id": "process.memory",
+      "code": "(function () { try { return process.memory().total + \" blocks\"; } catch (e) { return \"unavailable\"; } })()",
+      "ok": true,
+      "result": "unavailable"
+    },
+    {
+      "id": "process.env.ram",
+      "code": "(function () { try { return process.env.RAM + \"/\" + process.env.FLASH; } catch (e) { return \"unavailable\"; } })()",
+      "ok": true,
+      "result": "unavailable"
     }
   ]
 }

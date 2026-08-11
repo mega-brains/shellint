@@ -1,6 +1,6 @@
 import { renderStatsBars } from "./stats-chart";
 import { renderStatBadges } from "./stats-badges";
-import { renderMemBreakdown, renderMemBullet } from "./mem-chart";
+import { renderMemBreakdown, renderMemBullet, renderMemPeek } from "./mem-chart";
 import { renderSparkline } from "./spark";
 
 export type ScriptStats = {
@@ -22,8 +22,8 @@ export type ScriptStats = {
 export type HistoryRow = {
   ts: string;
   sizes: {
-    debug: { raw?: number; min?: number };
-    prod: { raw?: number; min?: number };
+    debug: { raw?: number; min?: number; adv?: number };
+    prod: { raw?: number; min?: number; adv?: number };
   };
   stats?: {
     apiCalls: number;
@@ -168,6 +168,7 @@ export function updateStatsPanel(opts: {
   estimateEl?: HTMLElement;
   breakdownEl?: HTMLElement;
   bulletEl?: HTMLElement;
+  memPeekEl?: HTMLElement;
   compareEl?: HTMLElement;
   minFwEl?: HTMLElement;
   stats?: ScriptStats | null;
@@ -192,6 +193,9 @@ export function updateStatsPanel(opts: {
   }
   if (opts.bulletEl) {
     renderMemBullet(opts.bulletEl, opts.estimate, opts.memPeak);
+  }
+  if (opts.memPeekEl) {
+    renderMemPeek(opts.memPeekEl, opts.estimate, opts.memPeak);
   }
   if (opts.minFwEl && opts.minFirmware !== undefined) {
     opts.minFwEl.textContent = formatMinFirmware(opts.minFirmware);

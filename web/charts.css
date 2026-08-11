@@ -40,6 +40,39 @@
   white-space: nowrap;
 }
 
+/* Hover readout. The host is the positioning context for the tooltip. */
+.spark-host {
+  position: relative;
+}
+
+.spark-guide {
+  stroke: var(--muted);
+  stroke-width: 1;
+  stroke-dasharray: 2 2;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.spark-tip {
+  position: absolute;
+  top: 0.2rem;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  padding: 0.15rem 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: rgba(255, 252, 247, 0.96);
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  line-height: 1.35;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
+.spark-tip[hidden] { display: none; }
+.spark-tip-x { color: var(--muted); }
+
 .spark-empty {
   margin: 0.25rem 0 0;
   font-family: var(--mono);
@@ -47,16 +80,71 @@
   color: var(--muted);
 }
 
-.logs-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.5rem;
-  margin: 0.35rem 0 0.3rem;
+/* Telemetry histories sit inside a grid cell, so they stay gauge-sized. */
+.mini-bars-host {
+  margin-top: 0.15rem;
 }
 
-.logs-note {
+.mini-bars {
+  display: block;
+  width: 100%;
+}
+
+.mini-bar {
+  fill: var(--accent);
+}
+
+.mini-bars-note {
   margin: 0;
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  color: var(--muted);
+}
+
+/* Controls are taller than the heading text they sit beside. */
+#logsHead { align-items: center; }
+
+/* Stream controls sit in the panel head, so they stay usable while collapsed. */
+.logs-controls {
+  display: flex;
+  /* One line: the filter field shrinks rather than pushing "follow" down. */
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.4rem;
+  margin-left: 0.25rem;
+  min-width: 0;
+}
+
+.logs-controls button,
+.logs-follow { flex: 0 0 auto; }
+
+.logs-controls button {
+  padding: 0.2rem 0.5rem;
+  font-size: 0.78rem;
+}
+
+.logs-filter {
+  flex: 0 1 12rem;
+  min-width: 4rem;
+  padding: 0.12rem 0.35rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+}
+
+.logs-follow {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.logs-follow input { margin: 0; }
+
+.logs-note {
+  margin: 0.3rem 0 0.25rem;
   font-family: var(--mono);
   font-size: 0.72rem;
   color: var(--muted);
@@ -64,12 +152,31 @@
 
 .logs-note.warn { color: var(--danger); }
 
+/* Note and chart keep their natural height; the list absorbs the rest. */
+.logs-note,
+.logs-chart { flex: 0 0 auto; }
+
+.logs-chart.collapsed #logsSpark { display: none; }
+
+.logs-chart-peek {
+  margin-left: auto;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.logs-chart:not(.collapsed) .logs-chart-peek { display: none; }
+
 .logs-list {
   margin: 0.3rem 0 0;
   padding: 0;
   list-style: none;
   font-family: var(--mono);
   font-size: 0.72rem;
+  /* Grows into whatever the footer was given; the cap is the fallback for
+     browsers without :has(), and for a footer that is not flexible. */
+  flex: 1 1 auto;
+  min-height: 5rem;
   max-height: 9rem;
   overflow: auto;
   color: var(--ink);
@@ -81,7 +188,10 @@
   white-space: pre-wrap;
 }
 
+main:has(#logsPanel:not(.collapsed)) .logs-list { max-height: none; }
+
 .logs-list li:last-child { border-bottom: none; }
 .logs-list li.level-0,
 .logs-list li.level-1 { color: var(--danger); }
 .logs-list li.metric { color: var(--accent); }
+.logs-list li.empty { color: var(--muted); font-style: italic; }

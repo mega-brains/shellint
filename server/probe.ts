@@ -3,18 +3,9 @@ import { dirname } from "node:path";
 import { PROBE_PATH } from "./paths.ts";
 import { loadConfig, assertDevroomCompiler } from "./config.ts";
 import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
-
-/**
- * Fixed capability probes — Script.Eval expressions.
- * Must stay side-effect-free: they may be evaluated inside a script the user owns.
- */
-const PROBES: { id: string; code: string }[] = [
-  { id: "array.map", code: "typeof [].map" },
-  { id: "string.padStart", code: 'typeof "".padStart' },
-  { id: "print", code: "typeof print" },
-  { id: "setTimeout", code: "typeof setTimeout" },
-  { id: "Timer", code: "typeof Timer" },
-];
+// Script.Eval expressions, and they must stay side-effect-free: they may be
+// evaluated inside a script the user owns.
+import { PROBES } from "./probe-catalog.ts";
 
 /** Temporary slot created by the probe. Only ever a freshly created id. */
 const SCRATCH_NAME = "devroom-probe";

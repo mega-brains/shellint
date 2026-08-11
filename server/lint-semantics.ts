@@ -20,8 +20,14 @@ import {
  * cannot survive (parse error, crash, rejected value); heuristics stay warns.
  */
 export const SEMANTIC_LIMITS = {
-  /** Anonymous callbacks nested deeper than this fail to parse on device. */
+  /**
+   * The docs say the parser gives up past 2 levels; a 98-probe run against a
+   * Plus1PM on fw 1.7.5 ran 5 nested anonymous IIFEs without complaint. So
+   * past 2 is a warning (documented limit, unreproduced) and past 5 an error
+   * (beyond anything observed to work).
+   */
   maxAnonymousNesting: 2,
+  maxAnonymousNestingHard: 5,
   minTimerPeriodMs: 10,
   minRebootDelayMs: 500,
   /** A literal loop bound above this blocks the cooperative scheduler. */
@@ -329,12 +335,19 @@ export function lintSemantics(
     const enteredAnon = isAnonFunction(node);
     if (enteredAnon) {
       anonDepth += 1;
-      if (anonDepth > SEMANTIC_LIMITS.maxAnonymousNesting) {
+      if (anonDepth > SEMANTIC_LIMITS.maxAnonymousNestingHard) {
         sink.at(
           node,
           "max-anonymous-nesting",
           "error",
-          `anonymous function nested ${anonDepth} deep — the device parser handles at most ${SEMANTIC_LIMITS.maxAnonymousNesting}; hoist it to a named function`,
+          `anonymous function nested ${anonDepth} deep — deeper than any depth observed to parse on device (${SEMANTIC_LIMITS.maxAnonymousNestingHard}); hoist it to a named function`,
+        );
+      } else if (anonDepth > SEMANTIC_LIMITS.maxAnonymousNesting) {
+        sink.at(
+          node,
+          "max-anonymous-nesting",
+          "warn",
+          `anonymous function nested ${anonDepth} deep — the docs put the parser limit at ${SEMANTIC_LIMITS.maxAnonymousNesting}, though a probed device ran ${SEMANTIC_LIMITS.maxAnonymousNestingHard}; hoist it to a named function`,
         );
       }
     }

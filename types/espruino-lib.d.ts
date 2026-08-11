@@ -58,7 +58,8 @@ interface String {
   readonly length: number;
   charAt(pos: number): string;
   charCodeAt(index: number): number;
-  concat(...strings: string[]): string;
+  // No concat(): `typeof "".concat` answered "undefined" on the probed device
+  // (Plus1PM, fw 1.7.5). Use `+`.
   indexOf(searchString: string, position?: number): number;
   lastIndexOf(searchString: string, position?: number): number;
   slice(start?: number, end?: number): string;

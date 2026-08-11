@@ -29,6 +29,10 @@ function run(cmd, args) {
 run("npm", ["run", "build:shelly"]);
 run("npm", ["run", "build:web"]);
 run("node", ["--import", "tsx", "scripts/test-dashboard.mjs"]);
+run("node", ["scripts/test-tier3.mjs"]);
+run("node", ["--import", "tsx", "scripts/test-logmap.mjs"]);
+run("node", ["--import", "tsx", "scripts/test-typings.mjs"]);
+run("node", ["--import", "tsx", "scripts/test-probe-catalog.mjs"]);
 
 for (const f of [
   "dist/debug.js",
@@ -128,6 +132,7 @@ import { lintAdvisories, parseMeta } from "./server/lint-advisories.ts";
 import { lintConnected } from "./server/lint-connected.ts";
 import { runCheck } from "./server/check.ts";
 import { acquireHost, removeScratch } from "./server/probe.ts";
+import { createApp } from "./server/app.ts";
 
 const dialect = checkBuildArtifacts();
 const bad = dialect.flatMap((r) => r.findings.filter((f) => f.severity === "error"));
@@ -189,10 +194,19 @@ const adv = (src, rule) => expect(advise, src, rule, true);
 const advNot = (src, rule) => expect(advise, src, rule, false);
 
 // Tier 3 — semantics
-sem(
-  'Shelly.call("a", null, function () { Timer.set(1, false, function () { g(function () { h(); }); }); });',
-  "max-anonymous-nesting",
-);
+// A probed Plus1PM ran 5 nested anonymous functions, so depth 3 is only a warn.
+const anonTower = (depth) =>
+  "f(" + "function () { g(".repeat(depth - 1) + "function () { h(); }" + ");  }".repeat(depth - 1) + ");";
+const anonSeverity = (depth) => {
+  const found = lintSemantics(anonTower(depth)).filter((f) => f.rule === "max-anonymous-nesting");
+  return found.length ? found[found.length - 1].severity : "none";
+};
+for (const [depth, want] of [[2, "none"], [3, "warn"], [5, "warn"], [6, "error"]]) {
+  const got = anonSeverity(depth);
+  if (got !== want) {
+    throw new Error("max-anonymous-nesting at depth " + depth + ": got " + got + ", want " + want);
+  }
+}
 sem('Script.addRpcHandler("m", function (req, p) { var x = 1; });', "rpc-handler-must-respond");
 semNot('Script.addRpcHandler("m", function (req, p) { req.result({}); });', "rpc-handler-must-respond");
 sem(
@@ -406,7 +420,33 @@ if (!report.ok) {
 }
 if (!report.artifacts.length) throw new Error("runCheck should see dist artifacts");
 
-console.log("smoke: dialect/stats/inferChip/lint tier1-5/check/probe-slot-safety ok");
+// Artifact preview: the name comes from the browser, so the allowlist is the test.
+const app = createApp();
+const listed = await (await app.request("/api/artifacts")).json();
+if (!listed.artifacts.some((a) => a.name === "prod.js")) {
+  throw new Error("artifact list should carry the built prod.js");
+}
+const artifact = await (await app.request("/api/artifact?name=prod.js")).json();
+if (!artifact.code.length || artifact.bytes !== Buffer.byteLength(artifact.code)) {
+  throw new Error("artifact read should return the file and its byte length");
+}
+for (const name of ["../package.json", "devroom.json", "", "prod.js.map"]) {
+  const res = await app.request("/api/artifact?name=" + encodeURIComponent(name));
+  if (res.status !== 404) throw new Error("artifact route served off-allowlist name: " + name);
+}
+
+// Start/stop the device script: reject a malformed body before any RPC is made,
+// so a typo can never reach Script.Start/Stop. The happy path needs a device.
+for (const body of ["{}", '{"running":"yes"}', "not json"]) {
+  const res = await app.request("/api/device/script", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body,
+  });
+  if (res.status !== 400) throw new Error("script route accepted bad body: " + body);
+}
+
+console.log("smoke: dialect/stats/inferChip/lint tier1-5/check/probe-slot-safety/artifacts ok");
 `,
   ],
   { cwd: ROOT, encoding: "utf8" },

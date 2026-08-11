@@ -7,6 +7,8 @@ import { loadConfig, assertDevroomCompiler } from "./config.ts";
 export type SizePair = {
   raw?: number;
   min?: number;
+  /** Tier 3 — absent whenever the advanced minifier is unavailable. */
+  adv?: number;
 };
 
 export type BuildSizes = {
@@ -27,10 +29,14 @@ function collectSizes(): BuildSizes {
   const prodRaw = byteLen(join(DIST_DIR, "prod.raw.js"));
   const debugMin = byteLen(join(DIST_DIR, "debug.js"));
   const prodMin = byteLen(join(DIST_DIR, "prod.js"));
+  const debugAdv = byteLen(join(DIST_DIR, "debug.adv.js"));
+  const prodAdv = byteLen(join(DIST_DIR, "prod.adv.js"));
   if (debugRaw != null) debug.raw = debugRaw;
   if (prodRaw != null) prod.raw = prodRaw;
   if (debugMin != null) debug.min = debugMin;
   if (prodMin != null) prod.min = prodMin;
+  if (debugAdv != null) debug.adv = debugAdv;
+  if (prodAdv != null) prod.adv = prodAdv;
   return { debug, prod };
 }
 

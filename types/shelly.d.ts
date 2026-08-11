@@ -14,6 +14,13 @@ interface Console {
 
 declare var console: Console;
 
+/**
+ * Espruino's own logger, confirmed present by `mise run probe`
+ * (`typeof print` → "function"). Cheaper than `console.log`, which carries
+ * ~42 B of overhead per call, so it is the right choice in hot paths.
+ */
+declare function print(...data: unknown[]): void;
+
 // ---------------------------------------------------------------------------
 // Timer
 // ---------------------------------------------------------------------------

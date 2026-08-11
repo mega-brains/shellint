@@ -14,6 +14,99 @@ export type SparkOptions = {
   formatX?: (x: number) => string;
 };
 
+/** Nearest live sample of each series to a fraction along the x axis. */
+export function sampleAt(
+  series: SparkSeries[],
+  b: Bounds,
+  fraction: number,
+): { x: number; readings: { label: string; index: number; y: number }[] } | null {
+  const target = b.xMin + fraction * (b.xMax - b.xMin);
+  let x: number | null = null;
+  const readings: { label: string; index: number; y: number }[] = [];
+
+  series.forEach((s, index) => {
+    let best: LivePoint | null = null;
+    for (const p of s.points) {
+      if (!isLive(p)) continue;
+      if (!best || Math.abs(p.x - target) < Math.abs(best.x - target)) best = p;
+    }
+    if (!best) return;
+    readings.push({ label: s.label, index, y: best.y });
+    // With one series this is its own sample; with several, the first one wins
+    // as the label, since they are polled together.
+    if (x === null) x = best.x;
+  });
+
+  return readings.length ? { x: x ?? target, readings } : null;
+}
+
+/**
+ * Hover readout: a guide line at the pointer and a tooltip with each series'
+ * nearest sample. Touch devices get nothing, which is fine — this is a
+ * pointer-precision affordance on a desktop tool.
+ */
+function attachHover(
+  host: HTMLElement,
+  svg: SVGSVGElement,
+  series: SparkSeries[],
+  b: Bounds,
+  formatX: (x: number) => string,
+  formatY: (y: number) => string,
+): void {
+  const tip = document.createElement("div");
+  tip.className = "spark-tip";
+  tip.hidden = true;
+  host.appendChild(tip);
+
+  const guide = document.createElementNS(SVG_NS, "line");
+  guide.setAttribute("class", "spark-guide");
+  guide.setAttribute("y1", "0");
+  guide.setAttribute("y2", String(svg.viewBox.baseVal.height || 1));
+  guide.setAttribute("visibility", "hidden");
+  svg.appendChild(guide);
+
+  svg.addEventListener("pointermove", (e) => {
+    const box = svg.getBoundingClientRect();
+    if (box.width === 0) return;
+    const fraction = Math.min(1, Math.max(0, (e.clientX - box.left) / box.width));
+    const hit = sampleAt(series, b, fraction);
+    if (!hit) return;
+
+    const vx = PAD_X + fraction * (VIEW_W - PAD_X * 2);
+    guide.setAttribute("x1", num(vx));
+    guide.setAttribute("x2", num(vx));
+    guide.setAttribute("visibility", "visible");
+
+    tip.replaceChildren(
+      ...hit.readings.map((r) => {
+        const row = document.createElement("span");
+        row.className = `spark-tip-row spark-line-${r.index}`;
+        row.textContent = r.label
+          ? `${r.label} ${formatY(r.y)}`
+          : formatY(r.y);
+        return row;
+      }),
+    );
+    const when = document.createElement("span");
+    when.className = "spark-tip-x";
+    when.textContent = formatX(hit.x);
+    tip.appendChild(when);
+
+    tip.hidden = false;
+    // Flip before the tooltip runs off the right edge of the host.
+    const left = e.clientX - host.getBoundingClientRect().left;
+    const flip = left > host.clientWidth - tip.offsetWidth - 8;
+    tip.style.left = `${flip ? left - tip.offsetWidth - 8 : left + 8}px`;
+  });
+
+  const hide = () => {
+    tip.hidden = true;
+    guide.setAttribute("visibility", "hidden");
+  };
+  svg.addEventListener("pointerleave", hide);
+  svg.addEventListener("pointercancel", hide);
+}
+
 type LivePoint = { x: number; y: number };
 type Bounds = { xMin: number; xMax: number; yMin: number; yMax: number };
 
@@ -172,6 +265,7 @@ export function renderSparkline(
   opts: SparkOptions = {},
 ): void {
   host.replaceChildren();
+  host.classList.add("spark-host");
   const b = bounds(series);
   if (!b) {
     const empty = document.createElement("p");
@@ -187,7 +281,9 @@ export function renderSparkline(
 
   const legend = legendEl(series);
   if (legend) host.appendChild(legend);
-  host.appendChild(svgEl(series, b, height, formatY));
+  const svg = svgEl(series, b, height, formatY);
+  host.appendChild(svg);
+  attachHover(host, svg, series, b, formatX, formatY);
   host.appendChild(
     axisEl([
       formatX(b.xMin),

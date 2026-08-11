@@ -67,6 +67,44 @@ export function renderMemBreakdown(
 }
 
 /**
+ * Collapsed summary: the estimate, and how much of the device's measured peak
+ * it accounts for. Same two numbers the bullet bar shows, at header size.
+ */
+export function renderMemPeek(
+  host: HTMLElement,
+  estimate: MemoryEstimate | null | undefined,
+  memPeak: number | null | undefined,
+): void {
+  host.replaceChildren();
+  const est = estimate?.bytes ?? 0;
+  if (!est) {
+    host.textContent = "—";
+    return;
+  }
+
+  const peak = memPeak != null && memPeak > 0 ? memPeak : null;
+  const value = document.createElement("span");
+  value.className = "mem-peek-value";
+  value.textContent = `~${est} B`;
+  host.appendChild(value);
+
+  if (!peak) {
+    host.title = `estimated ${est} B, no device peak reported yet`;
+    return;
+  }
+
+  const share = Math.min(1, est / peak);
+  const track = document.createElement("span");
+  track.className = "mem-peek-track";
+  const fill = document.createElement("span");
+  fill.className = "mem-peek-fill";
+  fill.style.width = `${(share * 100).toFixed(1)}%`;
+  track.appendChild(fill);
+  host.appendChild(track);
+  host.title = `estimated ${est} B against the device peak of ${peak} B`;
+}
+
+/**
  * Bullet bar: the fill is the static estimate, the tick is the device's
  * mem_peak. Both are scaled to whichever is larger, so the gap between the
  * cost model and reality is the thing you actually see.

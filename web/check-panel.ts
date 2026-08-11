@@ -1,3 +1,6 @@
+import { bindFindingNavigation } from "./goto-finding";
+import { FINDINGS_EVENT } from "./finding-gutter";
+
 export type Finding = {
   severity: "error" | "warn";
   rule: string;
@@ -65,19 +68,38 @@ function location(f: Finding): string {
   return f.line != null ? `${f.file}:${f.line}` : f.file;
 }
 
+/** Verdicts read as badges rather than prose; `label` stays for screen readers. */
+type Badge = { cls: string; text: string; label?: string };
+
 function plural(n: number, word: string): string {
   return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
+function countBadges(counts: { errors: number; warnings: number }): Badge[] {
+  const out: Badge[] = [];
+  if (counts.errors) {
+    out.push({
+      cls: "badge-fail",
+      text: `❌ ${counts.errors}`,
+      label: plural(counts.errors, "error"),
+    });
+  }
+  if (counts.warnings) {
+    out.push({
+      cls: "badge-warn",
+      text: `⚠️ ${counts.warnings}`,
+      label: plural(counts.warnings, "warning"),
+    });
+  }
+  return out;
 }
 
 export function summarize(counts: {
   errors: number;
   warnings: number;
 }): string {
-  if (!counts.errors && !counts.warnings) return "pass · no findings";
-  const parts: string[] = [];
-  if (counts.errors) parts.push(plural(counts.errors, "error"));
-  if (counts.warnings) parts.push(plural(counts.warnings, "warning"));
-  return `${counts.errors ? "fail" : "pass"} · ${parts.join(" · ")}`;
+  const badges = countBadges(counts);
+  return badges.length ? badges.map((b) => b.text).join(" · ") : "✓ pass";
 }
 
 function tally(rows: CheckRow[]): Record<CheckStatus, number> {
@@ -196,6 +218,9 @@ function renderRules(
 
 function renderFindingList(els: CheckPanelEls, findings: Finding[]) {
   els.findings.replaceChildren();
+  document.dispatchEvent(
+    new CustomEvent<Finding[]>(FINDINGS_EVENT, { detail: findings }),
+  );
   if (!findings.length) return;
 
   const ordered = [...findings].sort((a, b) =>
@@ -221,17 +246,33 @@ function renderFindingList(els: CheckPanelEls, findings: Finding[]) {
 
     const where = location(f);
     if (where) {
-      const loc = document.createElement("span");
+      // Clickable only with a line to jump to; otherwise it is a plain label.
+      const loc = document.createElement(f.line != null ? "button" : "span");
       loc.className = "finding-loc";
       loc.textContent = where;
+      if (loc instanceof HTMLButtonElement && f.file && f.line != null) {
+        loc.type = "button";
+        loc.dataset.file = f.file;
+        loc.dataset.line = String(f.line);
+        loc.title = `Go to ${where}`;
+      }
       li.appendChild(loc);
     }
     els.findings.appendChild(li);
   }
+  bindFindingNavigation(els.findings);
 }
 
-function setPeek(els: CheckPanelEls, text: string, failed: boolean) {
-  els.peek.textContent = text;
+function setPeek(els: CheckPanelEls, badges: Badge[], failed: boolean) {
+  els.peek.replaceChildren();
+  badges.forEach((badge, i) => {
+    if (i > 0) els.peek.append(" · ");
+    const span = document.createElement("span");
+    span.className = `badge ${badge.cls}`;
+    span.textContent = badge.text;
+    if (badge.label) span.setAttribute("aria-label", badge.label);
+    els.peek.appendChild(span);
+  });
   els.peek.classList.toggle("error", failed);
 }
 
@@ -242,7 +283,7 @@ export function renderCatalog(els: CheckPanelEls, catalog: CheckCatalog): void {
     status: "pending",
     count: 0,
   }));
-  setPeek(els, `${rows.length} checks · not run yet`, false);
+  setPeek(els, [{ cls: "badge-idle", text: `${rows.length} checks · not run yet` }], false);
   els.note.textContent = "press Check to run all of them against the saved script";
   renderFindingList(els, []);
   renderRules(els, catalog, rows);
@@ -254,10 +295,16 @@ export function renderReport(
   catalog: CheckCatalog | null,
 ): void {
   const counts = tally(report.checks);
-  const verdict = summarize(report.counts);
   setPeek(
     els,
-    `${verdict} · ${counts.pass}/${report.checks.length} checks pass`,
+    [
+      ...countBadges(report.counts),
+      {
+        cls: "badge-pass",
+        text: `✓ ${counts.pass}/${report.checks.length}`,
+        label: `${counts.pass} of ${report.checks.length} checks pass`,
+      },
+    ],
     report.counts.errors > 0,
   );
 
@@ -287,7 +334,10 @@ export function renderFindings(els: CheckPanelEls, findings: Finding[]): void {
   const errors = findings.filter((f) => f.severity === "error").length;
   setPeek(
     els,
-    `build guard · ${summarize({ errors, warnings: findings.length - errors })}`,
+    [
+      { cls: "badge-idle", text: "build guard" },
+      ...countBadges({ errors, warnings: findings.length - errors }),
+    ],
     errors > 0,
   );
   els.note.textContent = "from the last build — press Check for the full run";

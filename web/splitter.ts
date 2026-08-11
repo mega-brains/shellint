@@ -1,5 +1,5 @@
 export type SplitterEls = {
-  /** Flex row holding the editor, the handle and the side panel. */
+  /** Flex container holding the panel, the handle and whatever it trades with. */
   root: HTMLElement;
   handle: HTMLElement;
   panel: HTMLElement;
@@ -11,7 +11,11 @@ export type SplitterOptions = {
   cssVar: string;
   minPanel: number;
   minEditor: number;
-  /** Called after every width change so the editor can re-measure. */
+  /** "x" trades width with the panel on the right, "y" height with the top one. */
+  axis?: "x" | "y";
+  /** Toggled on the root while an explicit size is set, for the CSS to key on. */
+  sizedClass?: string;
+  /** Called after every size change so the editor can re-measure. */
   onResize?: () => void;
 };
 
@@ -41,19 +45,26 @@ function writeWidth(key: string, px: number | null) {
  */
 export function createSplitter(els: SplitterEls, opts: SplitterOptions) {
   const { root, handle, panel } = els;
+  const vertical = opts.axis === "y";
+
+  /** The panel's own extent along the dragged axis. */
+  function panelSize(): number {
+    const rect = panel.getBoundingClientRect();
+    return vertical ? rect.height : rect.width;
+  }
 
   function clamp(px: number): number {
-    const room = root.clientWidth - handle.offsetWidth - opts.minEditor;
+    const total = vertical ? root.clientHeight : root.clientWidth;
+    const handleSize = vertical ? handle.offsetHeight : handle.offsetWidth;
+    const room = total - handleSize - opts.minEditor;
     return Math.min(Math.max(px, opts.minPanel), Math.max(opts.minPanel, room));
   }
 
   function apply(px: number | null) {
     if (px === null) root.style.removeProperty(opts.cssVar);
     else root.style.setProperty(opts.cssVar, `${Math.round(px)}px`);
-    handle.setAttribute(
-      "aria-valuenow",
-      String(Math.round(panel.getBoundingClientRect().width)),
-    );
+    if (opts.sizedClass) root.classList.toggle(opts.sizedClass, px !== null);
+    handle.setAttribute("aria-valuenow", String(Math.round(panelSize())));
     opts.onResize?.();
   }
 
@@ -69,20 +80,23 @@ export function createSplitter(els: SplitterEls, opts: SplitterOptions) {
     e.preventDefault();
     handle.setPointerCapture(e.pointerId);
     handle.classList.add("dragging");
-    document.body.classList.add("col-resizing");
+    document.body.classList.add(vertical ? "row-resizing" : "col-resizing");
   });
 
   handle.addEventListener("pointermove", (e) => {
     if (!handle.hasPointerCapture(e.pointerId)) return;
-    apply(clamp(root.getBoundingClientRect().right - e.clientX));
+    const box = root.getBoundingClientRect();
+    // The horizontal panel sits at the top, the vertical one on the right, so
+    // each measures from the edge it is anchored to.
+    apply(clamp(vertical ? e.clientY - box.top : box.right - e.clientX));
   });
 
   function endDrag(e: PointerEvent) {
     if (!handle.hasPointerCapture(e.pointerId)) return;
     handle.releasePointerCapture(e.pointerId);
     handle.classList.remove("dragging");
-    document.body.classList.remove("col-resizing");
-    set(panel.getBoundingClientRect().width);
+    document.body.classList.remove(vertical ? "row-resizing" : "col-resizing");
+    set(panelSize());
   }
 
   handle.addEventListener("pointerup", endDrag);
@@ -92,9 +106,11 @@ export function createSplitter(els: SplitterEls, opts: SplitterOptions) {
 
   handle.addEventListener("keydown", (e) => {
     const step = e.shiftKey ? 48 : 16;
-    const width = panel.getBoundingClientRect().width;
-    if (e.key === "ArrowLeft") set(width + step);
-    else if (e.key === "ArrowRight") set(width - step);
+    const size = panelSize();
+    const grow = vertical ? "ArrowDown" : "ArrowLeft";
+    const shrink = vertical ? "ArrowUp" : "ArrowRight";
+    if (e.key === grow) set(size + step);
+    else if (e.key === shrink) set(size - step);
     else if (e.key === "Home" || e.key === "End") set(null);
     else return;
     e.preventDefault();
