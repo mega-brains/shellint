@@ -1,8 +1,6 @@
-import {
-  MAX_ANON_NEST,
-  MAX_TIMERS,
-  renderStatsBars,
-} from "./stats-chart";
+import { renderStatsBars } from "./stats-chart";
+import { renderStatBadges } from "./stats-badges";
+import { renderMemBreakdown, renderMemBullet } from "./mem-chart";
 import { renderSparkline } from "./spark";
 
 export type ScriptStats = {
@@ -45,18 +43,6 @@ export type MinFirmware = {
   version: string;
   reasons: { api: string; version: string }[];
 };
-
-export function formatStats(stats: ScriptStats | null | undefined): string {
-  if (!stats) return "—";
-  const apiN = Object.keys(stats.apis).length;
-  const apiCalls = Object.values(stats.apis).reduce((a, b) => a + b, 0);
-  const r = stats.registrations;
-  return [
-    `apis ${apiN} kinds / ${apiCalls} calls · vars ${stats.declarations.vars} · fn ${stats.declarations.functions}`,
-    `str ${stats.literals.strings.count} (${stats.literals.strings.totalBytes} B) · log ${stats.logging.consoleLog} · print ${stats.logging.print}`,
-    `Timer.set ${r.timers}/${MAX_TIMERS} · Shelly.call ${stats.network.shellyCall} · anon nest ${stats.nesting.maxAnonymousDepth}/${MAX_ANON_NEST}`,
-  ].join("\n");
-}
 
 export function renderHistoryList(host: HTMLElement, rows: HistoryRow[]): void {
   host.replaceChildren();
@@ -101,15 +87,26 @@ export function renderSizeSpark(host: HTMLElement, rows: HistoryRow[]): void {
   });
 }
 
+/** Estimated RAM per build, so the cost model can be watched over time. */
+export function renderMemSpark(host: HTMLElement, rows: HistoryRow[]): void {
+  const points = [...rows]
+    .reverse()
+    .map((row) => {
+      const at = new Date(row.ts).getTime();
+      return { x: Number.isNaN(at) ? 0 : at, y: row.memEstimate ?? null };
+    })
+    .filter((p) => p.x > 0);
+  renderSparkline(host, [{ label: "est RAM", points }], {
+    height: 32,
+    formatY: (y) => `${y} B`,
+    formatX: (x) =>
+      new Date(x).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+  });
+}
+
 export function formatEstimate(estimate: MemoryEstimate | null | undefined): string {
   if (!estimate) return "—";
-  const parts = Object.entries(estimate.breakdown)
-    .filter(([, bytes]) => bytes > 0)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([name, bytes]) => `${name} ${bytes}`)
-    .join(" · ");
-  return `est RAM ~${estimate.bytes} B${parts ? `\n${parts}` : ""}`;
+  return `est RAM ~${estimate.bytes} B`;
 }
 
 /**
@@ -163,11 +160,14 @@ function resolveStats(
 }
 
 export function updateStatsPanel(opts: {
-  summaryEl: HTMLElement;
+  badgesEl: HTMLElement;
   chartEl: HTMLElement;
   historyEl: HTMLElement;
   sparkEl?: HTMLElement;
+  memSparkEl?: HTMLElement;
   estimateEl?: HTMLElement;
+  breakdownEl?: HTMLElement;
+  bulletEl?: HTMLElement;
   compareEl?: HTMLElement;
   minFwEl?: HTMLElement;
   stats?: ScriptStats | null;
@@ -178,13 +178,20 @@ export function updateStatsPanel(opts: {
 }): void {
   const resolved = resolveStats(opts.stats, opts.history);
   if (opts.stats !== undefined || resolved) {
-    opts.summaryEl.textContent = formatStats(resolved);
+    renderStatBadges(opts.badgesEl, resolved);
   }
   renderHistoryList(opts.historyEl, opts.history);
   renderStatsBars(opts.chartEl, resolved);
   if (opts.sparkEl) renderSizeSpark(opts.sparkEl, opts.history);
+  if (opts.memSparkEl) renderMemSpark(opts.memSparkEl, opts.history);
   if (opts.estimateEl && opts.estimate !== undefined) {
     opts.estimateEl.textContent = formatEstimate(opts.estimate);
+  }
+  if (opts.breakdownEl && opts.estimate !== undefined) {
+    renderMemBreakdown(opts.breakdownEl, opts.estimate);
+  }
+  if (opts.bulletEl) {
+    renderMemBullet(opts.bulletEl, opts.estimate, opts.memPeak);
   }
   if (opts.minFwEl && opts.minFirmware !== undefined) {
     opts.minFwEl.textContent = formatMinFirmware(opts.minFirmware);

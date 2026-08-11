@@ -50,9 +50,6 @@ const el = {
   buildToggle: document.getElementById("buildToggle")!,
   sizeDebug: document.getElementById("sizeDebug")!,
   sizeProd: document.getElementById("sizeProd")!,
-  scriptStats: document.getElementById("scriptStats")!,
-  statsChart: document.getElementById("statsChart")!,
-  buildHistory: document.getElementById("buildHistory")!,
   configLine: document.getElementById("configLine")!,
   devicePanel: document.getElementById("devicePanel")!,
   deviceHead: document.getElementById("deviceHead")!,
@@ -444,13 +441,11 @@ async function main() {
       config: {
         deviceIp: string;
         scriptId: number;
-        host: string;
-        port: number;
         compiler: string;
       };
     }>("/api/config");
     const c = cfg.config;
-    configBase = `${c.deviceIp} · script ${c.scriptId} · ${c.host}:${c.port} · ${c.compiler}`;
+    configBase = `${c.deviceIp} · script ${c.scriptId} · ${c.compiler}`;
     syncConfigLine();
   } catch {
     el.configLine.textContent = "config unavailable";

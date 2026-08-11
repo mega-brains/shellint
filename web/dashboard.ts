@@ -1,3 +1,4 @@
+import { createCollapsible } from "./collapsible";
 import { createLogsPanel } from "./logs-panel";
 import {
   updateStatsPanel,
@@ -31,14 +32,29 @@ export function createDashboard(opts: {
 }) {
   const byId = (id: string) => document.getElementById(id)!;
   const els = {
-    summary: byId("scriptStats"),
+    badges: byId("statBadges"),
     chart: byId("statsChart"),
     history: byId("buildHistory"),
     spark: byId("historySpark"),
+    memSpark: byId("memSpark"),
     estimate: byId("memEstimate"),
+    breakdown: byId("memBreakdown"),
+    bullet: byId("memBullet"),
     compare: byId("memCompare"),
     minFw: byId("minFirmware"),
   };
+
+  createCollapsible(
+    {
+      panel: byId("historyBlock"),
+      head: byId("historyHead"),
+      toggle: byId("historyToggle"),
+    },
+    {
+      storageKey: "shelly-devroom.historyBlock.collapsed",
+      defaultCollapsed: true,
+    },
+  );
 
   createLogsPanel({
     els: {
@@ -61,11 +77,14 @@ export function createDashboard(opts: {
   function update(patch: DashboardPatch) {
     Object.assign(state, patch);
     updateStatsPanel({
-      summaryEl: els.summary,
+      badgesEl: els.badges,
       chartEl: els.chart,
       historyEl: els.history,
       sparkEl: els.spark,
+      memSparkEl: els.memSpark,
       estimateEl: els.estimate,
+      breakdownEl: els.breakdown,
+      bulletEl: els.bullet,
       compareEl: els.compare,
       minFwEl: els.minFw,
       stats: state.stats,

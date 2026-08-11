@@ -162,13 +162,13 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   filter: none;
 }
 
+/* No gap: the splitter is its own spacing, drawn as a 2px line inside it. */
 .workspace {
   flex: 1 1 auto;
   display: flex;
   align-items: stretch;
   min-height: 0;
   width: 100%;
-  gap: 0.75rem;
 }
 
 .splitter {

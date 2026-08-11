@@ -8,6 +8,7 @@
     <link rel="stylesheet" href="/panels.css" />
     <link rel="stylesheet" href="/checks.css" />
     <link rel="stylesheet" href="/charts.css" />
+    <link rel="stylesheet" href="/stats.css" />
   </head>
   <body>
     <header class="top">
@@ -153,19 +154,16 @@
               </div>
               <div class="size-block size-stats">
                 <h2>stats</h2>
-                <p id="scriptStats" class="stats-summary">—</p>
-                <p
-                  id="memEstimate"
-                  class="stats-summary"
-                  title="Static RAM estimate from an Espruino JsVar cost model — an estimate, not a measurement"
-                >
-                  —
-                </p>
-                <p
-                  id="memCompare"
-                  class="stats-summary mem-compare"
-                  title="Estimate versus the mem_peak the device actually reported for the running script"
-                ></p>
+                <div
+                  id="statBadges"
+                  class="stat-badges"
+                  aria-label="Script counters"
+                ></div>
+                <div
+                  id="statsChart"
+                  class="stats-chart"
+                  aria-label="Resource usage versus Shelly device caps and size advisories"
+                ></div>
                 <p
                   id="minFirmware"
                   class="stats-summary"
@@ -173,19 +171,52 @@
                 >
                   —
                 </p>
-                <div
-                  id="statsChart"
-                  class="stats-chart"
-                  aria-label="Resource usage versus Shelly device caps"
-                ></div>
               </div>
-              <div class="size-block size-history">
-                <h2>history</h2>
+              <div class="size-block size-mem">
+                <h2>memory</h2>
+                <p
+                  id="memEstimate"
+                  class="mem-total"
+                  title="Static RAM estimate from an Espruino JsVar cost model — an estimate, not a measurement"
+                >
+                  —
+                </p>
                 <div
-                  id="historySpark"
-                  aria-label="Minified script size over recent builds"
+                  id="memBreakdown"
+                  aria-label="Estimated RAM by cost bucket"
                 ></div>
-                <ol id="buildHistory" class="history-list"></ol>
+                <div
+                  id="memBullet"
+                  title="Estimate versus the mem_peak the device reported for the running script"
+                ></div>
+                <p id="memCompare" class="mem-compare"></p>
+              </div>
+              <div class="size-block size-history collapsed" id="historyBlock">
+                <div
+                  class="panel-head"
+                  id="historyHead"
+                  role="button"
+                  tabindex="0"
+                  aria-expanded="false"
+                  aria-controls="historyBody"
+                  title="Show or hide the size and RAM trends and the per-build list"
+                >
+                  <span class="panel-toggle" id="historyToggle" aria-hidden="true"
+                    >▸</span
+                  >
+                  <h2>history</h2>
+                </div>
+                <div class="size-history-body" id="historyBody">
+                  <div
+                    id="historySpark"
+                    aria-label="Minified script size over recent builds"
+                  ></div>
+                  <div
+                    id="memSpark"
+                    aria-label="Estimated RAM over recent builds"
+                  ></div>
+                  <ol id="buildHistory" class="history-list"></ol>
+                </div>
               </div>
             </div>
           </section>

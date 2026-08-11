@@ -3,6 +3,10 @@ export const MAX_TIMERS = 5;
 export const MAX_ANON_NEST = 3;
 export const MAX_HANDLERS = 5;
 
+/** Tier 5 advisory limits — keep in step with ADVISORY_LIMITS in the server. */
+export const MAX_LOG_CALLS = 20;
+export const MAX_STRING_BYTES = 1024;
+
 export type CapStats = {
   registrations: {
     timers: number;
@@ -12,9 +16,18 @@ export type CapStats = {
     rpcHandlers: number;
   };
   nesting: { maxAnonymousDepth: number };
+  literals: { strings: { count: number; totalBytes: number } };
+  logging: { consoleLog: number; print: number };
 };
 
-type CapRow = { label: string; used: number; max: number };
+type CapRow = {
+  label: string;
+  used: number;
+  max: number;
+  /** Advisory limits warn about cost; they are not enforced by the firmware. */
+  soft?: boolean;
+  unit?: string;
+};
 
 function rowsFromStats(stats: CapStats | null | undefined): CapRow[] {
   if (!stats) return [];
@@ -26,6 +39,19 @@ function rowsFromStats(stats: CapStats | null | undefined): CapRow[] {
     { label: "status handlers", used: r.statusHandlers, max: MAX_HANDLERS },
     { label: "http endpoints", used: r.httpEndpoints, max: MAX_HANDLERS },
     { label: "rpc handlers", used: r.rpcHandlers, max: MAX_HANDLERS },
+    {
+      label: "log calls",
+      used: stats.logging.consoleLog + stats.logging.print,
+      max: MAX_LOG_CALLS,
+      soft: true,
+    },
+    {
+      label: "string bytes",
+      used: stats.literals.strings.totalBytes,
+      max: MAX_STRING_BYTES,
+      soft: true,
+      unit: "B",
+    },
   ];
 }
 
@@ -57,14 +83,21 @@ export function renderStatsBars(
     const over = used >= max;
 
     const li = document.createElement("li");
-    li.className = over ? "stats-bar warn" : "stats-bar";
+    li.className = ["stats-bar", over ? "warn" : null, row.soft ? "soft" : null]
+      .filter(Boolean)
+      .join(" ");
+    li.title = row.soft
+      ? `${row.label}: ${used} of ${max} before the size advisory warns`
+      : `${row.label}: ${used} of the device cap of ${max}`;
 
     const label = document.createElement("span");
     label.className = "stats-bar-label";
     label.textContent = row.label;
     const value = document.createElement("span");
     value.className = "stats-bar-value";
-    value.textContent = `${used}/${max}`;
+    value.textContent = row.unit
+      ? `${used}/${max} ${row.unit}`
+      : `${used}/${max}`;
 
     const track = document.createElement("div");
     track.className = "stats-bar-track";

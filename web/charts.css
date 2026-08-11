@@ -23,6 +23,21 @@
   font-family: var(--mono);
   font-size: 0.62rem;
   fill: var(--muted);
+  color: var(--muted);
+}
+
+/* x-first, y-min, y-max, x-last — spread out, or they read as one number. */
+.spark-axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.4rem;
+}
+
+.spark-axis .spark-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .spark-empty {
@@ -31,9 +46,6 @@
   font-size: 0.75rem;
   color: var(--muted);
 }
-
-.mem-compare { color: var(--muted); }
-.mem-compare.warn { color: var(--danger); }
 
 .logs-toolbar {
   display: flex;

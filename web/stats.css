@@ -1,0 +1,124 @@
+/* Script counters as tiles, plus the memory-estimate visuals. */
+
+.stat-badges {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(5rem, 1fr));
+  gap: 0.3rem;
+  margin: 0.35rem 0 0.5rem;
+}
+
+.stat-badge {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: rgba(255, 252, 247, 0.6);
+}
+
+.stat-badge-value {
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  line-height: 1.15;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-badge-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stat-badge-hint {
+  font-family: var(--mono);
+  font-size: 0.6rem;
+  color: var(--muted);
+}
+
+.mem-total {
+  margin: 0.25rem 0 0.35rem;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+}
+
+.mem-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 0.1rem;
+}
+
+.mem-bar {
+  display: grid;
+  grid-template-columns: minmax(0, 4.5rem) minmax(2rem, 1fr) auto;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  color: var(--muted);
+}
+
+.mem-bar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mem-bar-value {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.mem-bar-track {
+  height: 0.3rem;
+  background: rgba(212, 207, 196, 0.55);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.mem-bar-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+/* Bullet bar: fill is the estimate, tick is the measured device peak. */
+.mem-bullet-track {
+  position: relative;
+  height: 0.55rem;
+  margin: 0.5rem 0 0.2rem;
+  background: rgba(212, 207, 196, 0.55);
+  border-radius: 3px;
+}
+
+.mem-bullet-fill {
+  height: 100%;
+  background: var(--accent);
+  border-radius: 3px;
+  opacity: 0.8;
+}
+
+.mem-bullet-tick {
+  position: absolute;
+  top: -0.15rem;
+  bottom: -0.15rem;
+  width: 2px;
+  background: var(--ink);
+  transform: translateX(-1px);
+}
+
+.mem-bullet-legend,
+.mem-compare {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.66rem;
+  color: var(--muted);
+}
+
+.mem-compare.warn { color: var(--danger); }
