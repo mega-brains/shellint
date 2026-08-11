@@ -1,6 +1,7 @@
 import { createCollapsible } from "./collapsible";
 import { createHistory } from "./metric-history";
 import { renderMiniBars } from "./mini-bars";
+import { createMetricSwap, type MetricSwap } from "./metric-swap";
 import type { SparkPoint } from "./spark";
 
 const STORAGE_KEY = "shelly-devroom.devicePanel.collapsed";
@@ -36,6 +37,7 @@ export type DeviceStatus = {
   };
   eco_mode: boolean | null;
   temperatureC: number | null;
+  temperatureFrom: string | null;
   wifi: { rssi: number | null; ssid: string | null };
 };
 
@@ -167,6 +169,20 @@ export type DeviceIdentity = {
   memPeak: number | null;
 };
 
+/** The swap controls are looked up by id, so main.ts need not know about them. */
+function swapFor(name: string, gauge: HTMLElement, label: string): MetricSwap {
+  const cap = name[0].toUpperCase() + name.slice(1);
+  return createMetricSwap(
+    name,
+    {
+      gauge,
+      host: document.getElementById(`h${cap}`)!,
+      button: document.getElementById(`swap${cap}`) as HTMLButtonElement,
+    },
+    label,
+  );
+}
+
 export function createDevicePanel(
   els: DevicePanelEls,
   api: ApiFn,
@@ -190,8 +206,11 @@ export function createDevicePanel(
   // Looked up here rather than passed in, to keep main.ts inside its line cap.
   const latencyHost = document.getElementById("latencySpark");
   const rssiHost = document.getElementById("rssiSpark");
+  const tempHost = document.getElementById("tempSpark");
+  const metaHead = document.getElementById("deviceMetaHead");
   const latencyHistory = createHistory("latency");
   const rssiHistory = createHistory("rssi");
+  const tempHistory = createHistory("temp");
 
   function renderLatency(points: SparkPoint[]) {
     if (!latencyHost) return;
@@ -213,8 +232,40 @@ export function createDevicePanel(
     });
   }
 
+  /**
+   * Device temperature moves within a few degrees, so a 0-based axis would
+   * draw a flat wall of full bars. The window follows the samples instead.
+   */
+  function renderTemp(points: SparkPoint[]) {
+    if (!tempHost) return;
+    const values = points
+      .map((p) => p.y)
+      .filter((y): y is number => typeof y === "number");
+    const lo = values.length ? Math.floor(Math.min(...values)) - 1 : 0;
+    const hi = values.length ? Math.ceil(Math.max(...values)) + 1 : 1;
+    renderMiniBars(tempHost, points, {
+      unit: "°C",
+      domainMin: lo,
+      domainMax: hi,
+      extremeLabel: "peak",
+    });
+  }
+
   renderLatency(latencyHistory.read());
   renderRssi(rssiHistory.read());
+  renderTemp(tempHistory.read());
+
+  /** Gauge cells can swap themselves for the history of the same percentage. */
+  const swaps = {
+    mem: swapFor("mem", els.gMem, "script memory used"),
+    cpu: swapFor("cpu", els.gCpu, "cpu"),
+    ram: swapFor("ram", els.gRam, "device RAM used"),
+    fs: swapFor("fs", els.gFs, "filesystem used"),
+  };
+
+  function record(share: number | null, swap: MetricSwap) {
+    swap.record(share == null ? null : share * 100);
+  }
 
   function render(status: DeviceStatus) {
     els.err.hidden = true;
@@ -228,6 +279,7 @@ export function createDevicePanel(
       d.gen != null ? `gen ${d.gen}` : null,
     ].filter(Boolean);
     els.meta.textContent = parts.join(" · ") || "—";
+    if (metaHead) metaHead.textContent = els.meta.textContent;
 
     const running = status.script.running;
     els.dRunning.textContent =
@@ -246,28 +298,36 @@ export function createDevicePanel(
     renderLatency(latencyHistory.push(status.latencyMs));
 
     // Script heap has no reported total, so scale used against used + free.
-    setGauge(
-      els.gMem,
+    const memShare =
       mem_used == null || mem_free == null
         ? null
-        : usedShare(mem_free, mem_used + mem_free),
-      "script memory used",
+        : usedShare(mem_free, mem_used + mem_free);
+    const cpuShare = cpu == null ? null : Math.min(1, cpu / 100);
+    const ramShare = usedShare(status.sys.ram_free, status.sys.ram_size);
+    const fsShare = usedShare(status.sys.fs_free, status.sys.fs_size);
+
+    setGauge(els.gMem, memShare, "script memory used");
+    setGauge(els.gCpu, cpuShare, "cpu");
+    setGauge(els.gRam, ramShare, "device RAM used");
+    setGauge(els.gFs, fsShare, "filesystem used");
+    record(memShare, swaps.mem);
+    record(cpuShare, swaps.cpu);
+    record(ramShare, swaps.ram);
+    record(fsShare, swaps.fs);
+    const tempC = status.temperatureC;
+    els.dTemp.textContent = tempC == null ? "—" : `${tempC.toFixed(1)} °C`;
+    renderTemp(
+      tempC == null
+        ? tempHistory.read()
+        : tempHistory.push(Math.round(tempC * 10) / 10),
     );
-    setGauge(els.gCpu, cpu == null ? null : Math.min(1, cpu / 100), "cpu");
-    setGauge(
-      els.gRam,
-      usedShare(status.sys.ram_free, status.sys.ram_size),
-      "device RAM used",
-    );
-    setGauge(
-      els.gFs,
-      usedShare(status.sys.fs_free, status.sys.fs_size),
-      "filesystem used",
-    );
-    els.dTemp.textContent =
+    // switch:0 is the relay's own die, not the room — say so rather than imply.
+    els.dTemp.title =
       status.temperatureC == null
-        ? "—"
-        : `${status.temperatureC.toFixed(1)} °C`;
+        ? "no temperature component on this device"
+        : status.temperatureFrom === "switch:0"
+          ? "internal temperature reported by switch:0"
+          : `reported by ${status.temperatureFrom ?? "the device"}`;
     const rssi = status.wifi.rssi;
     els.dRssi.textContent = rssi == null ? "—" : `${rssi} dBm`;
     renderRssi(rssi == null ? rssiHistory.read() : rssiHistory.push(rssi));
@@ -278,6 +338,7 @@ export function createDevicePanel(
     }
     if (status.sys.restart_required) {
       els.meta.textContent += " · restart required";
+      if (metaHead) metaHead.textContent = els.meta.textContent;
     }
 
     setPeek(buildPeek(status));

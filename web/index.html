@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="/checks.css" />
     <link rel="stylesheet" href="/charts.css" />
     <link rel="stylesheet" href="/stats.css" />
+    <link rel="stylesheet" href="/diff.css" />
   </head>
   <body>
     <header class="top">
@@ -26,13 +27,58 @@
           >
             Save
           </button>
-          <button
-            type="button"
-            id="btnBuild"
-            title="Compile TypeScript to ES5 and emit debug/prod raw + minified artifacts under dist/"
-          >
-            Build
-          </button>
+          <div class="split" id="buildSplit">
+            <button
+              type="button"
+              id="btnBuild"
+              title="Build, then run the compliance check over the fresh artifacts"
+            >
+              Build + Check
+            </button>
+            <button
+              type="button"
+              id="btnBuildMenu"
+              class="split-toggle"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              aria-controls="buildMenu"
+              title="Choose build, compliance check, or both"
+            >
+              ▾
+            </button>
+            <ul class="menu" id="buildMenu" role="menu" hidden>
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-action="both"
+                  title="Build, then run the compliance check over the fresh artifacts"
+                >
+                  build + check
+                </button>
+              </li>
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-action="build"
+                  title="Compile TypeScript to ES5 and emit debug/prod raw + minified artifacts under dist/"
+                >
+                  build
+                </button>
+              </li>
+              <li role="none">
+                <button
+                  type="button"
+                  role="menuitem"
+                  data-action="check"
+                  title="Shelly/Espruino compliance check of scripts/main.ts (and dist artifacts when present). Works offline; adds device capability checks when the device answers."
+                >
+                  check
+                </button>
+              </li>
+            </ul>
+          </div>
           <div class="split" id="deploySplit">
             <button
               type="button"
@@ -101,13 +147,6 @@
           </div>
           <button
             type="button"
-            id="btnCheck"
-            title="Shelly/Espruino compliance check of scripts/main.ts (and dist artifacts when present). Works offline; adds device capability checks when the device answers."
-          >
-            Check
-          </button>
-          <button
-            type="button"
             id="btnProbe"
             title="Run Script.Eval capability checks on the device and write types/generated-probe.json — stored device scripts are never overwritten"
           >
@@ -115,6 +154,8 @@
           </button>
         </div>
       </div>
+      <p class="device-meta" id="deviceMeta">—</p>
+      <p class="status" id="statusLine" role="status">ready</p>
     </header>
 
     <main>
@@ -272,7 +313,7 @@
             <div class="checks-body" id="checkBody">
               <p class="checks-note" id="checkNote">—</p>
               <ol class="findings-list" id="findingsList"></ol>
-              <ul class="check-rules" id="checkRules"></ul>
+              <div class="check-rules" id="checkRules"></div>
             </div>
           </section>
         </aside>
@@ -305,40 +346,54 @@
           >
             <span class="panel-toggle" id="deviceToggle" aria-hidden="true">▸</span>
             <h2>device</h2>
+            <p class="device-meta" id="deviceMetaHead">—</p>
             <p class="panel-peek" id="devicePeek">—</p>
+            <label
+              class="eco"
+              title="Sys.config.device.eco_mode — lower CPU clock + WiFi power-save; raises latency"
+            >
+              <input type="checkbox" id="ecoToggle" disabled />
+              eco
+            </label>
           </div>
           <div class="device-body" id="deviceBody">
-            <div class="device-toolbar">
-              <p class="device-meta" id="deviceMeta">—</p>
-              <label
-                class="eco"
-                title="Sys.config.device.eco_mode — lower CPU clock + WiFi power-save; raises latency"
-              >
-                <input type="checkbox" id="ecoToggle" disabled />
-                eco
-              </label>
-            </div>
             <dl class="device-grid" id="deviceGrid">
               <div><dt>script</dt><dd id="dRunning">—</dd></div>
               <div>
-                <dt>mem used / peak / free</dt>
+                <dt>
+                  mem used / peak / free
+                  <button type="button" class="metric-swap" id="swapMem" aria-pressed="false">🔄</button>
+                </dt>
                 <dd id="dMem">—</dd>
                 <div class="gauge idle" id="gMem"><div class="gauge-fill"></div></div>
+                <div class="mini-bars-host" id="hMem" hidden></div>
               </div>
               <div>
-                <dt>cpu</dt>
+                <dt>
+                  cpu
+                  <button type="button" class="metric-swap" id="swapCpu" aria-pressed="false">🔄</button>
+                </dt>
                 <dd id="dCpu">—</dd>
                 <div class="gauge idle" id="gCpu"><div class="gauge-fill"></div></div>
+                <div class="mini-bars-host" id="hCpu" hidden></div>
               </div>
               <div>
-                <dt>ram free / size</dt>
+                <dt>
+                  ram free / size
+                  <button type="button" class="metric-swap" id="swapRam" aria-pressed="false">🔄</button>
+                </dt>
                 <dd id="dRam">—</dd>
                 <div class="gauge idle" id="gRam"><div class="gauge-fill"></div></div>
+                <div class="mini-bars-host" id="hRam" hidden></div>
               </div>
               <div>
-                <dt>fs free / size</dt>
+                <dt>
+                  fs free / size
+                  <button type="button" class="metric-swap" id="swapFs" aria-pressed="false">🔄</button>
+                </dt>
                 <dd id="dFs">—</dd>
                 <div class="gauge idle" id="gFs"><div class="gauge-fill"></div></div>
+                <div class="mini-bars-host" id="hFs" hidden></div>
               </div>
               <div>
                 <dt>latency</dt>
@@ -349,7 +404,15 @@
                   aria-label="RPC latency, last 5 minutes"
                 ></div>
               </div>
-              <div><dt>temp</dt><dd id="dTemp">—</dd></div>
+              <div>
+                <dt>temp</dt>
+                <dd id="dTemp">—</dd>
+                <div
+                  class="mini-bars-host"
+                  id="tempSpark"
+                  aria-label="Device temperature, last 5 minutes"
+                ></div>
+              </div>
               <div>
                 <dt>rssi</dt>
                 <dd id="dRssi">—</dd>
@@ -383,6 +446,14 @@
                 title="Enable sys.debug.websocket on the device and stream ws://<ip>/debug/log"
               >
                 start stream
+              </button>
+              <button
+                type="button"
+                class="logs-clear"
+                id="btnLogsClear"
+                title="Clear the lines held in the browser — the device buffer is untouched"
+              >
+                clear
               </button>
               <input
                 type="search"
@@ -427,8 +498,6 @@
             <ol class="logs-list" id="logsList"></ol>
           </div>
         </section>
-
-        <p class="status" id="statusLine" role="status">ready</p>
       </div>
     </main>
 

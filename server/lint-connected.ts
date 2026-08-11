@@ -70,6 +70,21 @@ function deviceComponentTypes(profile: DeviceProfile): Set<string> {
   return types;
 }
 
+/**
+ * Singletons — `sys`, `wifi`, `cloud`, … — are reported by the device without
+ * an index, but scripts address them either way, so `sys` and `sys:0` are the
+ * same component and both spellings have to pass.
+ */
+function acceptedComponents(profile: DeviceProfile): Set<string> {
+  const keys = new Set<string>();
+  for (const raw of profile.components) {
+    const key = raw.toLowerCase();
+    keys.add(key);
+    if (!key.includes(":")) keys.add(`${key}:0`);
+  }
+  return keys;
+}
+
 /** `("switch", 0)` and `("switch:0")` are both legal call shapes. */
 function resolveComponentArgs(node: ts.CallExpression): string | null {
   const first = stringArg(node, 0);
@@ -87,13 +102,18 @@ function checkComponent(
   types: Set<string>,
   what: string,
 ) {
-  if (profile.components.includes(key)) return;
+  if (acceptedComponents(profile).has(key)) return;
   const type = key.split(":")[0]!;
-  const message = types.has(type)
-    ? `${what} "${key}" — this device has ${profile.components
-        .filter((c) => c.startsWith(`${type}:`))
-        .join(", ")}`
-    : `${what} "${key}" — this device has no "${type}" component at all`;
+  // Name the instances of that type the device does have, so the message says
+  // which id to use. A singleton has none, hence the bare-name fallback.
+  const siblings = profile.components.filter(
+    (c) => c.toLowerCase() === type || c.toLowerCase().startsWith(`${type}:`),
+  );
+  const message = siblings.length
+    ? `${what} "${key}" — this device has ${siblings.join(", ")}`
+    : types.has(type)
+      ? `${what} "${key}" — this device has no "${type}" with that id`
+      : `${what} "${key}" — this device has no "${type}" component at all`;
   sink.at(node, "component-exists", "error", message);
 }
 

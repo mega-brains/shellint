@@ -1,4 +1,5 @@
 import { loadConfig, assertDevroomCompiler } from "./config.ts";
+import { readDeviceProfile } from "./device-profile.ts";
 import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
 
 export type DeviceStatus = {
@@ -37,6 +38,8 @@ export type DeviceStatus = {
   };
   eco_mode: boolean | null;
   temperatureC: number | null;
+  /** Which component answered — a relay's own temperature is not a room sensor. */
+  temperatureFrom: string | null;
   wifi: {
     rssi: number | null;
     ssid: string | null;
@@ -46,6 +49,17 @@ export type DeviceStatus = {
 
 function num(v: unknown): number | null {
   return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * Component types from the cached profile, so a poll does not spend a failing
+ * round trip every five seconds on a component this device does not have.
+ * `null` means "no profile yet" — then everything is worth a try.
+ */
+function knownComponentTypes(): Set<string> | null {
+  const profile = readDeviceProfile();
+  if (!profile?.components?.length) return null;
+  return new Set(profile.components.map((c) => c.split(":")[0]!.toLowerCase()));
 }
 
 function bool(v: unknown): boolean | null {
@@ -140,12 +154,31 @@ export async function fetchDeviceStatus(): Promise<DeviceStatus> {
         !!s && typeof s === "object" && (s as { id?: unknown }).id === cfg.scriptId,
     );
 
+    // A dedicated sensor is the real reading; a relay's own die temperature is
+    // the fallback, because most Gen2 boxes report only that.
+    const present = knownComponentTypes();
     let temperatureC: number | null = null;
-    const tempCall = await softCall(rpc, "Temperature.GetStatus", { id: 0 });
-    if (tempCall) {
-      rtts.push(tempCall.ms);
-      const t = tempCall.result as Record<string, unknown>;
-      temperatureC = num(t.tC);
+    let temperatureFrom: string | null = null;
+
+    if (present === null || present.has("temperature")) {
+      const tempCall = await softCall(rpc, "Temperature.GetStatus", { id: 0 });
+      if (tempCall) {
+        rtts.push(tempCall.ms);
+        const t = (tempCall.result ?? {}) as Record<string, unknown>;
+        temperatureC = num(t.tC);
+        if (temperatureC != null) temperatureFrom = "temperature:0";
+      }
+    }
+
+    if (temperatureC == null && (present === null || present.has("switch"))) {
+      const swCall = await softCall(rpc, "Switch.GetStatus", { id: 0 });
+      if (swCall) {
+        rtts.push(swCall.ms);
+        const sw = (swCall.result ?? {}) as Record<string, unknown>;
+        const t = (sw.temperature ?? {}) as Record<string, unknown>;
+        temperatureC = num(t.tC);
+        if (temperatureC != null) temperatureFrom = "switch:0";
+      }
     }
 
     const latencyMs =
@@ -189,6 +222,7 @@ export async function fetchDeviceStatus(): Promise<DeviceStatus> {
       },
       eco_mode: bool(deviceCfg.eco_mode),
       temperatureC,
+      temperatureFrom,
       wifi: {
         rssi: num(wifi.rssi) ?? num(sta.rssi),
         ssid: str(wifi.ssid) ?? str(sta.ssid),

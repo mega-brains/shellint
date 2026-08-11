@@ -48,9 +48,17 @@ export function createHeaderLine(onToggleRun?: (running: boolean) => void) {
   function sync(id?: DeviceIdentity) {
     if (!configBase) return;
     // Address and device name identify one box, so they travel together.
-    ipLine.textContent = id?.deviceName
-      ? `${deviceIp} (${id.deviceName})`
-      : deviceIp;
+    const link = document.createElement("a");
+    link.className = "device-link";
+    link.href = `http://${deviceIp}`;
+    link.target = "_blank";
+    link.rel = "noreferrer";
+    link.textContent = deviceIp;
+    link.title = `Open the device web UI at http://${deviceIp} in a new tab`;
+    ipLine.replaceChildren(
+      link,
+      id?.deviceName ? ` (${id.deviceName})` : "",
+    );
     if (!id) {
       configLine.textContent = configBase;
       return;

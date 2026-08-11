@@ -1,0 +1,151 @@
+/* Side-by-side artifact diff, shown as a modal over the whole window. */
+
+.diff-modal {
+  width: min(1400px, 94vw);
+  height: min(900px, 88vh);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+  overflow: hidden;
+}
+
+.diff-modal::backdrop { background: rgba(28, 27, 25, 0.45); }
+
+.diff-modal[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.diff-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.diff-churn {
+  margin: 0;
+  flex: 1 1 auto;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.diff-close,
+.diff-layout {
+  padding: 0.25rem 0.6rem;
+  font-size: 0.8rem;
+}
+
+.diff-layout {
+  background: none;
+  border: 1px solid var(--line);
+  color: var(--muted);
+}
+
+.diff-layout:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+  filter: none;
+}
+
+/* One picker per column, sitting over the half of the table it controls. */
+.diff-labels {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-bottom: 1px solid var(--line);
+  background: rgba(212, 207, 196, 0.25);
+}
+
+.diff-pick {
+  width: 100%;
+  padding: 0.3rem 0.9rem;
+  border: none;
+  background: none;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.diff-pick + .diff-pick { border-left: 1px solid var(--line); }
+.diff-pick:hover { color: var(--accent); }
+
+.diff-scroll {
+  flex: 1 1 auto;
+  overflow: auto;
+}
+
+.diff-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  table-layout: fixed;
+}
+
+.diff-table td { vertical-align: top; }
+
+.diff-num {
+  width: 3rem;
+  padding: 0 0.4rem;
+  text-align: right;
+  color: var(--muted);
+  background: rgba(212, 207, 196, 0.18);
+  user-select: none;
+}
+
+.diff-code {
+  width: calc(50% - 3rem);
+  padding: 0 0.5rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+/* The right half starts here, so give it a visible seam. */
+.diff-table:not(.diff-unified) td:nth-child(3) {
+  border-left: 1px solid var(--line);
+}
+
+/* One column: both line numbers, the +/- sign, then the text. */
+.diff-unified .diff-num { width: 3rem; }
+
+.diff-sign {
+  width: 1.2rem;
+  padding: 0 0.3rem;
+  text-align: center;
+  color: var(--muted);
+  user-select: none;
+}
+
+.diff-unified .diff-code { width: auto; }
+
+/* Stacked layout keeps the pickers, but they no longer caption columns. */
+.diff-labels.stacked { grid-template-columns: auto auto; justify-content: start; }
+.diff-labels.stacked .diff-pick { width: auto; }
+
+.diff-del { background: rgba(139, 46, 26, 0.13); }
+.diff-add { background: rgba(15, 107, 92, 0.14); }
+.diff-blank { background: rgba(212, 207, 196, 0.22); }
+
+/* Inside an edited line, the words that actually differ. */
+.diff-word {
+  border-radius: 2px;
+  padding: 0 0.05em;
+}
+
+.diff-word-del {
+  background: rgba(139, 46, 26, 0.3);
+  color: #6d2414;
+}
+
+.diff-word-add {
+  background: rgba(15, 107, 92, 0.28);
+  color: #0b4f44;
+}

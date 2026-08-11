@@ -80,6 +80,7 @@ export function createDashboard(opts: {
       chartToggle: byId("logsChartToggle"),
       chartPeek: byId("logsChartPeek"),
       list: byId("logsList"),
+      clear: byId("btnLogsClear") as HTMLButtonElement,
       filter: byId("logsFilter") as HTMLInputElement,
       follow: byId("logsFollow") as HTMLInputElement,
     },

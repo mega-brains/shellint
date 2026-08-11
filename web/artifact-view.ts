@@ -6,6 +6,14 @@ import {
   type FindingLocation,
 } from "./goto-finding";
 import { FINDINGS_EVENT, showFindings } from "./finding-gutter";
+import {
+  HIGHLIGHT_LINES_EVENT,
+  highlightLines,
+  type LineHighlight,
+} from "./line-highlight";
+import { showDiffTint, unifiedDiff } from "./diff";
+import { openDiffModal } from "./diff-modal";
+import { suspendDirty } from "./dirty-gutter";
 import type { Finding } from "./check-panel";
 
 export type ArtifactInfo = { name: string; bytes: number; mtime: string };
@@ -17,6 +25,19 @@ type ApiFn = <T>(
 
 /** Editor value that means "the editable source buffer", not an artifact. */
 const SOURCE = "source";
+
+/**
+ * What `meta.env` gating actually removed, as a diff in the same selector. The
+ * readable artifacts are the only pair worth diffing — the minified ones are a
+ * single line each, so their diff says nothing a byte count does not.
+ */
+const DIFF = "diff:debug↔prod";
+/** Same pair, but two columns in a modal instead of one buffer in the editor. */
+const DIFF_SIDE = "diff:side-by-side";
+/** What the compiler did to the code in the editor, TypeScript against ES5. */
+const DIFF_SRC = "diff:source-vs-prod";
+const DIFF_LEFT = "debug.raw.js";
+const DIFF_RIGHT = "prod.raw.js";
 
 /** Swapped between editable and read-only; main.ts seeds it empty. */
 export const readOnlyCompartment = new Compartment();
@@ -46,6 +67,8 @@ export function createArtifactView(opts: {
   let findings: Finding[] = [];
   /** The editable buffer — unsaved edits included — parked during a preview. */
   let sourceDoc: string | null = null;
+  /** Last artifact listing, so the diff modal can offer every built version. */
+  let known: ArtifactInfo[] = [];
 
   function setMeta(text: string, previewing: boolean) {
     meta.textContent = text;
@@ -68,6 +91,10 @@ export function createArtifactView(opts: {
     });
     opts.view.dom.classList.toggle("preview", readOnly);
     markFindings();
+    // Badge lines belong to the buffer they were counted in, not this one.
+    highlightLines(opts.view, []);
+    showDiffTint(opts.view, false);
+    suspendDirty(opts.view, readOnly);
   }
 
   function restoreSource() {
@@ -83,11 +110,75 @@ export function createArtifactView(opts: {
   }
 
   function renderOptions(list: ArtifactInfo[]) {
+    known = list;
     select.replaceChildren(new Option("source (editable)", SOURCE));
     for (const a of list) {
       select.append(new Option(`${a.name} · ${a.bytes} B`, a.name));
     }
+    const has = (name: string) => list.some((a) => a.name === name);
+    if (has(DIFF_LEFT) && has(DIFF_RIGHT)) {
+      select.append(new Option(`diff · debug ↔ prod (raw)`, DIFF));
+      select.append(new Option(`diff · side by side ⤢`, DIFF_SIDE));
+    }
+    if (has(DIFF_RIGHT)) {
+      select.append(new Option(`diff · source ↔ prod.raw ⤢`, DIFF_SRC));
+    }
     select.value = current;
+  }
+
+  async function fetchArtifact(name: string) {
+    return opts.api<{ name: string; bytes: number; code: string }>(
+      `/api/artifact?name=${encodeURIComponent(name)}`,
+    );
+  }
+
+  /** Both artifacts, diffed in the browser — the server has no diff endpoint. */
+  async function showDiff() {
+    const [left, right] = await Promise.all([
+      fetchArtifact(DIFF_LEFT),
+      fetchArtifact(DIFF_RIGHT),
+    ]);
+    const diff = unifiedDiff(left, right);
+    if (current === SOURCE) sourceDoc = opts.view.state.doc.toString();
+    current = DIFF;
+    setDoc(diff.text, true);
+    showDiffTint(opts.view, true);
+    select.value = DIFF;
+    const churn = `+${diff.added} −${diff.removed}`;
+    setMeta(`${DIFF_LEFT} → ${DIFF_RIGHT} · ${churn}`, true);
+    opts.onPreview();
+    opts.onStatus(
+      `diff ${DIFF_LEFT} → ${DIFF_RIGHT} · ${churn} — what meta.env gating changed`,
+    );
+  }
+
+  /**
+   * The editable buffer, unsaved edits included, since that is the code the
+   * user is reasoning about rather than whatever was last written to disk.
+   */
+  function sourceText(): string {
+    return current === SOURCE
+      ? opts.view.state.doc.toString()
+      : (sourceDoc ?? "");
+  }
+
+  /**
+   * A popup, not a buffer: what the editor shows is left exactly as it was.
+   * Both sides are pickable inside it, so this only chooses where to start.
+   */
+  function openSideBySide(left: string, right: string) {
+    openDiffModal({
+      options: [
+        { id: SOURCE, label: "scripts/main.ts (editor)" },
+        ...known.map((a) => ({ id: a.name, label: `dist/${a.name}` })),
+      ],
+      left,
+      right,
+      load: async (id) =>
+        id === SOURCE ? sourceText() : (await fetchArtifact(id)).code,
+    });
+    select.value = current;
+    opts.onStatus(`side-by-side diff ${left} → ${right}`);
   }
 
   async function show(name: string, force = false) {
@@ -95,6 +186,9 @@ export function createArtifactView(opts: {
     if (name === SOURCE) return restoreSource();
     select.disabled = true;
     try {
+      if (name === DIFF_SRC) return openSideBySide(SOURCE, DIFF_RIGHT);
+      if (name === DIFF_SIDE) return openSideBySide(DIFF_LEFT, DIFF_RIGHT);
+      if (name === DIFF) return await showDiff();
       const data = await opts.api<{
         name: string;
         bytes: number;
@@ -134,7 +228,12 @@ export function createArtifactView(opts: {
       setMeta(list.length ? "" : "no build artifacts yet", false);
       return;
     }
-    if (list.some((a) => a.name === current)) return show(current, true);
+    const stillThere =
+      current === DIFF
+        ? list.some((a) => a.name === DIFF_LEFT) &&
+          list.some((a) => a.name === DIFF_RIGHT)
+        : list.some((a) => a.name === current);
+    if (stillThere) return show(current, true);
     restoreSource();
   }
 
@@ -153,9 +252,30 @@ export function createArtifactView(opts: {
     revealLine(opts.view, line);
   }
 
+  /** A badge click: same switch-then-show dance as a finding, many lines. */
+  async function locateLines({ file, lines, reveal = true }: LineHighlight) {
+    if (!lines.length) {
+      highlightLines(opts.view, []);
+      return;
+    }
+    const name = file.startsWith("dist/") ? file.slice("dist/".length) : SOURCE;
+    try {
+      await show(name);
+    } catch {
+      return;
+    }
+    highlightLines(opts.view, lines);
+    if (!reveal) return;
+    const first = Math.min(...lines);
+    revealLine(opts.view, first);
+  }
+
   select.addEventListener("change", () => void show(select.value));
   document.addEventListener(SHOW_FILE_EVENT, (e) => {
     void locate((e as CustomEvent<FindingLocation>).detail);
+  });
+  document.addEventListener(HIGHLIGHT_LINES_EVENT, (e) => {
+    void locateLines((e as CustomEvent<LineHighlight>).detail);
   });
   document.addEventListener(FINDINGS_EVENT, (e) => {
     findings = (e as CustomEvent<Finding[]>).detail;

@@ -1,5 +1,5 @@
 import { renderStatsBars } from "./stats-chart";
-import { renderStatBadges } from "./stats-badges";
+import { renderStatBadges, type StatSites } from "./stats-badges";
 import { renderMemBreakdown, renderMemBullet, renderMemPeek } from "./mem-chart";
 import { renderSparkline } from "./spark";
 
@@ -17,6 +17,7 @@ export type ScriptStats = {
   logging: { consoleLog: number; print: number };
   network: { shellyCall: number };
   nesting: { maxAnonymousDepth: number };
+  sites?: StatSites;
 };
 
 export type HistoryRow = {

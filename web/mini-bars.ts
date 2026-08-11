@@ -22,6 +22,12 @@ export type MiniBarsOptions = {
   extremeLabel?: string;
 };
 
+function clock(ms: number): string {
+  const d = new Date(ms);
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+}
+
 /** Median as well as average: a gap between them means an outlier is skewing it. */
 function median(values: number[]): number {
   const sorted = [...values].sort((a, b) => a - b);
@@ -66,6 +72,9 @@ export function renderMiniBars(
     `${live.length} samples: ${Math.min(...values)} to ${Math.max(...values)} ${opts.unit}`,
   );
 
+  const label = (p: { x: number; y: number }) =>
+    `${clock(p.x)} · ${p.y} ${opts.unit}`;
+
   live.forEach((p, i) => {
     const share = Math.min(1, Math.max(0, (p.y - lo) / span));
     const h = Math.max(1, share * HEIGHT);
@@ -75,7 +84,17 @@ export function renderMiniBars(
     rect.setAttribute("y", String(HEIGHT - h));
     rect.setAttribute("width", String(Math.max(0.5, slot - GAP)));
     rect.setAttribute("height", String(h));
-    svg.appendChild(rect);
+    // Bars are a pixel or two wide, so the whole slot is the hit area.
+    const hit = document.createElementNS(SVG_NS, "rect");
+    hit.setAttribute("class", "mini-bar-hit");
+    hit.setAttribute("x", String(i * slot));
+    hit.setAttribute("y", "0");
+    hit.setAttribute("width", String(Math.max(0.5, slot)));
+    hit.setAttribute("height", String(HEIGHT));
+    const tip = document.createElementNS(SVG_NS, "title");
+    tip.textContent = label(p);
+    hit.appendChild(tip);
+    svg.append(rect, hit);
   });
   host.appendChild(svg);
 
@@ -84,7 +103,22 @@ export function renderMiniBars(
   const avg = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
   const stats = document.createElement("p");
   stats.className = "mini-bars-note";
-  stats.textContent = `avg ${avg} · med ${median(values)} · ${opts.extremeLabel ?? "peak"} ${extreme} ${opts.unit}`;
+  const summary = `avg ${avg} · med ${median(values)} · ${opts.extremeLabel ?? "peak"} ${extreme} ${opts.unit}`;
+  stats.textContent = summary;
   stats.title = `${values.length} samples over the last 5 minutes`;
   host.appendChild(stats);
+
+  // The stats line doubles as the readout, so a hover costs no extra chrome.
+  svg.addEventListener("mousemove", (e) => {
+    const box = svg.getBoundingClientRect();
+    if (!box.width) return;
+    const i = Math.floor(((e.clientX - box.left) / box.width) * live.length);
+    const point = live[Math.min(Math.max(0, i), live.length - 1)];
+    stats.textContent = label(point);
+    stats.classList.add("hover");
+  });
+  svg.addEventListener("mouseleave", () => {
+    stats.textContent = summary;
+    stats.classList.remove("hover");
+  });
 }

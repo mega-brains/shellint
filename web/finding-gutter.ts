@@ -11,10 +11,38 @@ export const FINDINGS_EVENT = "devroom:findings";
 
 const setFindings = StateEffect.define<Finding[]>();
 
+/** One shared tip — native `title` lags; this shows on pointerenter. */
+let tipEl: HTMLDivElement | null = null;
+
+function tipHost(): HTMLDivElement {
+  if (!tipEl) {
+    tipEl = document.createElement("div");
+    tipEl.className = "cm-finding-tip";
+    tipEl.hidden = true;
+    document.body.appendChild(tipEl);
+  }
+  return tipEl;
+}
+
+function hideTip(): void {
+  if (tipEl) tipEl.hidden = true;
+}
+
+function showTip(anchor: HTMLElement, text: string, severity: Finding["severity"]): void {
+  const el = tipHost();
+  el.textContent = text;
+  el.classList.toggle("cm-finding-tip-error", severity === "error");
+  el.hidden = false;
+  const r = anchor.getBoundingClientRect();
+  const pad = 8;
+  el.style.left = `${Math.min(r.right + pad, window.innerWidth - el.offsetWidth - pad)}px`;
+  el.style.top = `${Math.min(r.top, window.innerHeight - el.offsetHeight - pad)}px`;
+}
+
 class FindingMarker extends GutterMarker {
   constructor(
     private readonly severity: Finding["severity"],
-    private readonly title: string,
+    private readonly detail: string,
   ) {
     super();
   }
@@ -23,7 +51,18 @@ class FindingMarker extends GutterMarker {
     const span = document.createElement("span");
     span.className = `cm-finding cm-finding-${this.severity}`;
     span.textContent = this.severity === "error" ? "✕" : "⚠";
-    span.title = this.title;
+    span.setAttribute("aria-label", this.detail);
+    if (this.detail) {
+      span.addEventListener("pointerenter", () => {
+        showTip(span, this.detail, this.severity);
+        // Span is mounted here; toDOM-time closest() would miss the scroller.
+        span.closest(".cm-scroller")?.addEventListener("scroll", hideTip, {
+          passive: true,
+          once: true,
+        });
+      });
+      span.addEventListener("pointerleave", hideTip);
+    }
     return span;
   }
 }
@@ -41,8 +80,8 @@ function build(doc: EditorView["state"]["doc"], findings: Finding[]) {
     .sort((a, b) => a[0] - b[0])
     .map(([line, list]) => {
       const worst = list.some((f) => f.severity === "error") ? "error" : "warn";
-      const title = list.map((f) => `${f.rule}: ${f.message}`).join("\n");
-      return new FindingMarker(worst, title).range(doc.line(line).from);
+      const detail = list.map((f) => `${f.rule}: ${f.message}`).join("\n");
+      return new FindingMarker(worst, detail).range(doc.line(line).from);
     });
   return RangeSet.of(ranges, true);
 }
@@ -52,7 +91,10 @@ const findingField = StateField.define<RangeSet<GutterMarker>>({
   update(set, tr) {
     set = set.map(tr.changes);
     for (const effect of tr.effects) {
-      if (effect.is(setFindings)) set = build(tr.state.doc, effect.value);
+      if (effect.is(setFindings)) {
+        hideTip();
+        set = build(tr.state.doc, effect.value);
+      }
     }
     return set;
   },

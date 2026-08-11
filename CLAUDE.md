@@ -31,14 +31,14 @@ build, test).
 | Server / UI | Hono + CodeMirror 6 |
 | Deploy | WS PutCode; mode debug/prod + artifact min/raw |
 | Live telemetry | `GET /api/device/status` + eco toggle (M5) |
-| Dashboard metrics | `/api/stats` → `estimate` (JsVar model) + `minFirmware`; size sparkline; estimate vs live `mem_peak` (M12) |
+| Dashboard metrics | `/api/stats` → `estimate` (JsVar model) + `minFirmware`; size sparkline; estimate vs live `mem_peak` (M12). Counter badges carry `stats.sites` (source lines per counter) and toggle a line highlight in the editor when clicked |
 | Debug logs | `GET`/`POST /api/device/logs` — server holds the one `/debug/log` socket, browser polls; `print("#m <series> <value>")` charts numerically (M12) |
 | Charts | Hand-rolled inline SVG (`web/spark.ts`). **No uPlot** — deliberately dependency-free |
 | Compliance | `POST /api/check` — source lint Tier 1–5 + post-compile dialect guard (M8–M10). `server/check-catalog.ts` names all 59 checks; each run reports pass/warn/fail/**skipped** per rule, and `GET /api/checks` serves the catalog alone |
-| UI layout | Editor + resizable sidebar (`build`, `check`); footer keeps device telemetry, logs, status |
+| UI layout | Editor + resizable sidebar (`build`, `check`); footer keeps device telemetry, logs, status. Toolbar: Save · Build split (build / check / build + check) · Deploy split · Probe, both splits driven by `web/split-button.ts` |
 | Device profile | `types/device-profile.json` (`ListMethods` + components + gen/fw) drives Tier 4; refreshed when the device answers |
 | Capability probe | `mise run probe` → 104 `Script.Eval` expressions (`server/probe-catalog.ts`) → `types/generated-probe.json` → `types/generated.d.ts`. **Advisory**: excluded from the device compile, surfaced as the `probe-absent-api` warning (M13) |
-| Artifact preview | Selector above the editor swaps in any built `dist` artifact read-only; `GET /api/artifacts` + `/api/artifact` serve a six-name allowlist (M13) |
+| Artifact preview | Selector above the editor swaps in any built `dist` artifact read-only; `GET /api/artifacts` + `/api/artifact` serve a six-name allowlist (M13). Last entry is `diff · debug ↔ prod (raw)` — unified diff computed in the browser (`web/diff.ts`, hand-rolled LCS), tinted per +/- line |
 | Auth | None for now |
 
 Default compiler is clean-room DevRoom (`compiler: "devroom"`). Setting

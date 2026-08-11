@@ -6,8 +6,12 @@ import { createCollapsible } from "./collapsible";
 import { createLayout } from "./layout";
 import { createArtifactView, readOnlyCompartment } from "./artifact-view";
 import { findingGutter } from "./finding-gutter";
+import { statLineHighlight } from "./line-highlight";
+import { diffHighlight } from "./diff";
+import { dirtyGutter, setDirtyBaseline } from "./dirty-gutter";
 import { createHeaderLine } from "./header-line";
 import { createDashboard } from "./dashboard";
+import { closeAllMenus, createSplitButton } from "./split-button";
 import {
   type HistoryRow,
   type MemoryEstimate,
@@ -26,16 +30,19 @@ import {
 
 type Mode = "debug" | "prod";
 type Minify = "min" | "raw";
+type BuildAction = "build" | "check" | "both";
 
 const el = {
   editor: document.getElementById("editor")!,
   save: document.getElementById("btnSave") as HTMLButtonElement,
   build: document.getElementById("btnBuild") as HTMLButtonElement,
+  buildMenuBtn: document.getElementById("btnBuildMenu") as HTMLButtonElement,
+  buildMenu: document.getElementById("buildMenu") as HTMLUListElement,
+  buildSplit: document.getElementById("buildSplit") as HTMLDivElement,
   deploy: document.getElementById("btnDeploy") as HTMLButtonElement,
   deployMenuBtn: document.getElementById("btnDeployMenu") as HTMLButtonElement,
   deployMenu: document.getElementById("deployMenu") as HTMLUListElement,
   deploySplit: document.getElementById("deploySplit") as HTMLDivElement,
-  check: document.getElementById("btnCheck") as HTMLButtonElement,
   probe: document.getElementById("btnProbe") as HTMLButtonElement,
   checkPanel: document.getElementById("checkPanel")!,
   checkHead: document.getElementById("checkHead")!,
@@ -77,6 +84,15 @@ let deployChoice: { mode: Mode; minify: Minify } = {
   minify: "min",
 };
 
+/** What the primary Build button runs — the last variant picked from its menu. */
+let buildAction: BuildAction = "both";
+
+const BUILD_LABEL: Record<BuildAction, string> = {
+  build: "Build",
+  check: "Check",
+  both: "Build + Check",
+};
+
 function minifyLabel(m: Minify): string {
   return m === "raw" ? "non-minified" : "minified";
 }
@@ -92,9 +108,18 @@ function syncDeployLabel() {
   el.deploy.title = `Upload ${file} (${mode}, ${minifyLabel(minify)}) to the Shelly script slot over WebSocket RPC`;
 }
 
-function setMenuOpen(open: boolean) {
-  el.deployMenu.hidden = !open;
-  el.deployMenuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+function syncBuildLabel() {
+  const item = el.buildMenu.querySelector<HTMLButtonElement>(
+    `button[data-action="${buildAction}"]`,
+  );
+  el.build.textContent = BUILD_LABEL[buildAction];
+  if (item?.title) el.build.title = item.title;
+}
+
+async function runBuildAction(action = buildAction) {
+  if (action === "check") return checkScript();
+  await buildScript();
+  if (action === "both") await checkScript();
 }
 
 function setStatus(msg: string, isError = false) {
@@ -252,6 +277,7 @@ async function loadScript() {
   view.dispatch({
     changes: { from: 0, to: view.state.doc.length, insert: data.source },
   });
+  setDirtyBaseline(view, data.source);
   setStatus("loaded scripts/main.ts");
 }
 
@@ -261,6 +287,7 @@ async function saveScript() {
     method: "PUT",
     body: JSON.stringify({ source }),
   });
+  setDirtyBaseline(view, source);
   setStatus(`saved (${new TextEncoder().encode(source).length} B)`);
 }
 
@@ -371,14 +398,14 @@ function busy(on: boolean) {
   for (const b of [
     el.save,
     el.build,
+    el.buildMenuBtn,
     el.deploy,
     el.deployMenuBtn,
-    el.check,
     el.probe,
   ]) {
     b.disabled = on || (b === el.save && artifacts?.previewing() === true);
   }
-  if (on) setMenuOpen(false);
+  if (on) closeAllMenus();
 }
 
 async function withBusy(fn: () => Promise<void>) {
@@ -401,6 +428,9 @@ async function main() {
         javascript({ typescript: true }),
         readOnlyCompartment.of([]),
         findingGutter,
+        dirtyGutter,
+        statLineHighlight,
+        diffHighlight,
         EditorView.lineWrapping,
         EditorView.theme({
           "&": { height: "100%", width: "100%" },
@@ -414,6 +444,7 @@ async function main() {
   createLayout(() => view.requestMeasure());
 
   syncDeployLabel();
+  syncBuildLabel();
 
   try {
     const cfg = await api<{
@@ -426,31 +457,30 @@ async function main() {
   }
 
   el.save.addEventListener("click", () => withBusy(saveScript));
-  el.build.addEventListener("click", () => withBusy(buildScript));
+  el.build.addEventListener("click", () => withBusy(() => runBuildAction()));
   el.deploy.addEventListener("click", () => withBusy(() => deployScript()));
-  el.check.addEventListener("click", () => withBusy(() => checkScript()));
   el.probe.addEventListener("click", () => withBusy(probeDevice));
-  el.deployMenuBtn.addEventListener("click", (e) => {
-    e.stopPropagation();
-    setMenuOpen(el.deployMenu.hidden);
-  });
-  el.deployMenu.addEventListener("click", (e) => {
-    const btn = (e.target as HTMLElement).closest("button[data-mode]");
-    if (!(btn instanceof HTMLButtonElement)) return;
-    deployChoice = {
-      mode: btn.dataset.mode === "prod" ? "prod" : "debug",
-      minify: btn.dataset.minify === "raw" ? "raw" : "min",
-    };
-    syncDeployLabel();
-    setMenuOpen(false);
-    withBusy(() => deployScript(deployChoice));
-  });
-  document.addEventListener("click", (e) => {
-    if (!el.deploySplit.contains(e.target as Node)) setMenuOpen(false);
-  });
-  document.addEventListener("keydown", (e) => {
-    if (e.key === "Escape") setMenuOpen(false);
-  });
+
+  createSplitButton(
+    { root: el.buildSplit, toggle: el.buildMenuBtn, menu: el.buildMenu },
+    (item) => {
+      buildAction = (item.dataset.action as BuildAction | undefined) ?? "build";
+      syncBuildLabel();
+      withBusy(() => runBuildAction());
+    },
+  );
+
+  createSplitButton(
+    { root: el.deploySplit, toggle: el.deployMenuBtn, menu: el.deployMenu },
+    (item) => {
+      deployChoice = {
+        mode: item.dataset.mode === "prod" ? "prod" : "debug",
+        minify: item.dataset.minify === "raw" ? "raw" : "min",
+      };
+      syncDeployLabel();
+      withBusy(() => deployScript(deployChoice));
+    },
+  );
   device.startPoll();
   await loadCheckCatalog();
   await loadHistory(await dashboard.loadStats());

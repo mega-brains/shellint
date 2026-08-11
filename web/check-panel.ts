@@ -114,78 +114,89 @@ function tally(rows: CheckRow[]): Record<CheckStatus, number> {
   return out;
 }
 
-function ruleItem(row: CheckRow): HTMLLIElement {
-  const li = document.createElement("li");
-  li.className = `check check-${row.status}`;
+function why(row: CheckRow): string {
+  return row.status === "skipped" && row.needs
+    ? `${row.about} — ${WHY_SKIPPED[row.needs]}`
+    : row.about;
+}
 
-  const mark = document.createElement("span");
+/** One table row per check: mark, rule, findings. Prose only where it earns it. */
+function ruleRow(row: CheckRow): HTMLTableRowElement {
+  const tr = document.createElement("tr");
+  tr.className = `check check-${row.status}`;
+  tr.title = `${row.rule} · ${row.status} — ${why(row)}`;
+
+  const mark = document.createElement("td");
   mark.className = "check-mark";
   mark.textContent = MARK[row.status];
   mark.setAttribute("aria-hidden", "true");
 
-  const name = document.createElement("span");
+  const name = document.createElement("td");
   name.className = "check-rule";
-  name.textContent = row.rule;
-
-  const about = document.createElement("span");
-  about.className = "check-about";
-  about.textContent =
-    row.status === "skipped" && row.needs
-      ? `${row.about} — ${WHY_SKIPPED[row.needs]}`
-      : row.about;
-
-  li.append(mark, name, about);
-
-  if (row.count) {
-    const count = document.createElement("span");
-    count.className = "check-count";
-    count.textContent = `${row.count}`;
-    count.title = plural(row.count, "finding");
-    li.appendChild(count);
+  name.appendChild(text("check-rule-name", row.rule));
+  // A passing rule needs no explanation; anything else does.
+  if (row.status !== "pass" && row.status !== "pending") {
+    name.appendChild(text("check-about", why(row)));
   }
 
-  li.title = `${row.rule} · ${row.status}`;
-  return li;
+  const count = document.createElement("td");
+  count.className = "check-count";
+  if (row.count) {
+    count.textContent = `${row.count}`;
+    count.title = plural(row.count, "finding");
+  }
+
+  tr.append(mark, name, count);
+  return tr;
 }
 
-function groupSection(
-  group: CheckGroup,
-  rows: CheckRow[],
-): HTMLLIElement | null {
-  if (!rows.length) return null;
-  const li = document.createElement("li");
-  li.className = "check-group";
-
-  const head = document.createElement("p");
-  head.className = "check-group-head";
-
-  const label = document.createElement("span");
-  label.className = "check-group-label";
-  label.textContent = group.label;
-
+/** Group verdict in the summary, so a collapsed group still says how it went. */
+function groupMeta(counts: Record<CheckStatus, number>, total: number) {
   const meta = document.createElement("span");
   meta.className = "check-group-meta";
+  const add = (cls: string, mark: string, n: number, label: string) => {
+    if (!n) return;
+    const tag = text(`check-tag ${cls}`, `${mark} ${n}`);
+    tag.title = `${n} ${label}`;
+    meta.appendChild(tag);
+  };
+  add("check-tag-fail", MARK.fail, counts.fail, "failing");
+  add("check-tag-warn", MARK.warn, counts.warn, "warning");
+  add("check-tag-skip", MARK.skipped, counts.skipped, "skipped");
+  add("check-tag-pass", MARK.pass, counts.pass, "passing");
+  add("check-tag-idle", MARK.pending, counts.pending, "not run yet");
+  meta.title = `${total} checks in this group`;
+  return meta;
+}
+
+/**
+ * Groups collapse by default and open themselves only when something inside
+ * needs attention, so a clean run is a short list of headers.
+ */
+function groupSection(group: CheckGroup, rows: CheckRow[]): HTMLElement | null {
+  if (!rows.length) return null;
   const counts = tally(rows);
-  meta.textContent = counts.fail
-    ? `${counts.fail} failing`
-    : counts.warn
-      ? `${counts.warn} warning`
-      : counts.skipped === rows.length
-        ? "skipped"
-        : `${rows.length}`;
 
-  head.append(label, meta);
+  const details = document.createElement("details");
+  details.className = "check-group";
+  details.open = counts.fail + counts.warn > 0;
 
-  const about = document.createElement("p");
-  about.className = "check-group-about";
-  about.textContent = group.about;
+  const summary = document.createElement("summary");
+  summary.className = "check-group-head";
+  summary.title = group.about;
+  summary.append(
+    text("check-group-label", group.label),
+    groupMeta(counts, rows.length),
+  );
 
-  const list = document.createElement("ul");
-  list.className = "check-list";
-  for (const row of rows) list.appendChild(ruleItem(row));
+  const table = document.createElement("table");
+  table.className = "check-table";
+  const body = document.createElement("tbody");
+  for (const row of rows) body.appendChild(ruleRow(row));
+  table.appendChild(body);
 
-  li.append(head, about, list);
-  return li;
+  details.append(summary, table);
+  return details;
 }
 
 function renderRules(
@@ -216,6 +227,22 @@ function renderRules(
   }
 }
 
+/** Decoration only: the severity word and the location text carry the meaning. */
+function glyph(className: string, mark: string): HTMLSpanElement {
+  const span = document.createElement("span");
+  span.className = className;
+  span.textContent = mark;
+  span.setAttribute("aria-hidden", "true");
+  return span;
+}
+
+function text(className: string, value: string): HTMLSpanElement {
+  const span = document.createElement("span");
+  span.className = className;
+  span.textContent = value;
+  return span;
+}
+
 function renderFindingList(els: CheckPanelEls, findings: Finding[]) {
   els.findings.replaceChildren();
   document.dispatchEvent(
@@ -229,10 +256,16 @@ function renderFindingList(els: CheckPanelEls, findings: Finding[]) {
   for (const f of ordered) {
     const li = document.createElement("li");
     li.className = `finding ${f.severity}`;
+    if (f.file && f.line != null) {
+      li.dataset.file = f.file;
+      li.dataset.line = String(f.line);
+    }
 
-    const sev = document.createElement("span");
-    sev.className = "finding-sev";
-    sev.textContent = f.severity;
+    const isError = f.severity === "error";
+    const sev = text(
+      `badge ${isError ? "badge-fail" : "badge-warn"} finding-sev`,
+      isError ? "ERROR" : "WARN",
+    );
 
     const rule = document.createElement("span");
     rule.className = "finding-rule";
@@ -249,12 +282,16 @@ function renderFindingList(els: CheckPanelEls, findings: Finding[]) {
       // Clickable only with a line to jump to; otherwise it is a plain label.
       const loc = document.createElement(f.line != null ? "button" : "span");
       loc.className = "finding-loc";
-      loc.textContent = where;
+      loc.append(
+        glyph("finding-loc-sev", f.severity === "error" ? "✕" : "⚠"),
+        text("finding-loc-text", where),
+      );
       if (loc instanceof HTMLButtonElement && f.file && f.line != null) {
         loc.type = "button";
         loc.dataset.file = f.file;
         loc.dataset.line = String(f.line);
         loc.title = `Go to ${where}`;
+        loc.append(glyph("finding-loc-go", "↗"));
       }
       li.appendChild(loc);
     }

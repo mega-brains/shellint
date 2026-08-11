@@ -18,6 +18,25 @@
   background: rgba(255, 252, 247, 0.6);
 }
 
+/* Badges with known source lines act as buttons that highlight them. */
+button.stat-badge {
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+button.stat-badge:hover { border-color: var(--accent); }
+
+button.stat-badge:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.stat-badge.active {
+  border-color: var(--accent);
+  background: rgba(15, 107, 92, 0.12);
+}
+
 .stat-badge-value {
   font-family: var(--mono);
   font-size: 1.05rem;

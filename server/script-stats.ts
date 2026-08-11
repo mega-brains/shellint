@@ -2,6 +2,20 @@ import { readFileSync, existsSync } from "node:fs";
 import ts from "typescript";
 import { SCRIPT_PATH } from "./paths.ts";
 
+/**
+ * 1-based source lines behind each dashboard badge, so a counter can be
+ * traced back to the code that produced it. Occurrence order, duplicates kept.
+ */
+export type StatSites = {
+  apis: number[];
+  vars: number[];
+  functions: number[];
+  strings: number[];
+  consoleLog: number[];
+  print: number[];
+  shellyCall: number[];
+};
+
 export type ScriptStats = {
   apis: Record<string, number>;
   registrations: {
@@ -34,6 +48,7 @@ export type ScriptStats = {
   nesting: {
     maxAnonymousDepth: number;
   };
+  sites: StatSites;
 };
 
 const EMPTY: ScriptStats = {
@@ -54,6 +69,15 @@ const EMPTY: ScriptStats = {
   logging: { consoleLog: 0, print: 0 },
   network: { shellyCall: 0, httpGet: 0, httpPost: 0, mqttPublish: 0 },
   nesting: { maxAnonymousDepth: 0 },
+  sites: {
+    apis: [],
+    vars: [],
+    functions: [],
+    strings: [],
+    consoleLog: [],
+    print: [],
+    shellyCall: [],
+  },
 };
 
 function bump(map: Record<string, number>, key: string) {
@@ -92,6 +116,12 @@ export function analyzeSource(source: string, fileName = "main.ts"): ScriptStats
   const stats: ScriptStats = structuredClone(EMPTY);
   let anonDepth = 0;
 
+  const at = (node: ts.Node) =>
+    sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
+  const mark = (key: keyof StatSites, node: ts.Node) => {
+    stats.sites[key].push(at(node));
+  };
+
   const visit = (node: ts.Node) => {
     const enteredAnon = isAnonFunction(node);
     if (enteredAnon) {
@@ -110,24 +140,31 @@ export function analyzeSource(source: string, fileName = "main.ts"): ScriptStats
       )
     ) {
       stats.declarations.vars += node.declarations.length;
+      for (const d of node.declarations) mark("vars", d);
     }
 
     if (ts.isFunctionDeclaration(node) && node.name) {
       stats.declarations.functions += 1;
       stats.declarations.params += node.parameters.length;
+      mark("functions", node);
     }
     if (ts.isFunctionExpression(node) || ts.isArrowFunction(node)) {
-      if (node.name) stats.declarations.functions += 1;
+      if (node.name) {
+        stats.declarations.functions += 1;
+        mark("functions", node);
+      }
       stats.declarations.params += node.parameters.length;
     }
     if (ts.isMethodDeclaration(node)) {
       stats.declarations.functions += 1;
       stats.declarations.params += node.parameters.length;
+      mark("functions", node);
     }
 
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
       stats.literals.strings.count += 1;
       stats.literals.strings.totalBytes += Buffer.byteLength(node.text, "utf8");
+      mark("strings", node);
     }
     if (ts.isNumericLiteral(node)) {
       stats.literals.numbers.count += 1;
@@ -148,7 +185,10 @@ export function analyzeSource(source: string, fileName = "main.ts"): ScriptStats
           name === "console.log" ||
           name === "console.error" ||
           name === "console.warn";
-        if (known) bump(stats.apis, name);
+        if (known) {
+          bump(stats.apis, name);
+          mark("apis", node);
+        }
 
         if (name === "Timer.set") stats.registrations.timers += 1;
         if (name === "Shelly.addEventHandler")
@@ -163,10 +203,17 @@ export function analyzeSource(source: string, fileName = "main.ts"): ScriptStats
 
         if (name === "console.log" || name === "console.error" || name === "console.warn") {
           stats.logging.consoleLog += 1;
+          mark("consoleLog", node);
         }
-        if (name === "print") stats.logging.print += 1;
+        if (name === "print") {
+          stats.logging.print += 1;
+          mark("print", node);
+        }
 
-        if (name === "Shelly.call") stats.network.shellyCall += 1;
+        if (name === "Shelly.call") {
+          stats.network.shellyCall += 1;
+          mark("shellyCall", node);
+        }
         if (name === "Shelly.HTTP.get" || name === "HTTP.get")
           stats.network.httpGet += 1;
         if (name === "Shelly.HTTP.post" || name === "HTTP.post")

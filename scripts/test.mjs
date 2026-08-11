@@ -293,6 +293,11 @@ hasCon('Shelly.call("Switch.Set", { id: 3 });', "component-exists");
 hasNotCon('Shelly.call("Switch.Set", { id: 0 });', "component-exists");
 hasCon('Shelly.getComponentStatus("cct", 0);', "component-exists");
 hasNotCon('Shelly.getComponentStatus("switch:0");', "component-exists");
+// Singletons are listed without an index; both spellings address the same one.
+hasNotCon('Shelly.getComponentStatus("sys");', "component-exists");
+hasNotCon('Shelly.getComponentStatus("sys", 0);', "component-exists");
+hasNotCon('Shelly.getComponentStatus("wifi");', "component-exists");
+hasCon('Shelly.getComponentStatus("sys", 1);', "component-exists");
 hasCon("AES.encrypt(k, d);", "require-capability-aes");
 hasNotCon("AES.encrypt(k, d);", "require-capability-aes", gen3);
 hasCon('Virtual.getHandle("number:200");', "require-capability-virtual");

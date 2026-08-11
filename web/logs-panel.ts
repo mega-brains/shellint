@@ -33,6 +33,7 @@ export type LogsPanelEls = {
   chartToggle: HTMLElement;
   chartPeek: HTMLElement;
   list: HTMLElement;
+  clear: HTMLButtonElement;
   filter: HTMLInputElement;
   follow: HTMLInputElement;
 };
@@ -252,6 +253,18 @@ export function createLogsPanel(opts: {
   els.button.addEventListener("click", (e) => {
     e.stopPropagation();
     void (streaming ? stop() : start());
+  });
+
+  /**
+   * Browser-side only: the device keeps its own circular buffer and `since`
+   * keeps its place in the stream, so streaming continues uninterrupted and
+   * new lines keep arriving after a clear.
+   */
+  els.clear.addEventListener("click", () => {
+    lines = [];
+    els.note.classList.remove("warn");
+    renderLines();
+    setPeek(streaming ? `0 lines · ${series.size} series` : "cleared");
   });
 
   return { stop };
