@@ -7,6 +7,9 @@
   gap: 0.5rem;
 }
 
+#buildPanel,
+#devicePanel { font-family: var(--sans-narrow); }
+
 /* Collapsible panel chrome, shared by the build and device sections. */
 .panel-head {
   display: flex;

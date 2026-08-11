@@ -7,8 +7,12 @@
   --accent: #0f6b5c;
   --accent-ink: #ffffff;
   --danger: #8b2e1a;
-  --mono: "IBM Plex Mono", "SF Mono", "Menlo", "Consolas", monospace;
-  --sans: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", sans-serif;
+  /* OS-bundled faces only (macOS / Windows / Linux) — nothing is downloaded. */
+  --mono: ui-monospace, "SF Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
+  --sans: system-ui, "Segoe UI", "Helvetica Neue", "DejaVu Sans", sans-serif;
+  --sans-narrow:
+    "Avenir Next Condensed", "Arial Narrow", "Liberation Sans Narrow",
+    "DejaVu Sans Condensed", var(--sans);
   --chrome-pad: 1rem 1.25rem;
 }
 
@@ -38,6 +42,7 @@ body {
 }
 
 .top {
+  font-family: var(--sans-narrow);
   position: sticky;
   top: 0;
   z-index: 30;
