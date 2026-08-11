@@ -21,6 +21,9 @@ type Pending = {
   reject: (err: Error) => void;
 };
 
+const CONNECT_TIMEOUT_MS = 5_000;
+const RPC_TIMEOUT_MS = 10_000;
+
 /**
  * Unauthenticated Shelly Gen2 WebSocket RPC client.
  * Sends ≥1 request with valid `src` on connect (Shelly WS requirement).
@@ -42,32 +45,52 @@ export class ShellyRpc {
       const url = `ws://${this.deviceIp}/rpc`;
       const ws = new WebSocket(url);
       this.ws = ws;
+      let settled = false;
 
       const fail = (err: Error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
         this.cleanup();
         reject(err);
       };
 
+      const ok = () => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        resolve();
+      };
+
+      const timer = setTimeout(() => {
+        fail(new Error(`connect timeout to ${url} (${CONNECT_TIMEOUT_MS}ms)`));
+      }, CONNECT_TIMEOUT_MS);
+
       ws.on("open", () => {
         // Warm the channel with a valid src (required before notifications / further use).
         this.call("Shelly.GetDeviceInfo", {})
-          .then(() => resolve())
+          .then(() => ok())
           .catch((err: unknown) => {
             if (err instanceof AuthNotSupportedError) {
               fail(err);
               return;
             }
-            // Some firmwares may lack GetDeviceInfo under that name — fall back to Script.List.
             this.call("Script.List", {})
-              .then(() => resolve())
-              .catch((e2: unknown) => fail(e2 instanceof Error ? e2 : new Error(String(e2))));
+              .then(() => ok())
+              .catch((e2: unknown) =>
+                fail(e2 instanceof Error ? e2 : new Error(String(e2))),
+              );
           });
       });
 
       ws.on("message", (data) => this.onMessage(data.toString()));
 
       ws.on("error", (err) => {
-        fail(err instanceof Error ? err : new Error(String(err)));
+        fail(
+          err instanceof Error
+            ? err
+            : new Error(`WebSocket error connecting to ${url}`),
+        );
       });
 
       ws.on("close", () => {
@@ -91,7 +114,7 @@ export class ShellyRpc {
   private cleanup() {
     if (this.ws) {
       try {
-        this.ws.close();
+        this.ws.terminate();
       } catch {
         /* ignore */
       }
@@ -153,7 +176,7 @@ export class ShellyRpc {
           this.pending.delete(id);
           reject(new Error(`RPC timeout: ${method}`));
         }
-      }, 15_000);
+      }, RPC_TIMEOUT_MS);
     });
   }
 

@@ -23,16 +23,24 @@ Small, simple development room (playground) for developing shelly scripts
 | `host` / `port` | DevRoom HTTP bind (default `0.0.0.0:8787`) |
 | `compiler` | Must be `"devroom"` for now (`shelly-forge` not wired) |
 
-2. Install and start:
+2. Install and start (mise preferred):
 
 ```bash
-npm install
-npm run dev
+mise install && mise run install
+mise run start
+# or: npm install && npm run dev
 ```
 
-Open `http://127.0.0.1:8787` — edit `scripts/main.ts`, **Save → Build → Deploy** (pick debug|prod). **Probe** runs `Script.Eval` checks and writes `types/generated-probe.json`.
+Open `http://127.0.0.1:8787` — edit `scripts/main.ts`, **Save → Build → Deploy**.
+Pick **debug|prod** mode and **minified|non-minified** artifact. **Probe** runs
+`Script.Eval` checks and writes `types/generated-probe.json`.
 
-CLI helpers: `npm run build:shelly`, `npm run deploy -- [debug|prod]`, `npm run probe`.
+```bash
+mise run build
+mise run deploy -- debug min    # or: prod raw
+mise run probe
+mise run test
+```
 
 Unauthenticated devices only; a 401 surfaces as **auth not supported yet**.
 

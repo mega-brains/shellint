@@ -1,5 +1,5 @@
 {
-  "description": "Deps for M2–M4 (Hono UI + WS deploy). Merge into root package.json if needed.",
+  "description": "Deps for M2–M4 (Hono UI + WS deploy). Merged into root package.json — reference copy.",
   "dependencies": {
     "hono": "^4.7.0",
     "@hono/node-server": "^1.14.0",
@@ -15,14 +15,12 @@
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.36.2",
     "@codemirror/commands": "^6.8.0",
-    "@codemirror/language": "^6.10.8",
-    "@codemirror/theme-one-dark": "^6.1.2"
+    "@codemirror/language": "^6.10.8"
   },
   "scripts": {
     "dev": "npm run build:web && node --import tsx server/index.ts",
     "build:web": "node scripts/build-web.mjs",
     "deploy": "node --import tsx server/cli-deploy.ts",
     "probe": "node --import tsx server/cli-probe.ts"
-  },
-  "note": "Merged into root package.json — kept as reference for M2–M4 deps."
+  }
 }

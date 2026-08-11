@@ -9,23 +9,24 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - read [plans-in-project-dir](./.claude/memory/plans-in-project-dir.md)
 
 
-## Status: M0–M1 scaffolded
+## Status: M0–M1 done · M2–M4 UI/deploy present
 
-Scaffold + dual-build pipeline landed. Hono UI / deploy / probe are M2–M4 (see
-[`.claude/plans/2026-08-11_06_basic-implementation.md`](./.claude/plans/2026-08-11_06_basic-implementation.md)).
-Verify with `ls` before assuming any file exists.
+Prefer **mise** tasks ([`mise.toml`](./mise.toml)). Verify with `ls` / `mise tasks`
+before assuming entrypoints exist.
 
 ## Stack (committed)
 
 | Layer | Choice |
 |---|---|
-| Runtime | Node.js ≥20 (`"type": "module"`) |
+| Runtime | Node 22 via mise (`"type": "module"`) |
+| Task runner | mise (`start`/`dev`, `build`, `deploy`, `lint`, `test`, `probe`, `clean`) |
 | Device compile | `tsc` → ES5, `module: none`, `noEmitHelpers` |
-| Minify | Terser tier-2 (dual `meta.env` via `global_defs`) |
-| Emit | Flat (no IIFE) → `dist/debug.js` + `dist/prod.js` |
+| Env gating | `meta.env` DCE → `*.raw.js`; then Terser minify → `*.js` |
+| Emit | Flat (no IIFE) → `dist/{debug,prod}.{raw.js,js}` |
 | Types | `types/shelly.d.ts`, `types/espruino-lib.d.ts`, `types/meta.d.ts` |
 | Config | `devroom.json` (`deviceIp`, `scriptId`, `host`, `port`, `compiler`) |
-| Server / UI | Hono + CodeMirror 6 (M2+) |
+| Server / UI | Hono + CodeMirror 6 |
+| Deploy | WS PutCode; mode debug/prod + artifact min/raw |
 | Auth | None for now |
 
 Default compiler is clean-room DevRoom (`compiler: "devroom"`). Setting
@@ -34,15 +35,18 @@ Default compiler is clean-room DevRoom (`compiler: "devroom"`). Setting
 ## Commands
 
 ```bash
-npm install              # uses project .npmrc → registry.npmjs.org
-npm run build:shelly     # tsc → Terser×2 → dist/debug.js + dist/prod.js; prints byte sizes
-npm run lint             # tsc -p tsconfig.shelly.json --noEmit
-npm run test             # alias: build:shelly
-npm run dev              # Hono + web UI (M2+; host/port from devroom.json)
-npm run deploy           # CLI deploy helper (M3+)
-npm run probe            # Script.Eval capability probe (M4+)
+mise install
+mise run install          # npm install
+mise run build            # → dist/debug.{raw.js,js} + dist/prod.{raw.js,js}
+mise run lint             # tsc --noEmit (Shelly script)
+mise run test             # build + assert debug≠prod and raw≠min
+mise run start            # DevRoom server (alias: mise run dev)
+mise run deploy -- debug min   # MODE + MINIFY=min|raw
+mise run probe
+mise run clean
 ```
 
+Also available via `npm run …` (`build:shelly`, `build:web`, `dev`, …).
 Build config: `tsconfig.shelly.json`. Entry: `scripts/main.ts`. Pipeline:
 `scripts/build-shelly.mjs`.
 
