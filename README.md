@@ -33,14 +33,20 @@ mise run start
 
 Open `http://127.0.0.1:8787` — edit `scripts/main.ts`, **Save → Build → Deploy**.
 Deploy is a split button: main click reuses last choice; ▾ picks
-**debug|prod** × **minified|non-minified**. **Probe** runs `Script.Eval` checks and
-writes `types/generated-probe.json`. Footer polls live device telemetry (script
+**debug|prod** × **minified|non-minified**. **Check** runs the Shelly/Espruino
+compliance pass and lists findings in the footer — it works offline, and when
+the device is answering it also checks RPC method names, component ids and
+firmware capabilities against that device. **Probe** runs `Script.Eval` checks and
+writes `types/generated-probe.json`; it never overwrites stored device scripts —
+if the configured slot is not running it creates a throwaway `devroom-probe`
+slot and deletes it again. Footer polls live device telemetry (script
 mem/cpu, RAM/FS, latency, RSSI) and has an **eco** toggle.
 
 ```bash
 mise run build
 mise run deploy -- debug min    # or: prod raw
 mise run probe
+mise run profile                # cache device capabilities for the connected lint
 mise run test
 mise run beforeCommit           # lines + typecheck + build + test
 ```

@@ -10,4 +10,5 @@ export const SCRIPT_PATH = join(ROOT, "scripts", "main.ts");
 export const DIST_DIR = join(ROOT, "dist");
 export const WEB_DIR = join(ROOT, "web");
 export const PROBE_PATH = join(ROOT, "types", "generated-probe.json");
+export const DEVICE_PROFILE_PATH = join(ROOT, "types", "device-profile.json");
 export const DEVROOM_JSON = join(ROOT, "devroom.json");

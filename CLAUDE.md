@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - read [plans-in-project-dir](./.claude/memory/plans-in-project-dir.md)
 
 
-## Status: M0–M4 basic · M5–M7 post-basic · M8 dialect guard (lint pack TBD)
+## Status: M0–M4 basic · M5–M10 done (lint Tier 1–5, incl. connected Tier 4)
 
 Prefer **mise** tasks ([`mise.toml`](./mise.toml)). Verify with `ls` / `mise tasks`
 before assuming entrypoints exist.
@@ -31,6 +31,8 @@ build, test).
 | Server / UI | Hono + CodeMirror 6 |
 | Deploy | WS PutCode; mode debug/prod + artifact min/raw |
 | Live telemetry | `GET /api/device/status` + eco toggle (M5) |
+| Compliance | `POST /api/check` — source lint Tier 1–5 + post-compile dialect guard (M8–M10) |
+| Device profile | `types/device-profile.json` (`ListMethods` + components + gen/fw) drives Tier 4; refreshed when the device answers |
 | Auth | None for now |
 
 Default compiler is clean-room DevRoom (`compiler: "devroom"`). Setting
@@ -50,6 +52,7 @@ mise run beforeCommit     # check:lines → typecheck → build → test
 mise run start            # DevRoom server (alias: mise run dev)
 mise run deploy -- debug min   # MODE + MINIFY=min|raw
 mise run probe
+mise run profile # cache the device capability profile for Tier 4 lint
 mise run clean
 ```
 
@@ -93,15 +96,3 @@ writing anything that touches the device API surface or the language subset;
 the Shelly API changes and has a
 [changelog](https://shelly-api-docs.shelly.cloud/gen2/changelog).
 
-## Conventions inherited from the monorepo
-
-This directory is one project inside `~/d/IDEAS` — see that repo's
-`CLAUDE.md` and `.claude/memory/BASIC_INSTRUCTIONS.md`. Notably:
-
-- Plans/findings go in the **project-local** `.claude/plans/` (not `~/.claude`),
-  named `YYYY-MM-DD_slug.md`.
-- Every plan/findings file opens with a fenced `Date: / Scope: / Status:` block;
-  advance Status as work lands.
-- Each project owns its own stack and tooling — nothing is shared across the monorepo.
-- `shelly-devroom` is **not yet listed** in the parent `IDEAS/CLAUDE.md` project
-  table; add it there once the stack is chosen.

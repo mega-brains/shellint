@@ -7,6 +7,7 @@ export type DeviceStatus = {
   latencyMs: number;
   device: {
     id?: string;
+    name?: string;
     model?: string;
     gen?: number | string;
     ver?: string;
@@ -16,6 +17,7 @@ export type DeviceStatus = {
   };
   script: {
     id: number;
+    name: string | null;
     running: boolean | null;
     mem_used: number | null;
     mem_peak: number | null;
@@ -129,6 +131,15 @@ export async function fetchDeviceStatus(): Promise<DeviceStatus> {
       unknown
     >;
 
+    // Script.GetStatus carries no name; the slot listing is the only source.
+    const listCall = await softCall(rpc, "Script.List", {});
+    if (listCall) rtts.push(listCall.ms);
+    const list = (listCall?.result ?? {}) as { scripts?: unknown };
+    const slot = (Array.isArray(list.scripts) ? list.scripts : []).find(
+      (s): s is Record<string, unknown> =>
+        !!s && typeof s === "object" && (s as { id?: unknown }).id === cfg.scriptId,
+    );
+
     let temperatureC: number | null = null;
     const tempCall = await softCall(rpc, "Temperature.GetStatus", { id: 0 });
     if (tempCall) {
@@ -148,6 +159,7 @@ export async function fetchDeviceStatus(): Promise<DeviceStatus> {
       latencyMs,
       device: {
         id: str(info.id) ?? undefined,
+        name: str(info.name) ?? str(deviceCfg.name) ?? undefined,
         model: str(info.model) ?? undefined,
         gen: (info.gen as number | string | undefined) ?? undefined,
         ver: str(info.ver) ?? undefined,
@@ -157,6 +169,7 @@ export async function fetchDeviceStatus(): Promise<DeviceStatus> {
       },
       script: {
         id: cfg.scriptId,
+        name: slot ? str(slot.name) : null,
         running: bool(script.running),
         mem_used: num(script.mem_used),
         mem_peak: num(script.mem_peak),

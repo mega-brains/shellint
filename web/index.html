@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Shelly DevRoom</title>
     <link rel="stylesheet" href="/styles.css" />
+    <link rel="stylesheet" href="/panels.css" />
   </head>
   <body>
     <header class="top">
@@ -98,8 +99,15 @@
         </div>
         <button
           type="button"
+          id="btnCheck"
+          title="Shelly/Espruino compliance check of scripts/main.ts (and dist artifacts when present). Works offline; adds device capability checks when the device answers."
+        >
+          Check
+        </button>
+        <button
+          type="button"
           id="btnProbe"
-          title="Run Script.Eval capability checks on the device and write types/generated-probe.json"
+          title="Run Script.Eval capability checks on the device and write types/generated-probe.json — stored device scripts are never overwritten"
         >
           Probe
         </button>
@@ -108,28 +116,51 @@
       <div id="editor" class="editor"></div>
 
       <div class="footer">
-        <section class="sizes" aria-label="Build sizes">
-          <div class="size-block">
-            <h2>debug</h2>
-            <p id="sizeDebug">—</p>
+        <section class="build" aria-label="Build sizes" id="buildPanel">
+          <div
+            class="panel-head"
+            id="buildHead"
+            role="button"
+            tabindex="0"
+            aria-expanded="true"
+            aria-controls="buildBody"
+            title="Show or hide build sizes, script stats and history"
+          >
+            <span class="panel-toggle" id="buildToggle" aria-hidden="true">▾</span>
+            <h2>build</h2>
+            <p class="panel-peek" id="buildPeek">—</p>
           </div>
-          <div class="size-block">
-            <h2>prod</h2>
-            <p id="sizeProd">—</p>
+          <div class="sizes" id="buildBody">
+            <div class="size-block">
+              <h2>debug</h2>
+              <p id="sizeDebug">—</p>
+            </div>
+            <div class="size-block">
+              <h2>prod</h2>
+              <p id="sizeProd">—</p>
+            </div>
+            <div class="size-block size-stats">
+              <h2>stats</h2>
+              <p id="scriptStats" class="stats-summary">—</p>
+              <div
+                id="statsChart"
+                class="stats-chart"
+                aria-label="Resource usage versus Shelly device caps"
+              ></div>
+            </div>
+            <div class="size-block size-history">
+              <h2>history</h2>
+              <ol id="buildHistory" class="history-list"></ol>
+            </div>
           </div>
-          <div class="size-block size-stats">
-            <h2>stats</h2>
-            <p id="scriptStats" class="stats-summary">—</p>
-            <div
-              id="statsChart"
-              class="stats-chart"
-              aria-label="Resource usage versus Shelly device caps"
-            ></div>
+        </section>
+
+        <section class="findings" aria-label="Compliance findings" id="findingsPanel" hidden>
+          <div class="findings-head">
+            <h2>check</h2>
+            <p class="findings-summary" id="findingsSummary">—</p>
           </div>
-          <div class="size-block size-history">
-            <h2>history</h2>
-            <ol id="buildHistory" class="history-list"></ol>
-          </div>
+          <ol class="findings-list" id="findingsList"></ol>
         </section>
 
         <section
@@ -138,7 +169,7 @@
           id="devicePanel"
         >
           <div
-            class="device-head"
+            class="panel-head"
             id="deviceHead"
             role="button"
             tabindex="0"
@@ -146,9 +177,9 @@
             aria-controls="deviceBody"
             title="Show or hide full device telemetry"
           >
-            <span class="device-toggle" id="deviceToggle" aria-hidden="true">▸</span>
+            <span class="panel-toggle" id="deviceToggle" aria-hidden="true">▸</span>
             <h2>device</h2>
-            <p class="device-peek" id="devicePeek">—</p>
+            <p class="panel-peek" id="devicePeek">—</p>
           </div>
           <div class="device-body" id="deviceBody">
             <div class="device-toolbar">
@@ -163,13 +194,33 @@
             </div>
             <dl class="device-grid" id="deviceGrid">
               <div><dt>script</dt><dd id="dRunning">—</dd></div>
-              <div><dt>mem used / peak / free</dt><dd id="dMem">—</dd></div>
-              <div><dt>cpu</dt><dd id="dCpu">—</dd></div>
-              <div><dt>ram free / size</dt><dd id="dRam">—</dd></div>
-              <div><dt>fs free / size</dt><dd id="dFs">—</dd></div>
+              <div>
+                <dt>mem used / peak / free</dt>
+                <dd id="dMem">—</dd>
+                <div class="gauge idle" id="gMem"><div class="gauge-fill"></div></div>
+              </div>
+              <div>
+                <dt>cpu</dt>
+                <dd id="dCpu">—</dd>
+                <div class="gauge idle" id="gCpu"><div class="gauge-fill"></div></div>
+              </div>
+              <div>
+                <dt>ram free / size</dt>
+                <dd id="dRam">—</dd>
+                <div class="gauge idle" id="gRam"><div class="gauge-fill"></div></div>
+              </div>
+              <div>
+                <dt>fs free / size</dt>
+                <dd id="dFs">—</dd>
+                <div class="gauge idle" id="gFs"><div class="gauge-fill"></div></div>
+              </div>
               <div><dt>latency</dt><dd id="dLatency">—</dd></div>
               <div><dt>temp</dt><dd id="dTemp">—</dd></div>
-              <div><dt>rssi</dt><dd id="dRssi">—</dd></div>
+              <div>
+                <dt>rssi</dt>
+                <dd id="dRssi">—</dd>
+                <div class="gauge idle" id="gRssi"><div class="gauge-fill"></div></div>
+              </div>
             </dl>
             <p class="device-err" id="deviceErr" hidden></p>
           </div>

@@ -11,6 +11,7 @@
     "dev": "npm run build:web && node --import tsx server/index.ts",
     "deploy": "node --import tsx server/cli-deploy.ts",
     "probe": "node --import tsx server/cli-probe.ts",
+    "profile": "node --import tsx server/cli-profile.ts",
     "typecheck:shelly": "tsc -p tsconfig.shelly.json --noEmit",
     "typecheck:server": "tsc -p tsconfig.server.json",
     "typecheck:web": "tsc -p tsconfig.web.json",

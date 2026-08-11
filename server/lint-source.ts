@@ -1,14 +1,9 @@
 import { readFileSync, existsSync } from "node:fs";
 import ts from "typescript";
 import { SCRIPT_PATH } from "./paths.ts";
+import { calleeName, stringArg, type Finding } from "./lint-util.ts";
 
-export type Finding = {
-  severity: "error" | "warn";
-  rule: string;
-  message: string;
-  file?: string;
-  line?: number;
-};
+export type { Finding };
 
 /**
  * Tier 1 rules restricted to what `tsc` cannot down-level for us.
@@ -43,21 +38,6 @@ const MAX_STORAGE_ITEMS = 12;
 const MAX_STORAGE_KEY_BYTES = 16;
 const MAX_STORAGE_VALUE_BYTES = 1024;
 const MAX_RPC_NAME_CHARS = 32;
-
-function calleeName(expr: ts.Expression): string | null {
-  if (ts.isIdentifier(expr)) return expr.text;
-  if (ts.isPropertyAccessExpression(expr)) {
-    const left = calleeName(expr.expression);
-    return left ? `${left}.${expr.name.text}` : null;
-  }
-  return null;
-}
-
-function stringArg(node: ts.CallExpression, index: number): string | null {
-  const arg = node.arguments[index];
-  if (!arg) return null;
-  return ts.isStringLiteralLike(arg) ? arg.text : null;
-}
 
 type RegistrationSite = { conditional: boolean };
 
@@ -172,8 +152,9 @@ export function lintSource(
     }
   };
 
-  const checkStringRegexMethods = (node: ts.CallExpression, name: string) => {
-    const method = name.split(".").pop() ?? "";
+  const checkStringRegexMethods = (node: ts.CallExpression) => {
+    if (!ts.isPropertyAccessExpression(node.expression)) return;
+    const method = node.expression.name.text;
     if (method === "match" || method === "search") {
       add(
         node,
@@ -248,9 +229,9 @@ export function lintSource(
   };
 
   const checkTier2Call = (node: ts.CallExpression) => {
+    checkStringRegexMethods(node);
     const name = calleeName(node.expression);
     if (!name) return;
-    checkStringRegexMethods(node, name);
     checkStorage(node, name);
     checkRpcName(node, name);
     if (!CAPS[name]) return;

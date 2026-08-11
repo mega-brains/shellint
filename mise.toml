@@ -48,6 +48,10 @@ run = "npm run beforeCommit"
 description = "Run Script.Eval capability probe against device"
 run = "npm run probe"
 
+[tasks.profile]
+description = "Cache the device capability profile (ListMethods + components) for Tier 4 lint"
+run = "npm run profile"
+
 [tasks.clean]
 description = "Remove Shelly + web build artifacts"
 run = "rm -rf dist web/dist .tsc-out"

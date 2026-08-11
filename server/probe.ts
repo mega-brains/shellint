@@ -4,14 +4,25 @@ import { PROBE_PATH } from "./paths.ts";
 import { loadConfig, assertDevroomCompiler } from "./config.ts";
 import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
 
-/** Fixed capability probes — Script.Eval expressions. */
+/**
+ * Fixed capability probes — Script.Eval expressions.
+ * Must stay side-effect-free: they may be evaluated inside a script the user owns.
+ */
 const PROBES: { id: string; code: string }[] = [
-  { id: "array.map", code: 'typeof [].map' },
+  { id: "array.map", code: "typeof [].map" },
   { id: "string.padStart", code: 'typeof "".padStart' },
   { id: "print", code: "typeof print" },
   { id: "setTimeout", code: "typeof setTimeout" },
   { id: "Timer", code: "typeof Timer" },
 ];
+
+/** Temporary slot created by the probe. Only ever a freshly created id. */
+const SCRATCH_NAME = "devroom-probe";
+/** A registered handler guarantees the slot stays `running` while we evaluate. */
+const SCRATCH_CODE = "Shelly.addStatusHandler(function () {});\n";
+
+/** Which slot the probes ran in, and how it was obtained. */
+export type ProbeStrategy = "configured" | "scratch" | "running-slot";
 
 export type ProbeEntry = {
   id: string;
@@ -25,14 +36,179 @@ export type ProbeReport = {
   probed: true;
   at: string;
   deviceIp: string;
+  /** Slot the probes actually ran in. */
   scriptId: number;
+  configuredScriptId: number;
+  strategy: ProbeStrategy;
+  /** Slots present before the probe — none of these are written to or deleted. */
+  existingScriptIds: number[];
+  scratchScriptId: number | null;
+  scratchRemoved: boolean;
+  notes: string[];
   results: ProbeEntry[];
 };
 
+type Slot = { id: number; name: string | null; running: boolean | null };
+
+/** Minimal RPC surface the slot handling needs — lets tests supply a fake device. */
+export type ProbeRpc = {
+  call(method: string, params?: Record<string, unknown>): Promise<unknown>;
+};
+
+export type Host = {
+  scriptId: number;
+  strategy: ProbeStrategy;
+  scratchScriptId: number | null;
+  existingScriptIds: number[];
+  notes: string[];
+};
+
+function msg(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
+function toSlot(v: unknown): Slot | null {
+  if (!v || typeof v !== "object") return null;
+  const o = v as Record<string, unknown>;
+  if (typeof o.id !== "number") return null;
+  return {
+    id: o.id,
+    name: typeof o.name === "string" ? o.name : null,
+    running: typeof o.running === "boolean" ? o.running : null,
+  };
+}
+
+async function listSlots(rpc: ProbeRpc): Promise<Slot[]> {
+  const res = (await rpc.call("Script.List", {})) as { scripts?: unknown } | null;
+  const arr = Array.isArray(res?.scripts) ? res.scripts : [];
+  return arr.map(toSlot).filter((s): s is Slot => s !== null);
+}
+
+async function isRunning(rpc: ProbeRpc, id: number): Promise<boolean> {
+  try {
+    const st = (await rpc.call("Script.GetStatus", { id })) as {
+      running?: unknown;
+    } | null;
+    return st?.running === true;
+  } catch (e) {
+    if (e instanceof AuthNotSupportedError) throw e;
+    return false;
+  }
+}
+
 /**
- * Run Script.Eval capability checks against the configured script slot.
- * Script must already be running on the device.
- * Writes types/generated-probe.json.
+ * Script.Create a fresh slot, upload the keep-alive stub, start it.
+ * Refuses to write to any id that already existed; cleans up on partial failure.
+ */
+async function createScratchHost(
+  rpc: ProbeRpc,
+  existingIds: Set<number>,
+): Promise<number> {
+  const created = (await rpc.call("Script.Create", { name: SCRATCH_NAME })) as {
+    id?: unknown;
+  } | null;
+  const id = typeof created?.id === "number" ? created.id : null;
+  if (id == null) throw new Error("Script.Create returned no id");
+  if (existingIds.has(id)) {
+    throw new Error(
+      `Script.Create returned pre-existing slot ${id} — refusing to overwrite a stored script`,
+    );
+  }
+
+  try {
+    await rpc.call("Script.PutCode", { id, code: SCRATCH_CODE, append: false });
+    await rpc.call("Script.Start", { id });
+    return id;
+  } catch (e) {
+    await removeScratch(rpc, id).catch(() => {});
+    throw e;
+  }
+}
+
+export async function removeScratch(rpc: ProbeRpc, id: number): Promise<void> {
+  try {
+    await rpc.call("Script.Stop", { id });
+  } catch {
+    // Not running is fine — Delete is what matters.
+  }
+  await rpc.call("Script.Delete", { id });
+}
+
+/**
+ * Find a slot to evaluate in without modifying anything the user stored:
+ * configured slot if it is already running → fresh temporary slot →
+ * read-only eval inside some other already-running script.
+ */
+export async function acquireHost(
+  rpc: ProbeRpc,
+  configuredId: number,
+): Promise<Host> {
+  const notes: string[] = [];
+  const slots = await listSlots(rpc);
+  const existingIds = new Set(slots.map((s) => s.id));
+  const existingScriptIds = [...existingIds].sort((a, b) => a - b);
+
+  if (existingIds.has(configuredId) && (await isRunning(rpc, configuredId))) {
+    return {
+      scriptId: configuredId,
+      strategy: "configured",
+      scratchScriptId: null,
+      existingScriptIds,
+      notes,
+    };
+  }
+
+  const stale = slots.filter((s) => s.name === SCRATCH_NAME).map((s) => s.id);
+  if (stale.length > 0) {
+    notes.push(
+      `leftover "${SCRATCH_NAME}" slot(s) ${stale.join(", ")} on device — left untouched, delete manually if unwanted`,
+    );
+  }
+
+  try {
+    const id = await createScratchHost(rpc, existingIds);
+    notes.push(
+      `script ${configuredId} not running — probed in temporary slot ${id} ("${SCRATCH_NAME}"), removed afterwards`,
+    );
+    return {
+      scriptId: id,
+      strategy: "scratch",
+      scratchScriptId: id,
+      existingScriptIds,
+      notes,
+    };
+  } catch (e) {
+    if (e instanceof AuthNotSupportedError) throw e;
+    notes.push(`temporary slot unavailable (${msg(e)})`);
+  }
+
+  for (const s of slots) {
+    if (s.id === configuredId || s.running === false) continue;
+    if (await isRunning(rpc, s.id)) {
+      notes.push(
+        `probed read-only inside running script ${s.id}${s.name ? ` ("${s.name}")` : ""} — its code was not modified`,
+      );
+      return {
+        scriptId: s.id,
+        strategy: "running-slot",
+        scratchScriptId: null,
+        existingScriptIds,
+        notes,
+      };
+    }
+  }
+
+  throw new Error(
+    `no script is running and a temporary probe slot could not be created` +
+      ` (${notes.join("; ")}) — start a script (Deploy) and probe again`,
+  );
+}
+
+/**
+ * Run Script.Eval capability checks and write types/generated-probe.json.
+ * Never writes to or deletes a script slot that already existed on the device:
+ * it evaluates in the configured slot when that is already running, otherwise in a
+ * temporary slot it creates and removes, otherwise read-only in another running script.
  */
 export async function runProbe(): Promise<ProbeReport> {
   const cfg = loadConfig();
@@ -40,46 +216,62 @@ export async function runProbe(): Promise<ProbeReport> {
 
   const rpc = new ShellyRpc(cfg.deviceIp);
   const results: ProbeEntry[] = [];
+  let scratchRemoved = false;
 
   try {
     await rpc.connect();
+    const host = await acquireHost(rpc, cfg.scriptId);
 
-    for (const p of PROBES) {
-      try {
-        const result = await rpc.call("Script.Eval", {
-          id: cfg.scriptId,
-          code: p.code,
-        });
-        const value =
-          result && typeof result === "object" && "result" in (result as object)
-            ? (result as { result: unknown }).result
-            : result;
-        results.push({ id: p.id, code: p.code, ok: true, result: value });
-      } catch (e) {
-        if (e instanceof AuthNotSupportedError) throw e;
-        results.push({
-          id: p.id,
-          code: p.code,
-          ok: false,
-          error: e instanceof Error ? e.message : String(e),
-        });
+    try {
+      for (const p of PROBES) {
+        try {
+          const result = await rpc.call("Script.Eval", {
+            id: host.scriptId,
+            code: p.code,
+          });
+          const value =
+            result && typeof result === "object" && "result" in (result as object)
+              ? (result as { result: unknown }).result
+              : result;
+          results.push({ id: p.id, code: p.code, ok: true, result: value });
+        } catch (e) {
+          if (e instanceof AuthNotSupportedError) throw e;
+          results.push({ id: p.id, code: p.code, ok: false, error: msg(e) });
+        }
+      }
+    } finally {
+      if (host.scratchScriptId != null) {
+        try {
+          await removeScratch(rpc, host.scratchScriptId);
+          scratchRemoved = true;
+        } catch (e) {
+          host.notes.push(
+            `WARNING: temporary slot ${host.scratchScriptId} could not be removed (${msg(e)}) — delete it on the device`,
+          );
+        }
       }
     }
+
+    const report: ProbeReport = {
+      probed: true,
+      at: new Date().toISOString(),
+      deviceIp: cfg.deviceIp,
+      scriptId: host.scriptId,
+      configuredScriptId: cfg.scriptId,
+      strategy: host.strategy,
+      existingScriptIds: host.existingScriptIds,
+      scratchScriptId: host.scratchScriptId,
+      scratchRemoved,
+      notes: host.notes,
+      results,
+    };
+
+    mkdirSync(dirname(PROBE_PATH), { recursive: true });
+    writeFileSync(PROBE_PATH, JSON.stringify(report, null, 2) + "\n", "utf8");
+    return report;
   } finally {
     rpc.close();
   }
-
-  const report: ProbeReport = {
-    probed: true,
-    at: new Date().toISOString(),
-    deviceIp: cfg.deviceIp,
-    scriptId: cfg.scriptId,
-    results,
-  };
-
-  mkdirSync(dirname(PROBE_PATH), { recursive: true });
-  writeFileSync(PROBE_PATH, JSON.stringify(report, null, 2) + "\n", "utf8");
-  return report;
 }
 
 export { AuthNotSupportedError };

@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { serveStatic } from "@hono/node-server/serve-static";
@@ -77,10 +77,23 @@ export function createApp() {
     }
   });
 
-  const check = (c: Context) => {
+  // `ok` stays transport-level; compliance verdict lives in report.ok
+  const check = async (c: Context) => {
+    let connected = c.req.query("connected") === "1";
+    if (c.req.method === "POST") {
+      try {
+        const body = (await c.req.json()) as { connected?: unknown };
+        connected = body.connected === true;
+      } catch {
+        /* body is optional */
+      }
+    }
     try {
-      return c.json({ ok: true, ...runCheck() });
+      return c.json({ ok: true, report: await runCheck({ connected }) });
     } catch (e) {
+      if (e instanceof CompilerNotWiredError) {
+        return c.json({ ok: false, error: e.message }, 400);
+      }
       return c.json(
         { ok: false, error: e instanceof Error ? e.message : String(e) },
         500,
@@ -239,8 +252,8 @@ export function createApp() {
     return c.html(readFileSync(index, "utf8"));
   });
 
-  app.get("/styles.css", (c) => {
-    const css = join(WEB_DIR, "styles.css");
+  app.get("/:name{[a-z0-9-]+\\.css}", (c) => {
+    const css = join(WEB_DIR, c.req.param("name"));
     if (!existsSync(css)) return c.text("not found", 404);
     c.header("Content-Type", "text/css; charset=utf-8");
     return c.body(readFileSync(css, "utf8"));

@@ -19,6 +19,8 @@ export class RpcError extends Error {
 type Pending = {
   resolve: (result: unknown) => void;
   reject: (err: Error) => void;
+  /** Cleared on settle, otherwise it holds the event loop open until it fires. */
+  timer: ReturnType<typeof setTimeout>;
 };
 
 const CONNECT_TIMEOUT_MS = 5_000;
@@ -94,10 +96,7 @@ export class ShellyRpc {
       });
 
       ws.on("close", () => {
-        for (const [, p] of this.pending) {
-          p.reject(new Error("WebSocket closed"));
-        }
-        this.pending.clear();
+        this.rejectAll(new Error("WebSocket closed"));
         this.ws = null;
         this.openPromise = null;
       });
@@ -121,8 +120,13 @@ export class ShellyRpc {
     }
     this.ws = null;
     this.openPromise = null;
+    this.rejectAll(new Error("connection failed"));
+  }
+
+  private rejectAll(err: Error) {
     for (const [, p] of this.pending) {
-      p.reject(new Error("connection failed"));
+      clearTimeout(p.timer);
+      p.reject(err);
     }
     this.pending.clear();
   }
@@ -142,6 +146,7 @@ export class ShellyRpc {
     const pending = this.pending.get(msg.id);
     if (!pending) return;
     this.pending.delete(msg.id);
+    clearTimeout(pending.timer);
 
     if (msg.error) {
       const code = msg.error.code ?? -1;
@@ -169,14 +174,13 @@ export class ShellyRpc {
       params,
     };
     return new Promise((resolve, reject) => {
-      this.pending.set(id, { resolve, reject });
-      this.ws!.send(JSON.stringify(frame));
-      setTimeout(() => {
-        if (this.pending.has(id)) {
-          this.pending.delete(id);
+      const timer = setTimeout(() => {
+        if (this.pending.delete(id)) {
           reject(new Error(`RPC timeout: ${method}`));
         }
       }, RPC_TIMEOUT_MS);
+      this.pending.set(id, { resolve, reject, timer });
+      this.ws!.send(JSON.stringify(frame));
     });
   }
 

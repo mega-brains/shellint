@@ -1,9 +1,27 @@
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { DIST_DIR, SCRIPT_PATH } from "./paths.ts";
-import { lintScriptFile, type Finding } from "./lint-source.ts";
+import { lintScriptFile } from "./lint-source.ts";
+import { lintSemanticsFile } from "./lint-semantics.ts";
+import { lintAdvisoriesFile } from "./lint-advisories.ts";
+import { lintConnected } from "./lint-connected.ts";
+import {
+  fetchDeviceProfile,
+  readDeviceProfile,
+  type DeviceProfile,
+} from "./device-profile.ts";
+import type { Finding } from "./lint-util.ts";
 import { checkBuildArtifacts } from "./dialect-check.ts";
 import { analyzeScriptFile, type ScriptStats } from "./script-stats.ts";
+
+export type CheckProfileInfo = {
+  source: "live" | "cache";
+  at: string;
+  deviceIp: string;
+  model: string | null;
+  gen: number | null;
+  ver: string | null;
+};
 
 export type CheckReport = {
   ok: boolean;
@@ -11,6 +29,12 @@ export type CheckReport = {
   counts: { errors: number; warnings: number };
   artifacts: string[];
   stats: ScriptStats | null;
+  profile: CheckProfileInfo | null;
+};
+
+export type CheckOptions = {
+  /** Refresh the device profile over RPC before linting; falls back to cache. */
+  connected?: boolean;
 };
 
 const ARTIFACTS = ["debug.raw.js", "prod.raw.js"];
@@ -46,12 +70,61 @@ function artifactFindings(): { findings: Finding[]; artifacts: string[] } {
 }
 
 /**
- * Static Shelly/Espruino compliance for the saved script.
- * Source lint (Tier 1–2) always runs; the dialect guard runs over whatever
- * build artifacts exist, so Check works with no device and no prior build.
+ * The device profile is refreshed only when the caller says the device is
+ * reachable, so an offline Check never waits on an RPC timeout. A cached
+ * profile still drives Tier 4, flagged as such.
  */
-export function runCheck(): CheckReport {
-  const findings: Finding[] = [...lintScriptFile()];
+async function resolveProfile(
+  connected: boolean,
+): Promise<{ profile: DeviceProfile | null; findings: Finding[] }> {
+  const findings: Finding[] = [];
+  if (connected) {
+    try {
+      const profile = await fetchDeviceProfile();
+      return { profile, findings };
+    } catch (e) {
+      findings.push({
+        severity: "warn",
+        rule: "device-unreachable",
+        message: `could not read the device profile (${e instanceof Error ? e.message : String(e)}) — falling back to the cached one`,
+      });
+    }
+  }
+
+  const cached = readDeviceProfile();
+  if (!cached) {
+    findings.push({
+      severity: "warn",
+      rule: "profile-missing",
+      message:
+        "no device profile cached — connected lint (unknown RPC methods, missing components, firmware capabilities) is skipped",
+    });
+  }
+  return { profile: cached, findings };
+}
+
+/**
+ * Static Shelly/Espruino compliance for the saved script.
+ * Source lint (Tier 1–3 + Tier 5 advisories) always runs; the dialect guard
+ * runs over whatever build artifacts exist, so Check works with no device and
+ * no prior build. Tier 4 additionally needs a device profile, live or cached.
+ */
+export async function runCheck(opts: CheckOptions = {}): Promise<CheckReport> {
+  const findings: Finding[] = [
+    ...lintScriptFile(),
+    ...lintSemanticsFile(),
+    ...lintAdvisoriesFile(),
+  ];
+
+  const { profile, findings: profileNotes } = await resolveProfile(
+    opts.connected === true,
+  );
+  findings.push(...profileNotes);
+  if (profile && existsSync(SCRIPT_PATH)) {
+    findings.push(
+      ...lintConnected(readFileSync(SCRIPT_PATH, "utf8"), profile),
+    );
+  }
 
   const { findings: artifactNotes, artifacts } = artifactFindings();
   findings.push(...artifactNotes);
@@ -76,5 +149,15 @@ export function runCheck(): CheckReport {
     counts: { errors, warnings: findings.length - errors },
     artifacts,
     stats,
+    profile: profile
+      ? {
+          source: opts.connected && !profileNotes.length ? "live" : "cache",
+          at: profile.at,
+          deviceIp: profile.deviceIp,
+          model: profile.model,
+          gen: profile.gen,
+          ver: profile.ver,
+        }
+      : null,
   };
 }

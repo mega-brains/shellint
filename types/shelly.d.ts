@@ -167,3 +167,40 @@ interface ScriptStatic {
 }
 
 declare var Script: ScriptStatic;
+
+// ---------------------------------------------------------------------------
+// HTTPServer
+// ---------------------------------------------------------------------------
+
+/** Headers are `[name, value]` pairs on the device, not an object. */
+type HttpHeaderPairs = Array<[string, string]>;
+
+interface HttpServerRequest {
+  method: string;
+  query: string | null;
+  headers: HttpHeaderPairs;
+  body: string;
+}
+
+interface HttpServerResponse {
+  code: number;
+  body: string;
+  headers: HttpHeaderPairs;
+  /** Must be called, or the device answers 504 after 10 s. */
+  send(): boolean;
+}
+
+interface HTTPServerStatic {
+  /** Max 5 endpoints per script. */
+  registerEndpoint(
+    endpoint: string,
+    handler: (
+      request: HttpServerRequest,
+      response: HttpServerResponse,
+      userdata?: unknown
+    ) => void,
+    userdata?: unknown
+  ): string;
+}
+
+declare var HTTPServer: HTTPServerStatic;
