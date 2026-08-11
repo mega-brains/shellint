@@ -79,6 +79,7 @@ export function createDashboard(opts: {
       chartHead: byId("logsChartHead"),
       chartToggle: byId("logsChartToggle"),
       chartPeek: byId("logsChartPeek"),
+      chartSeparate: byId("logsChartSeparate") as HTMLInputElement,
       list: byId("logsList"),
       clear: byId("btnLogsClear") as HTMLButtonElement,
       filter: byId("logsFilter") as HTMLInputElement,

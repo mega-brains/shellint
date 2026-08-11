@@ -32,6 +32,7 @@ export type LogsPanelEls = {
   chartHead: HTMLElement;
   chartToggle: HTMLElement;
   chartPeek: HTMLElement;
+  chartSeparate: HTMLInputElement;
   list: HTMLElement;
   clear: HTMLButtonElement;
   filter: HTMLInputElement;
@@ -68,8 +69,17 @@ export function createLogsPanel(opts: {
     {
       storageKey: "shelly-devroom.logsChart.collapsed",
       defaultCollapsed: false,
+      ignoreSelector: ".logs-chart-separate",
     },
   );
+
+  const SEPARATE_KEY = "shelly-devroom.logsChart.separate";
+  els.chartSeparate.checked = localStorage.getItem(SEPARATE_KEY) === "1";
+  els.chartSeparate.addEventListener("click", (e) => e.stopPropagation());
+  els.chartSeparate.addEventListener("change", () => {
+    localStorage.setItem(SEPARATE_KEY, els.chartSeparate.checked ? "1" : "0");
+    renderChart();
+  });
 
   function setPeek(text: string, isError = false) {
     els.peek.textContent = text;
@@ -121,11 +131,25 @@ export function createLogsPanel(opts: {
     els.chartPeek.textContent = chart.length
       ? chart.map((s) => s.label).join(" · ")
       : "no #m series yet";
-    renderSparkline(els.spark, chart, {
+    const opts = {
       height: 64,
-      formatX: (x) => fmtClock(x),
-      formatY: (y) => (Number.isInteger(y) ? String(y) : y.toFixed(2)),
-    });
+      formatX: (x: number) => fmtClock(x),
+      formatY: (y: number) => (Number.isInteger(y) ? String(y) : y.toFixed(2)),
+    };
+    // Overlaid, series with wildly different scales flatten each other — split
+    // them into one sparkline per series, each with its own y-axis, on request.
+    if (els.chartSeparate.checked && chart.length > 1) {
+      els.spark.classList.add("spark-grid");
+      els.spark.replaceChildren();
+      for (const s of chart) {
+        const sub = document.createElement("div");
+        els.spark.appendChild(sub);
+        renderSparkline(sub, [s], opts);
+      }
+    } else {
+      els.spark.classList.remove("spark-grid");
+      renderSparkline(els.spark, chart, opts);
+    }
   }
 
   /**
@@ -194,6 +218,10 @@ export function createLogsPanel(opts: {
 
   async function start() {
     els.button.disabled = true;
+    // Series names never expire on their own — a fresh stream should not
+    // still be dragging a chart line from whatever the last script printed.
+    series.clear();
+    renderChart();
     try {
       const data = await api<{
         connected: boolean;
@@ -262,9 +290,11 @@ export function createLogsPanel(opts: {
    */
   els.clear.addEventListener("click", () => {
     lines = [];
+    series.clear();
     els.note.classList.remove("warn");
     renderLines();
-    setPeek(streaming ? `0 lines · ${series.size} series` : "cleared");
+    renderChart();
+    setPeek(streaming ? "0 lines · 0 series" : "cleared");
   });
 
   return { stop };

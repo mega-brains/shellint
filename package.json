@@ -6,7 +6,7 @@
   "description": "Local playground for authoring Shelly Gen2 device scripts",
   "scripts": {
     "build:shelly": "node scripts/build-shelly.mjs",
-    "build:web": "node scripts/build-web.mjs",
+    "build:web": "node scripts/gen-api-docs.mjs && node scripts/build-web.mjs",
     "build": "npm run build:shelly && npm run build:web",
     "dev": "npm run build:web && node --import tsx server/index.ts",
     "deploy": "node --import tsx server/cli-deploy.ts",

@@ -200,6 +200,29 @@ button {
 button:hover { filter: brightness(1.05); }
 button:disabled { opacity: 0.55; cursor: not-allowed; }
 
+.split > button:first-child { position: relative; overflow: hidden; }
+
+.btn-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 2px;
+  width: 40%;
+  background: var(--accent-ink);
+  opacity: 0;
+  transform: translateX(-100%);
+}
+
+button.running .btn-progress {
+  opacity: 0.85;
+  animation: btn-progress-slide 1s ease-in-out infinite;
+}
+
+@keyframes btn-progress-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+
 .split {
   position: relative;
   display: inline-flex;
@@ -250,6 +273,17 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
 .menu button:hover {
   background: #e7efe9;
   filter: none;
+}
+
+.menu-sep {
+  height: 1px;
+  margin: 0.25rem 0.4rem;
+  background: var(--line);
+}
+
+.menu .menu-check {
+  padding: 0.35rem 0.6rem;
+  font-size: 0.85rem;
 }
 
 /* No gap: the splitter is its own spacing, drawn as a 2px line inside it. */
@@ -448,4 +482,36 @@ body.row-resizing { cursor: row-resize; user-select: none; }
 .editor .cm-stat-line {
   background: rgba(15, 107, 92, 0.13);
   box-shadow: inset 2px 0 0 var(--accent);
+}
+
+/* Hover tooltip for Shelly/Espruino API identifiers. */
+.cm-shelly-hover {
+  max-width: 420px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+.cm-shelly-hover-sig {
+  display: block;
+  white-space: pre-wrap;
+  font-family: var(--mono);
+  color: var(--accent);
+}
+.cm-shelly-hover-doc {
+  margin-top: 4px;
+  white-space: pre-wrap;
+  color: var(--muted);
+}
+.cm-shelly-hover-link {
+  display: inline-block;
+  margin-top: 6px;
+  color: var(--accent);
+  text-decoration: none;
+}
+.cm-shelly-hover-link:hover {
+  text-decoration: underline;
 }

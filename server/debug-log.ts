@@ -209,6 +209,9 @@ export async function startLogStream(): Promise<LogStreamStart> {
     return { connected: true, enabledDebug, restartRequired };
   }
   if (starting) return starting;
+  // A metric series never expires on its own; a fresh connection is the one
+  // natural point to drop whatever the previously deployed script was printing.
+  metrics.length = 0;
   starting = begin();
   try {
     return await starting;

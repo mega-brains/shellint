@@ -9,6 +9,9 @@ import { findingGutter } from "./finding-gutter";
 import { statLineHighlight } from "./line-highlight";
 import { diffHighlight } from "./diff";
 import { dirtyGutter, setDirtyBaseline } from "./dirty-gutter";
+import { shellyHover } from "./hover-docs";
+import { buildErrorGutter, clearBuildErrors, reportBuildFailure } from "./build-error-gutter";
+import { createDeployGate } from "./deploy-gate";
 import { createHeaderLine } from "./header-line";
 import { createDashboard } from "./dashboard";
 import { closeAllMenus, createSplitButton } from "./split-button";
@@ -35,7 +38,9 @@ type BuildAction = "build" | "check" | "both";
 const el = {
   editor: document.getElementById("editor")!,
   save: document.getElementById("btnSave") as HTMLButtonElement,
+  autoBuildCheck: document.getElementById("autoBuildCheck") as HTMLInputElement,
   build: document.getElementById("btnBuild") as HTMLButtonElement,
+  buildLabel: document.getElementById("btnBuildLabel")!,
   buildMenuBtn: document.getElementById("btnBuildMenu") as HTMLButtonElement,
   buildMenu: document.getElementById("buildMenu") as HTMLUListElement,
   buildSplit: document.getElementById("buildSplit") as HTMLDivElement,
@@ -87,6 +92,8 @@ let deployChoice: { mode: Mode; minify: Minify } = {
 /** What the primary Build button runs — the last variant picked from its menu. */
 let buildAction: BuildAction = "both";
 
+const deployGate = createDeployGate();
+
 const BUILD_LABEL: Record<BuildAction, string> = {
   build: "Build",
   check: "Check",
@@ -105,21 +112,27 @@ function syncDeployLabel() {
   const { mode, minify } = deployChoice;
   const file = minify === "raw" ? `dist/${mode}.raw.js` : `dist/${mode}.js`;
   el.deploy.textContent = `Deploy ${mode} · ${shortMinify(minify)}`;
-  el.deploy.title = `Upload ${file} (${mode}, ${minifyLabel(minify)}) to the Shelly script slot over WebSocket RPC`;
+  const base = `Upload ${file} (${mode}, ${minifyLabel(minify)}) to the Shelly script slot over WebSocket RPC`;
+  el.deploy.title = deployGate.ready() ? base : `${base} — disabled until Build + Check succeed`;
 }
 
 function syncBuildLabel() {
   const item = el.buildMenu.querySelector<HTMLButtonElement>(
     `button[data-action="${buildAction}"]`,
   );
-  el.build.textContent = BUILD_LABEL[buildAction];
+  el.buildLabel.textContent = BUILD_LABEL[buildAction];
   if (item?.title) el.build.title = item.title;
 }
 
 async function runBuildAction(action = buildAction) {
-  if (action === "check") return checkScript();
-  await buildScript();
-  if (action === "both") await checkScript();
+  el.build.classList.add("running");
+  try {
+    if (action === "check") return await checkScript();
+    await buildScript();
+    if (action === "both") await checkScript();
+  } finally {
+    el.build.classList.remove("running");
+  }
 }
 
 function setStatus(msg: string, isError = false) {
@@ -281,6 +294,22 @@ async function loadScript() {
   setStatus("loaded scripts/main.ts");
 }
 
+const AUTO_KEY = "shelly-devroom.autoBuildCheck";
+let autoTimer: ReturnType<typeof setTimeout> | null = null;
+
+function scheduleAuto() {
+  if (!el.autoBuildCheck.checked) return;
+  if (artifacts?.previewing()) return;
+  if (autoTimer) clearTimeout(autoTimer);
+  autoTimer = setTimeout(() => {
+    autoTimer = null;
+    void withBusy(async () => {
+      await saveScript();
+      await runBuildAction();
+    });
+  }, 3000);
+}
+
 async function saveScript() {
   const source = view.state.doc.toString();
   await api("/api/script", {
@@ -292,20 +321,17 @@ async function saveScript() {
 }
 
 async function buildScript() {
-  setStatus("building…");
+  setStatus("building…"); clearBuildErrors(view); deployGate.setBuildOk(false);
   const data = await api<{
     sizes: { debug: Sizes; prod: Sizes };
     stats?: ScriptStats;
     estimate?: MemoryEstimate;
     minFirmware?: MinFirmware | null;
     dialect?: { file: string; findings: Finding[] }[];
-  }>("/api/build", { method: "POST", body: "{}" });
+  }>("/api/build", { method: "POST", body: "{}" }).catch((e) => reportBuildFailure(view, e));
   el.sizeDebug.textContent = formatSizes(data.sizes.debug);
   el.sizeProd.textContent = formatSizes(data.sizes.prod);
-  dashboard.update({
-    estimate: data.estimate ?? null,
-    minFirmware: data.minFirmware ?? null,
-  });
+  dashboard.update({ estimate: data.estimate ?? null, minFirmware: data.minFirmware ?? null });
   await loadHistory(data.stats ?? null);
   await artifacts?.refresh();
   const dialect =
@@ -313,10 +339,13 @@ async function buildScript() {
       r.findings.map((f) => ({ ...f, file: `dist/${r.file}` })),
     ) ?? [];
   if (dialect.length) {
+    const dialectErrors = dialect.some((f) => f.severity === "error");
     renderFindings(checkEls, dialect);
-    setStatus("build ok — dialect guard reported findings (see check panel)", true);
+    deployGate.setBuildOk(!dialectErrors);
+    setStatus("build ok — dialect guard reported findings (see check panel)", dialectErrors);
     return;
   }
+  deployGate.setBuildOk(true);
   setStatus("build ok");
 }
 
@@ -330,6 +359,7 @@ async function checkScript({ quiet = false } = {}) {
   });
   const { report } = data;
   renderReport(checkEls, report, checkCatalog);
+  deployGate.setCheckOk(report.ok);
   if (quiet) return;
   const scope = report.artifacts.length
     ? `scripts/main.ts + ${report.artifacts.join(", ")}`
@@ -395,17 +425,12 @@ async function probeDevice() {
 }
 
 function busy(on: boolean) {
-  for (const b of [
-    el.save,
-    el.build,
-    el.buildMenuBtn,
-    el.deploy,
-    el.deployMenuBtn,
-    el.probe,
-  ]) {
-    b.disabled = on || (b === el.save && artifacts?.previewing() === true);
+  for (const b of [el.save, el.build, el.buildMenuBtn, el.deploy, el.deployMenuBtn, el.probe]) {
+    const gated = (b === el.deploy || b === el.deployMenuBtn) && !deployGate.ready();
+    b.disabled = on || (b === el.save && artifacts?.previewing() === true) || gated;
   }
   if (on) closeAllMenus();
+  else syncDeployLabel();
 }
 
 async function withBusy(fn: () => Promise<void>) {
@@ -431,7 +456,11 @@ async function main() {
         dirtyGutter,
         statLineHighlight,
         diffHighlight,
+        shellyHover, buildErrorGutter,
         EditorView.lineWrapping,
+        EditorView.updateListener.of((u) => {
+          if (u.docChanged) scheduleAuto();
+        }),
         EditorView.theme({
           "&": { height: "100%", width: "100%" },
           ".cm-scroller": { overflow: "auto" },
@@ -439,6 +468,15 @@ async function main() {
       ],
     }),
     parent: el.editor,
+  });
+
+  el.autoBuildCheck.checked = localStorage.getItem(AUTO_KEY) === "1";
+  el.autoBuildCheck.addEventListener("change", () => {
+    localStorage.setItem(AUTO_KEY, el.autoBuildCheck.checked ? "1" : "0");
+    if (!el.autoBuildCheck.checked && autoTimer) {
+      clearTimeout(autoTimer);
+      autoTimer = null;
+    }
   });
 
   createLayout(() => view.requestMeasure());
@@ -489,7 +527,7 @@ async function main() {
   const onPreview = () => busy(false);
   artifacts = createArtifactView({ view, api, onStatus: setStatus, onPreview });
   // Fill the indicator with real verdicts without hijacking the status line.
-  void checkScript({ quiet: true }).catch(() => {
+  void checkScript({ quiet: true }).then(() => busy(false), () => {
     el.checkNote.textContent = "check could not run — press Check for the error";
   });
 }

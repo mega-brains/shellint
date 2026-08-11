@@ -1,0 +1,774 @@
+{
+  "entries": {
+    "console": {
+      "signature": "declare var console: Console",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Utilities"
+    },
+    "print": {
+      "signature": "declare function print(...data: unknown[]): void",
+      "doc": "Espruino's own logger, confirmed present by `mise run probe`\n(`typeof print` → \"function\"). Cheaper than `console.log`, which carries\n~42 B of overhead per call, so it is the right choice in hot paths.",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Utilities"
+    },
+    "Timer": {
+      "signature": "declare var Timer: TimerStatic",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Timer"
+    },
+    "Shelly": {
+      "signature": "declare var Shelly: ShellyStatic",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Shelly"
+    },
+    "Script": {
+      "signature": "declare var Script: ScriptStatic",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Script"
+    },
+    "HTTPServer": {
+      "signature": "declare var HTTPServer: HTTPServerStatic",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/HTTPServer"
+    },
+    "console.log": {
+      "signature": "log(...data: unknown[]): void",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Utilities"
+    },
+    "Timer.set": {
+      "signature": "set(\n    period_ms: number,\n    repeat: boolean,\n    callback: TimerCallback,\n    userdata?: unknown\n  ): number",
+      "doc": "Schedule a timer. Max 5 per script. Practical min period ~10 ms.",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Timer"
+    },
+    "Timer.clear": {
+      "signature": "clear(handle: number): boolean | undefined",
+      "doc": "Clear a timer. Always clear before re-assigning a live handle.",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Timer"
+    },
+    "Timer.getInfo": {
+      "signature": "getInfo(handle: number): TimerInfo | undefined",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Timer"
+    },
+    "Shelly.call": {
+      "signature": "call(\n    method: string,\n    params: object | null | undefined,\n    callback?: ShellyCallCallback,\n    userdata?: unknown\n  ): undefined",
+      "doc": "Async component call. Max 5 in flight.\nPrefer getComponentStatus/Config for GetStatus/GetConfig.",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Shelly"
+    },
+    "Shelly.addEventHandler": {
+      "signature": "addEventHandler(cb: ShellyEventHandler, userdata?: unknown): number",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Shelly"
+    },
+    "Shelly.addStatusHandler": {
+      "signature": "addStatusHandler(cb: ShellyStatusHandler, userdata?: unknown): number",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Shelly"
+    },
+    "Shelly.removeEventHandler": {
+      "signature": "removeEventHandler(handle: number): boolean | undefined",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Shelly"
+    },
+    "Shelly.removeStatusHandler": {
+      "signature": "removeStatusHandler(handle: number): boolean | undefined",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Shelly"
+    },
+    "Shelly.emitEvent": {
+      "signature": "emitEvent(name: string, data: unknown): undefined",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Shelly"
+    },
+    "Shelly.getComponentConfig": {
+      "signature": "getComponentConfig(type_or_key: string, id?: number): object | null",
+      "doc": "Synchronous. Accepts (\"switch\", 0) or (\"switch:0\").",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Shelly"
+    },
+    "Shelly.getComponentStatus": {
+      "signature": "getComponentStatus(type_or_key: string, id?: number): object | null",
+      "doc": "Synchronous. Prefer over Shelly.call(\"*.GetStatus\").",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Shelly"
+    },
+    "Shelly.getDeviceInfo": {
+      "signature": "getDeviceInfo(): ShellyDeviceInfo",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Shelly"
+    },
+    "Shelly.getCurrentScriptId": {
+      "signature": "getCurrentScriptId(): number",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Shelly"
+    },
+    "Shelly.getUptimeMs": {
+      "signature": "getUptimeMs(): number",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Shelly"
+    },
+    "Script.id": {
+      "signature": "readonly id: number",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Script"
+    },
+    "Script.storage": {
+      "signature": "readonly storage: ScriptStorage",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Script"
+    },
+    "Script.addRpcHandler": {
+      "signature": "addRpcHandler(\n    method: string,\n    cb: ScriptRpcHandler,\n    userdata?: unknown\n  ): number",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Script"
+    },
+    "Script.removeRpcHandler": {
+      "signature": "removeRpcHandler(handle: number): boolean",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Script"
+    },
+    "Script.getVcHandle": {
+      "signature": "getVcHandle(role: string): unknown",
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Script"
+    },
+    "HTTPServer.registerEndpoint": {
+      "signature": "registerEndpoint(\n    endpoint: string,\n    handler: (\n      request: HttpServerRequest,\n      response: HttpServerResponse,\n      userdata?: unknown\n    ) => void,\n    userdata?: unknown\n  ): string",
+      "doc": "Max 5 endpoints per script.",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/HTTPServer"
+    },
+    "Console.log": {
+      "signature": "log(...data: unknown[]): void",
+      "doc": ""
+    },
+    "TimerInfo.interval": {
+      "signature": "interval: number",
+      "doc": ""
+    },
+    "TimerInfo.next": {
+      "signature": "next: number",
+      "doc": ""
+    },
+    "TimerStatic.set": {
+      "signature": "set(\n    period_ms: number,\n    repeat: boolean,\n    callback: TimerCallback,\n    userdata?: unknown\n  ): number",
+      "doc": "Schedule a timer. Max 5 per script. Practical min period ~10 ms."
+    },
+    "TimerStatic.clear": {
+      "signature": "clear(handle: number): boolean | undefined",
+      "doc": "Clear a timer. Always clear before re-assigning a live handle."
+    },
+    "TimerStatic.getInfo": {
+      "signature": "getInfo(handle: number): TimerInfo | undefined",
+      "doc": ""
+    },
+    "ShellyEventData.component": {
+      "signature": "component: string",
+      "doc": ""
+    },
+    "ShellyEventData.id": {
+      "signature": "id: number",
+      "doc": ""
+    },
+    "ShellyEventData.info": {
+      "signature": "info: {\n    event: string;\n    ts?: number;\n    [key: string]: unknown;\n  }",
+      "doc": ""
+    },
+    "ShellyStatusData.component": {
+      "signature": "component: string",
+      "doc": ""
+    },
+    "ShellyStatusData.delta": {
+      "signature": "delta: {\n    [key: string]: unknown;\n  }",
+      "doc": "Only changed keys — check before reading nested fields."
+    },
+    "ShellyDeviceInfo.id": {
+      "signature": "id?: string",
+      "doc": ""
+    },
+    "ShellyDeviceInfo.mac": {
+      "signature": "mac?: string",
+      "doc": ""
+    },
+    "ShellyDeviceInfo.model": {
+      "signature": "model?: string",
+      "doc": ""
+    },
+    "ShellyDeviceInfo.gen": {
+      "signature": "gen?: number",
+      "doc": ""
+    },
+    "ShellyDeviceInfo.fw_id": {
+      "signature": "fw_id?: string",
+      "doc": ""
+    },
+    "ShellyDeviceInfo.ver": {
+      "signature": "ver?: string",
+      "doc": ""
+    },
+    "ShellyDeviceInfo.app": {
+      "signature": "app?: string",
+      "doc": ""
+    },
+    "ShellyStatic.call": {
+      "signature": "call(\n    method: string,\n    params: object | null | undefined,\n    callback?: ShellyCallCallback,\n    userdata?: unknown\n  ): undefined",
+      "doc": "Async component call. Max 5 in flight.\nPrefer getComponentStatus/Config for GetStatus/GetConfig."
+    },
+    "ShellyStatic.addEventHandler": {
+      "signature": "addEventHandler(cb: ShellyEventHandler, userdata?: unknown): number",
+      "doc": ""
+    },
+    "ShellyStatic.addStatusHandler": {
+      "signature": "addStatusHandler(cb: ShellyStatusHandler, userdata?: unknown): number",
+      "doc": ""
+    },
+    "ShellyStatic.removeEventHandler": {
+      "signature": "removeEventHandler(handle: number): boolean | undefined",
+      "doc": ""
+    },
+    "ShellyStatic.removeStatusHandler": {
+      "signature": "removeStatusHandler(handle: number): boolean | undefined",
+      "doc": ""
+    },
+    "ShellyStatic.emitEvent": {
+      "signature": "emitEvent(name: string, data: unknown): undefined",
+      "doc": ""
+    },
+    "ShellyStatic.getComponentConfig": {
+      "signature": "getComponentConfig(type_or_key: string, id?: number): object | null",
+      "doc": "Synchronous. Accepts (\"switch\", 0) or (\"switch:0\")."
+    },
+    "ShellyStatic.getComponentStatus": {
+      "signature": "getComponentStatus(type_or_key: string, id?: number): object | null",
+      "doc": "Synchronous. Prefer over Shelly.call(\"*.GetStatus\")."
+    },
+    "ShellyStatic.getDeviceInfo": {
+      "signature": "getDeviceInfo(): ShellyDeviceInfo",
+      "doc": ""
+    },
+    "ShellyStatic.getCurrentScriptId": {
+      "signature": "getCurrentScriptId(): number",
+      "doc": ""
+    },
+    "ShellyStatic.getUptimeMs": {
+      "signature": "getUptimeMs(): number",
+      "doc": ""
+    },
+    "ScriptStorage.setItem": {
+      "signature": "setItem(key: string, value: string): void",
+      "doc": ""
+    },
+    "ScriptStorage.getItem": {
+      "signature": "getItem(key: string): string | null",
+      "doc": ""
+    },
+    "ScriptStorage.removeItem": {
+      "signature": "removeItem(key: string): void",
+      "doc": ""
+    },
+    "ScriptStorage.clear": {
+      "signature": "clear(): void",
+      "doc": ""
+    },
+    "ScriptStorage.key": {
+      "signature": "key(index: number): string | null",
+      "doc": ""
+    },
+    "ScriptStorage.length": {
+      "signature": "readonly length: number",
+      "doc": ""
+    },
+    "ScriptStatic.id": {
+      "signature": "readonly id: number",
+      "doc": ""
+    },
+    "ScriptStatic.storage": {
+      "signature": "readonly storage: ScriptStorage",
+      "doc": ""
+    },
+    "ScriptStatic.addRpcHandler": {
+      "signature": "addRpcHandler(\n    method: string,\n    cb: ScriptRpcHandler,\n    userdata?: unknown\n  ): number",
+      "doc": ""
+    },
+    "ScriptStatic.removeRpcHandler": {
+      "signature": "removeRpcHandler(handle: number): boolean",
+      "doc": ""
+    },
+    "ScriptStatic.getVcHandle": {
+      "signature": "getVcHandle(role: string): unknown",
+      "doc": ""
+    },
+    "HttpServerRequest.method": {
+      "signature": "method: string",
+      "doc": ""
+    },
+    "HttpServerRequest.query": {
+      "signature": "query: string | null",
+      "doc": ""
+    },
+    "HttpServerRequest.headers": {
+      "signature": "headers: HttpHeaderPairs",
+      "doc": ""
+    },
+    "HttpServerRequest.body": {
+      "signature": "body: string",
+      "doc": ""
+    },
+    "HttpServerResponse.code": {
+      "signature": "code: number",
+      "doc": ""
+    },
+    "HttpServerResponse.body": {
+      "signature": "body: string",
+      "doc": ""
+    },
+    "HttpServerResponse.headers": {
+      "signature": "headers: HttpHeaderPairs",
+      "doc": ""
+    },
+    "HttpServerResponse.send": {
+      "signature": "send(): boolean",
+      "doc": "Must be called, or the device answers 504 after 10 s."
+    },
+    "HTTPServerStatic.registerEndpoint": {
+      "signature": "registerEndpoint(\n    endpoint: string,\n    handler: (\n      request: HttpServerRequest,\n      response: HttpServerResponse,\n      userdata?: unknown\n    ) => void,\n    userdata?: unknown\n  ): string",
+      "doc": "Max 5 endpoints per script."
+    },
+    "Object": {
+      "signature": "declare var Object: ObjectConstructor",
+      "doc": ""
+    },
+    "Function": {
+      "signature": "declare var Function: FunctionConstructor",
+      "doc": ""
+    },
+    "String": {
+      "signature": "declare var String: StringConstructor",
+      "doc": ""
+    },
+    "Number": {
+      "signature": "declare var Number: NumberConstructor",
+      "doc": ""
+    },
+    "Boolean": {
+      "signature": "declare var Boolean: BooleanConstructor",
+      "doc": ""
+    },
+    "Array": {
+      "signature": "declare var Array: ArrayConstructor",
+      "doc": ""
+    },
+    "Math": {
+      "signature": "declare var Math: Math",
+      "doc": ""
+    },
+    "Date": {
+      "signature": "declare var Date: DateConstructor",
+      "doc": ""
+    },
+    "JSON": {
+      "signature": "declare var JSON: JSON",
+      "doc": ""
+    },
+    "parseInt": {
+      "signature": "declare function parseInt(string: string, radix?: number): number",
+      "doc": ""
+    },
+    "parseFloat": {
+      "signature": "declare function parseFloat(string: string): number",
+      "doc": ""
+    },
+    "isNaN": {
+      "signature": "declare function isNaN(number: number): boolean",
+      "doc": ""
+    },
+    "isFinite": {
+      "signature": "declare function isFinite(number: number): boolean",
+      "doc": ""
+    },
+    "encodeURIComponent": {
+      "signature": "declare function encodeURIComponent(uriComponent: string): string",
+      "doc": ""
+    },
+    "decodeURIComponent": {
+      "signature": "declare function decodeURIComponent(encodedURIComponent: string): string",
+      "doc": ""
+    },
+    "btoh": {
+      "signature": "declare function btoh(str: string): string",
+      "doc": "Hex encode a string (Shelly utility)."
+    },
+    "btoa": {
+      "signature": "declare function btoa(str: string): string",
+      "doc": "Base64 encode."
+    },
+    "atob": {
+      "signature": "declare function atob(b64: string): string",
+      "doc": "Base64 decode."
+    },
+    "Object.keys": {
+      "signature": "keys(o: object): string[]",
+      "doc": ""
+    },
+    "String.prototype": {
+      "signature": "readonly prototype: String",
+      "doc": ""
+    },
+    "String.fromCharCode": {
+      "signature": "fromCharCode(...codes: number[]): string",
+      "doc": ""
+    },
+    "Number.prototype": {
+      "signature": "readonly prototype: Number",
+      "doc": ""
+    },
+    "Number.MAX_VALUE": {
+      "signature": "readonly MAX_VALUE: number",
+      "doc": ""
+    },
+    "Number.MIN_VALUE": {
+      "signature": "readonly MIN_VALUE: number",
+      "doc": ""
+    },
+    "Number.NaN": {
+      "signature": "readonly NaN: number",
+      "doc": ""
+    },
+    "Number.NEGATIVE_INFINITY": {
+      "signature": "readonly NEGATIVE_INFINITY: number",
+      "doc": ""
+    },
+    "Number.POSITIVE_INFINITY": {
+      "signature": "readonly POSITIVE_INFINITY: number",
+      "doc": ""
+    },
+    "Number.isNaN": {
+      "signature": "isNaN(number: number): boolean",
+      "doc": ""
+    },
+    "Number.isFinite": {
+      "signature": "isFinite(number: number): boolean",
+      "doc": ""
+    },
+    "Boolean.prototype": {
+      "signature": "readonly prototype: Boolean",
+      "doc": ""
+    },
+    "Array.prototype": {
+      "signature": "readonly prototype: Array<unknown>",
+      "doc": ""
+    },
+    "Array.isArray": {
+      "signature": "isArray(arg: unknown): arg is unknown[]",
+      "doc": ""
+    },
+    "Math.E": {
+      "signature": "readonly E: number",
+      "doc": ""
+    },
+    "Math.LN10": {
+      "signature": "readonly LN10: number",
+      "doc": ""
+    },
+    "Math.LN2": {
+      "signature": "readonly LN2: number",
+      "doc": ""
+    },
+    "Math.LOG2E": {
+      "signature": "readonly LOG2E: number",
+      "doc": ""
+    },
+    "Math.LOG10E": {
+      "signature": "readonly LOG10E: number",
+      "doc": ""
+    },
+    "Math.PI": {
+      "signature": "readonly PI: number",
+      "doc": ""
+    },
+    "Math.SQRT1_2": {
+      "signature": "readonly SQRT1_2: number",
+      "doc": ""
+    },
+    "Math.SQRT2": {
+      "signature": "readonly SQRT2: number",
+      "doc": ""
+    },
+    "Math.abs": {
+      "signature": "abs(x: number): number",
+      "doc": ""
+    },
+    "Math.acos": {
+      "signature": "acos(x: number): number",
+      "doc": ""
+    },
+    "Math.asin": {
+      "signature": "asin(x: number): number",
+      "doc": ""
+    },
+    "Math.atan": {
+      "signature": "atan(x: number): number",
+      "doc": ""
+    },
+    "Math.atan2": {
+      "signature": "atan2(y: number, x: number): number",
+      "doc": ""
+    },
+    "Math.ceil": {
+      "signature": "ceil(x: number): number",
+      "doc": ""
+    },
+    "Math.cos": {
+      "signature": "cos(x: number): number",
+      "doc": ""
+    },
+    "Math.exp": {
+      "signature": "exp(x: number): number",
+      "doc": ""
+    },
+    "Math.floor": {
+      "signature": "floor(x: number): number",
+      "doc": ""
+    },
+    "Math.log": {
+      "signature": "log(x: number): number",
+      "doc": ""
+    },
+    "Math.max": {
+      "signature": "max(...values: number[]): number",
+      "doc": ""
+    },
+    "Math.min": {
+      "signature": "min(...values: number[]): number",
+      "doc": ""
+    },
+    "Math.pow": {
+      "signature": "pow(x: number, y: number): number",
+      "doc": ""
+    },
+    "Math.random": {
+      "signature": "random(): number",
+      "doc": ""
+    },
+    "Math.round": {
+      "signature": "round(x: number): number",
+      "doc": ""
+    },
+    "Math.sin": {
+      "signature": "sin(x: number): number",
+      "doc": ""
+    },
+    "Math.sqrt": {
+      "signature": "sqrt(x: number): number",
+      "doc": ""
+    },
+    "Math.tan": {
+      "signature": "tan(x: number): number",
+      "doc": ""
+    },
+    "Date.prototype": {
+      "signature": "readonly prototype: Date",
+      "doc": ""
+    },
+    "Date.now": {
+      "signature": "now(): number",
+      "doc": ""
+    },
+    "Date.parse": {
+      "signature": "parse(s: string): number",
+      "doc": ""
+    },
+    "Date.UTC": {
+      "signature": "UTC(\n    year: number,\n    monthIndex: number,\n    date?: number,\n    hours?: number,\n    minutes?: number,\n    seconds?: number,\n    ms?: number\n  ): number",
+      "doc": ""
+    },
+    "JSON.parse": {
+      "signature": "parse(text: string): unknown",
+      "doc": ""
+    },
+    "JSON.stringify": {
+      "signature": "stringify(value: unknown): string",
+      "doc": ""
+    },
+    "ObjectConstructor.keys": {
+      "signature": "keys(o: object): string[]",
+      "doc": ""
+    },
+    "IArguments.length": {
+      "signature": "length: number",
+      "doc": ""
+    },
+    "StringConstructor.prototype": {
+      "signature": "readonly prototype: String",
+      "doc": ""
+    },
+    "StringConstructor.fromCharCode": {
+      "signature": "fromCharCode(...codes: number[]): string",
+      "doc": ""
+    },
+    "NumberConstructor.prototype": {
+      "signature": "readonly prototype: Number",
+      "doc": ""
+    },
+    "NumberConstructor.MAX_VALUE": {
+      "signature": "readonly MAX_VALUE: number",
+      "doc": ""
+    },
+    "NumberConstructor.MIN_VALUE": {
+      "signature": "readonly MIN_VALUE: number",
+      "doc": ""
+    },
+    "NumberConstructor.NaN": {
+      "signature": "readonly NaN: number",
+      "doc": ""
+    },
+    "NumberConstructor.NEGATIVE_INFINITY": {
+      "signature": "readonly NEGATIVE_INFINITY: number",
+      "doc": ""
+    },
+    "NumberConstructor.POSITIVE_INFINITY": {
+      "signature": "readonly POSITIVE_INFINITY: number",
+      "doc": ""
+    },
+    "NumberConstructor.isNaN": {
+      "signature": "isNaN(number: number): boolean",
+      "doc": ""
+    },
+    "NumberConstructor.isFinite": {
+      "signature": "isFinite(number: number): boolean",
+      "doc": ""
+    },
+    "BooleanConstructor.prototype": {
+      "signature": "readonly prototype: Boolean",
+      "doc": ""
+    },
+    "ArrayConstructor.prototype": {
+      "signature": "readonly prototype: Array<unknown>",
+      "doc": ""
+    },
+    "ArrayConstructor.isArray": {
+      "signature": "isArray(arg: unknown): arg is unknown[]",
+      "doc": ""
+    },
+    "DateConstructor.prototype": {
+      "signature": "readonly prototype: Date",
+      "doc": ""
+    },
+    "DateConstructor.now": {
+      "signature": "now(): number",
+      "doc": ""
+    },
+    "DateConstructor.parse": {
+      "signature": "parse(s: string): number",
+      "doc": ""
+    },
+    "DateConstructor.UTC": {
+      "signature": "UTC(\n    year: number,\n    monthIndex: number,\n    date?: number,\n    hours?: number,\n    minutes?: number,\n    seconds?: number,\n    ms?: number\n  ): number",
+      "doc": ""
+    }
+  },
+  "byBareName": {
+    "console": "console",
+    "print": "print",
+    "Timer": "Timer",
+    "Shelly": "Shelly",
+    "Script": "Script",
+    "HTTPServer": "HTTPServer",
+    "log": "console.log",
+    "set": "Timer.set",
+    "clear": "Timer.clear",
+    "getInfo": "Timer.getInfo",
+    "call": "Shelly.call",
+    "addEventHandler": "Shelly.addEventHandler",
+    "addStatusHandler": "Shelly.addStatusHandler",
+    "removeEventHandler": "Shelly.removeEventHandler",
+    "removeStatusHandler": "Shelly.removeStatusHandler",
+    "emitEvent": "Shelly.emitEvent",
+    "getComponentConfig": "Shelly.getComponentConfig",
+    "getComponentStatus": "Shelly.getComponentStatus",
+    "getDeviceInfo": "Shelly.getDeviceInfo",
+    "getCurrentScriptId": "Shelly.getCurrentScriptId",
+    "getUptimeMs": "Shelly.getUptimeMs",
+    "id": "Script.id",
+    "storage": "Script.storage",
+    "addRpcHandler": "Script.addRpcHandler",
+    "removeRpcHandler": "Script.removeRpcHandler",
+    "getVcHandle": "Script.getVcHandle",
+    "registerEndpoint": "HTTPServer.registerEndpoint",
+    "interval": "TimerInfo.interval",
+    "next": "TimerInfo.next",
+    "component": "ShellyEventData.component",
+    "info": "ShellyEventData.info",
+    "delta": "ShellyStatusData.delta",
+    "mac": "ShellyDeviceInfo.mac",
+    "model": "ShellyDeviceInfo.model",
+    "gen": "ShellyDeviceInfo.gen",
+    "fw_id": "ShellyDeviceInfo.fw_id",
+    "ver": "ShellyDeviceInfo.ver",
+    "app": "ShellyDeviceInfo.app",
+    "setItem": "ScriptStorage.setItem",
+    "getItem": "ScriptStorage.getItem",
+    "removeItem": "ScriptStorage.removeItem",
+    "key": "ScriptStorage.key",
+    "length": "ScriptStorage.length",
+    "method": "HttpServerRequest.method",
+    "query": "HttpServerRequest.query",
+    "headers": "HttpServerRequest.headers",
+    "body": "HttpServerRequest.body",
+    "code": "HttpServerResponse.code",
+    "send": "HttpServerResponse.send",
+    "Object": "Object",
+    "Function": "Function",
+    "String": "String",
+    "Number": "Number",
+    "Boolean": "Boolean",
+    "Array": "Array",
+    "Math": "Math",
+    "Date": "Date",
+    "JSON": "JSON",
+    "parseInt": "parseInt",
+    "parseFloat": "parseFloat",
+    "isNaN": "isNaN",
+    "isFinite": "isFinite",
+    "encodeURIComponent": "encodeURIComponent",
+    "decodeURIComponent": "decodeURIComponent",
+    "btoh": "btoh",
+    "btoa": "btoa",
+    "atob": "atob",
+    "keys": "Object.keys",
+    "prototype": "String.prototype",
+    "fromCharCode": "String.fromCharCode",
+    "MAX_VALUE": "Number.MAX_VALUE",
+    "MIN_VALUE": "Number.MIN_VALUE",
+    "NaN": "Number.NaN",
+    "NEGATIVE_INFINITY": "Number.NEGATIVE_INFINITY",
+    "POSITIVE_INFINITY": "Number.POSITIVE_INFINITY",
+    "isArray": "Array.isArray",
+    "E": "Math.E",
+    "LN10": "Math.LN10",
+    "LN2": "Math.LN2",
+    "LOG2E": "Math.LOG2E",
+    "LOG10E": "Math.LOG10E",
+    "PI": "Math.PI",
+    "SQRT1_2": "Math.SQRT1_2",
+    "SQRT2": "Math.SQRT2",
+    "abs": "Math.abs",
+    "acos": "Math.acos",
+    "asin": "Math.asin",
+    "atan": "Math.atan",
+    "atan2": "Math.atan2",
+    "ceil": "Math.ceil",
+    "cos": "Math.cos",
+    "exp": "Math.exp",
+    "floor": "Math.floor",
+    "max": "Math.max",
+    "min": "Math.min",
+    "pow": "Math.pow",
+    "random": "Math.random",
+    "round": "Math.round",
+    "sin": "Math.sin",
+    "sqrt": "Math.sqrt",
+    "tan": "Math.tan",
+    "now": "Date.now",
+    "parse": "Date.parse",
+    "UTC": "Date.UTC",
+    "stringify": "JSON.stringify"
+  }
+}

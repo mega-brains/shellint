@@ -10,6 +10,7 @@
     <link rel="stylesheet" href="/charts.css" />
     <link rel="stylesheet" href="/stats.css" />
     <link rel="stylesheet" href="/diff.css" />
+    <link rel="stylesheet" href="/build-error.css" />
   </head>
   <body>
     <header class="top">
@@ -33,7 +34,8 @@
               id="btnBuild"
               title="Build, then run the compliance check over the fresh artifacts"
             >
-              Build + Check
+              <span id="btnBuildLabel">Build + Check</span>
+              <span class="btn-progress" id="btnBuildProgress"></span>
             </button>
             <button
               type="button"
@@ -76,6 +78,16 @@
                 >
                   check
                 </button>
+              </li>
+              <li role="none" class="menu-sep"></li>
+              <li role="none">
+                <label
+                  class="logs-follow menu-check"
+                  title="Save + Build + Check automatically 3s after each edit"
+                >
+                  <input type="checkbox" id="autoBuildCheck" />
+                  auto
+                </label>
               </li>
             </ul>
           </div>
@@ -489,6 +501,13 @@
                 >
                 <h2>metrics</h2>
                 <span class="logs-chart-peek" id="logsChartPeek"></span>
+                <label
+                  class="logs-chart-separate"
+                  title="Draw each #m series as its own chart, with its own y-scale"
+                >
+                  <input type="checkbox" id="logsChartSeparate" />
+                  separate
+                </label>
               </div>
               <div
                 id="logsSpark"
