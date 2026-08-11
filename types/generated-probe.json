@@ -1,6 +1,6 @@
 {
   "probed": true,
-  "at": "2026-08-11T16:47:31.745Z",
+  "at": "2026-08-11T17:20:12.087Z",
   "deviceIp": "192.168.2.209",
   "scriptId": 1,
   "configuredScriptId": 1,
@@ -583,6 +583,42 @@
       "code": "(function () { try { return typeof v; } catch (e) { return \"throws:\" + (e.message || e); } var v = 1; })()",
       "ok": true,
       "result": "undefined"
+    },
+    {
+      "id": "binary.uint8.construct",
+      "code": "(function () { try { return typeof new Uint8Array(2); } catch (e) { return \"throws:\" + (e.message || e); } })()",
+      "ok": true,
+      "result": "object"
+    },
+    {
+      "id": "binary.uint8.size",
+      "code": "(function () { try { return \"\" + new Uint8Array(4).length; } catch (e) { return \"throws:\" + (e.message || e); } })()",
+      "ok": true,
+      "result": "4"
+    },
+    {
+      "id": "binary.uint8.element",
+      "code": "(function () { try { return typeof new Uint8Array(2)[0]; } catch (e) { return \"throws:\" + (e.message || e); } })()",
+      "ok": true,
+      "result": "number"
+    },
+    {
+      "id": "binary.uint8.overBuffer",
+      "code": "(function () { try { return \"\" + new Uint8Array(new ArrayBuffer(3)).length; } catch (e) { return \"throws:\" + (e.message || e); } })()",
+      "ok": true,
+      "result": "3"
+    },
+    {
+      "id": "binary.uint8.backing",
+      "code": "(function () { try { return typeof new Uint8Array(2).buffer; } catch (e) { return \"throws:\" + (e.message || e); } })()",
+      "ok": true,
+      "result": "object"
+    },
+    {
+      "id": "binary.uint8.methods",
+      "code": "(function () { try { var a = new Uint8Array(1); return typeof a.set + \"/\" + typeof a.fill + \"/\" + typeof a.subarray + \"/\" + typeof a.slice; } catch (e) { return \"throws:\" + (e.message || e); } })()",
+      "ok": true,
+      "result": "function/undefined/undefined/undefined"
     },
     {
       "id": "process",

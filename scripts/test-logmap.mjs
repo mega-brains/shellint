@@ -84,6 +84,8 @@ const eq = (got, want, what) => {
 }
 
 // L7 — a missing or unreadable map degrades to `{}`.
+// Whether dist/prod.logmap.json exists depends on whether the sample script
+// has a prod-surviving log call, so nothing here may assume either way.
 {
   const map = loadLogMap();
   if (map === null || typeof map !== "object" || Array.isArray(map)) {
@@ -92,7 +94,14 @@ const eq = (got, want, what) => {
   if (!existsSync(LOG_MAP_PATH)) {
     eq(Object.keys(map).length, 0, "absent dist/prod.logmap.json yields {}");
   }
-  eq(expandLogText("L1 untouched without a map"), "L1 untouched without a map", "no map, no change");
+  for (const [id, text] of Object.entries(map)) {
+    if (typeof text !== "string") fail(`map entry ${id} is not a string`);
+  }
+  eq(
+    expandLogText("L1 untouched without a map", {}),
+    "L1 untouched without a map",
+    "an empty map leaves every id alone",
+  );
 }
 
 console.log("logmap: shorten / metric-safe / dedupe / expand ok");

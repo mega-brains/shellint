@@ -94,6 +94,66 @@ const HOISTING: Probe[] = [
 ];
 
 /**
+ * `typeof Uint8Array` in the `global` group only proves the binding exists.
+ * Typed arrays arrived with `ArrayBuffer` (fw 1.6.0, Gen3/Gen4), and Espruino's
+ * flat-string backing makes construction, indexing and the ArrayBuffer
+ * round-trip separate facts. Every answer is a string, so a missing constructor
+ * reads as `throws:…` rather than aborting the entry.
+ */
+const TYPED_ARRAY: Probe[] = [
+  {
+    id: "binary.uint8.construct",
+    group: "binary",
+    code:
+      '(function () { try { return typeof new Uint8Array(2); }' +
+      ' catch (e) { return "throws:" + (e.message || e); } })()',
+    note: '"object" = the constructor is usable, not just bound',
+  },
+  {
+    id: "binary.uint8.size",
+    group: "binary",
+    code:
+      '(function () { try { return "" + new Uint8Array(4).length; }' +
+      ' catch (e) { return "throws:" + (e.message || e); } })()',
+    note: '"4" = the length argument is honoured',
+  },
+  {
+    id: "binary.uint8.element",
+    group: "binary",
+    code:
+      '(function () { try { return typeof new Uint8Array(2)[0]; }' +
+      ' catch (e) { return "throws:" + (e.message || e); } })()',
+    note: '"number" = indexed reads work and the buffer is zero-filled',
+  },
+  {
+    id: "binary.uint8.overBuffer",
+    group: "binary",
+    code:
+      '(function () { try { return "" + new Uint8Array(new ArrayBuffer(3)).length; }' +
+      ' catch (e) { return "throws:" + (e.message || e); } })()',
+    note: '"3" = a view over an ArrayBuffer works — the shape the AES API takes',
+  },
+  {
+    id: "binary.uint8.backing",
+    group: "binary",
+    code:
+      '(function () { try { return typeof new Uint8Array(2).buffer; }' +
+      ' catch (e) { return "throws:" + (e.message || e); } })()',
+    note: '"object" = the view exposes its backing ArrayBuffer',
+  },
+  {
+    id: "binary.uint8.methods",
+    group: "binary",
+    code:
+      '(function () { try { var a = new Uint8Array(1);' +
+      ' return typeof a.set + "/" + typeof a.fill + "/" + typeof a.subarray' +
+      ' + "/" + typeof a.slice; }' +
+      ' catch (e) { return "throws:" + (e.message || e); } })()',
+    note: 'set/fill/subarray/slice in that order; one compound answer so an absent typed-array method never shadows the same name on Array or Timer',
+  },
+];
+
+/**
  * Item 5 (JsVar block size) is not answerable by an expression. These are the
  * only cheap indirect lead: Espruino's own `process` object. Read the notes
  * before drawing a conclusion from them.
@@ -234,5 +294,6 @@ export const PROBES: Probe[] = [
     note: "same depth as nesting.anon.depth3 with named function expressions — if this parses and the anonymous one does not, the limit is about anonymity",
   },
   ...HOISTING,
+  ...TYPED_ARRAY,
   ...MEMORY,
 ];
