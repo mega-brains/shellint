@@ -58,7 +58,7 @@ body {
   display: flex;
   flex-wrap: wrap;
   /* Centred, not baseline: the buttons are taller than the text beside them. */
-  align-items: center;
+  align-items: last baseline;
   gap: 0.5rem 1.25rem;
 }
 
@@ -124,7 +124,7 @@ body {
 /* Script state as a glyph. Only "running" pulses — a steady glow on a stopped
    script would read as activity that is not happening. */
 .run-state {
-  font-size: 0.85rem;
+  font-size: 1.4rem;
   line-height: 1;
 }
 

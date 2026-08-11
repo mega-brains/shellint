@@ -253,6 +253,7 @@ main:has(#logsPanel:not(.collapsed)) #logsPanel {
   font-family: var(--mono);
   font-size: 0.8rem;
   color: var(--muted);
+  display: none;
 }
 
 /* Header identity strip — always visible under the toolbar row. */

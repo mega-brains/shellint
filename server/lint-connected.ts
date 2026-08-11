@@ -175,7 +175,14 @@ export function lintConnected(
 
     if (name === "Shelly.getComponentStatus" || name === "Shelly.getComponentConfig") {
       const key = resolveComponentArgs(node);
-      if (key) checkComponent(sink, node, key, profile, types, "no component");
+      if (key) {
+        const [singletonType, singletonId] = key.split(":");
+        const isDefaultSingleton =
+          NON_COMPONENT_NAMESPACES.has(singletonType!) && singletonId === "0";
+        if (!isDefaultSingleton) {
+          checkComponent(sink, node, key, profile, types, "no component");
+        }
+      }
     }
 
     if (name !== "Shelly.call") return;
