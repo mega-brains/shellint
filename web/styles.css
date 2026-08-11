@@ -9,6 +9,7 @@
   --danger: #8b2e1a;
   --mono: "IBM Plex Mono", "SF Mono", "Menlo", "Consolas", monospace;
   --sans: "IBM Plex Sans", "Segoe UI", "Helvetica Neue", sans-serif;
+  --chrome-pad: 1rem 1.25rem;
 }
 
 * {
@@ -18,7 +19,11 @@
 html,
 body {
   margin: 0;
-  min-height: 100%;
+  height: 100%;
+  width: 100%;
+}
+
+html {
   background:
     radial-gradient(1200px 500px at 10% -10%, #e7efe9 0%, transparent 55%),
     linear-gradient(180deg, #efebe3 0%, var(--bg) 40%, #e8e4db 100%);
@@ -27,9 +32,31 @@ body {
 }
 
 body {
-  max-width: 1100px;
-  margin: 0 auto;
-  padding: 1.25rem 1.25rem 2.5rem;
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  max-width: none;
+  padding: 0;
+  overflow: hidden;
+}
+
+.top {
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  flex: 0 0 auto;
+  padding: var(--chrome-pad);
+  padding-bottom: 0.75rem;
+  background: rgba(243, 241, 236, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+}
+
+.top-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.75rem 1.25rem;
 }
 
 .top h1 {
@@ -40,10 +67,20 @@ body {
 }
 
 .sub {
-  margin: 0.35rem 0 0;
+  margin: 0;
   color: var(--muted);
   font-size: 0.9rem;
   font-family: var(--mono);
+}
+
+main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  padding: 0.75rem 1.25rem 1rem;
+  gap: 0.75rem;
 }
 
 .toolbar {
@@ -51,7 +88,8 @@ body {
   flex-wrap: wrap;
   gap: 0.5rem;
   align-items: center;
-  margin: 1.1rem 0 0.75rem;
+  flex: 0 0 auto;
+  margin: 0;
 }
 
 button,
@@ -83,6 +121,60 @@ button:disabled {
   align-items: center;
 }
 
+.split {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.split > #btnDeploy {
+  border-radius: 4px 0 0 4px;
+  border-right: none;
+}
+
+.split-toggle {
+  border-radius: 0 4px 4px 0;
+  padding: 0.45rem 0.55rem;
+  min-width: 2rem;
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 40;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  min-width: 12.5rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: 0 6px 18px rgba(28, 27, 25, 0.12);
+}
+
+.menu[hidden] {
+  display: none;
+}
+
+.menu button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: transparent;
+  color: var(--ink);
+  border: none;
+  border-radius: 3px;
+  padding: 0.45rem 0.6rem;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+.menu button:hover {
+  background: #e7efe9;
+  filter: none;
+}
+
 .mode {
   display: inline-flex;
   gap: 0.4rem;
@@ -105,15 +197,22 @@ button:disabled {
 }
 
 .editor {
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
   border: 1px solid var(--line);
   background: var(--panel);
-  min-height: 420px;
   border-radius: 4px;
   overflow: hidden;
+  display: flex;
+  flex-direction: column;
 }
 
 .editor .cm-editor {
-  height: 420px;
+  flex: 1 1 auto;
+  width: 100%;
+  height: 100%;
   font-size: 13.5px;
 }
 
@@ -121,11 +220,18 @@ button:disabled {
   font-family: var(--mono);
 }
 
+.footer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
 .sizes {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 0.75rem;
-  margin-top: 0.9rem;
+  margin: 0;
 }
 
 .size-block {
@@ -149,7 +255,7 @@ button:disabled {
 }
 
 .status {
-  margin: 1rem 0 0;
+  margin: 0;
   padding: 0.55rem 0.65rem;
   border-left: 3px solid var(--accent);
   background: rgba(255, 252, 247, 0.7);
@@ -157,6 +263,8 @@ button:disabled {
   font-size: 0.85rem;
   color: var(--ink);
   white-space: pre-wrap;
+  max-height: 6rem;
+  overflow: auto;
 }
 
 .status.error {
@@ -167,8 +275,5 @@ button:disabled {
 @media (max-width: 640px) {
   .sizes {
     grid-template-columns: 1fr;
-  }
-  .editor .cm-editor {
-    height: 320px;
   }
 }

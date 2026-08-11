@@ -32,8 +32,9 @@ mise run start
 ```
 
 Open `http://127.0.0.1:8787` — edit `scripts/main.ts`, **Save → Build → Deploy**.
-Pick **debug|prod** mode and **minified|non-minified** artifact. **Probe** runs
-`Script.Eval` checks and writes `types/generated-probe.json`.
+Deploy is a split button: main click reuses last choice; ▾ picks
+**debug|prod** × **minified|non-minified**. **Probe** runs `Script.Eval` checks and
+writes `types/generated-probe.json`.
 
 ```bash
 mise run build

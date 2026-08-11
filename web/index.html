@@ -8,48 +8,119 @@
   </head>
   <body>
     <header class="top">
-      <h1>Shelly DevRoom</h1>
-      <p class="sub" id="configLine">loading config…</p>
+      <div class="top-row">
+        <h1>Shelly DevRoom</h1>
+        <p class="sub" id="configLine">loading config…</p>
+      </div>
     </header>
 
     <main>
       <div class="toolbar">
-        <button type="button" id="btnSave">Save</button>
-        <button type="button" id="btnBuild">Build</button>
-        <label class="mode">
-          Mode
-          <select id="modeSelect">
-            <option value="debug">debug</option>
-            <option value="prod">prod</option>
-          </select>
-        </label>
-        <div class="deploy-group">
-          <button type="button" id="btnDeploy">Deploy</button>
-          <label class="mode deploy-minify">
-            Artifact
-            <select id="minifySelect" aria-label="Deploy artifact">
-              <option value="min">minified</option>
-              <option value="raw">non-minified</option>
-            </select>
-          </label>
+        <button
+          type="button"
+          id="btnSave"
+          title="Save editor contents to scripts/main.ts"
+        >
+          Save
+        </button>
+        <button
+          type="button"
+          id="btnBuild"
+          title="Compile TypeScript to ES5 and emit debug/prod raw + minified artifacts under dist/"
+        >
+          Build
+        </button>
+        <div class="split" id="deploySplit">
+          <button
+            type="button"
+            id="btnDeploy"
+            title="Upload the selected build (debug · min) to the Shelly script slot over WebSocket RPC"
+          >
+            Deploy debug · min
+          </button>
+          <button
+            type="button"
+            id="btnDeployMenu"
+            class="split-toggle"
+            aria-haspopup="menu"
+            aria-expanded="false"
+            aria-controls="deployMenu"
+            title="Choose debug/prod and minified/non-minified, then deploy"
+          >
+            ▾
+          </button>
+          <ul class="menu" id="deployMenu" role="menu" hidden>
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                data-mode="debug"
+                data-minify="min"
+                title="Deploy dist/debug.js (meta.env.debug, minified)"
+              >
+                debug · minified
+              </button>
+            </li>
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                data-mode="debug"
+                data-minify="raw"
+                title="Deploy dist/debug.raw.js (meta.env.debug, readable / non-minified)"
+              >
+                debug · non-minified
+              </button>
+            </li>
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                data-mode="prod"
+                data-minify="min"
+                title="Deploy dist/prod.js (meta.env.prod, minified)"
+              >
+                prod · minified
+              </button>
+            </li>
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                data-mode="prod"
+                data-minify="raw"
+                title="Deploy dist/prod.raw.js (meta.env.prod, readable / non-minified)"
+              >
+                prod · non-minified
+              </button>
+            </li>
+          </ul>
         </div>
-        <button type="button" id="btnProbe">Probe</button>
+        <button
+          type="button"
+          id="btnProbe"
+          title="Run Script.Eval capability checks on the device and write types/generated-probe.json"
+        >
+          Probe
+        </button>
       </div>
 
       <div id="editor" class="editor"></div>
 
-      <section class="sizes" aria-label="Build sizes">
-        <div class="size-block">
-          <h2>debug</h2>
-          <p id="sizeDebug">—</p>
-        </div>
-        <div class="size-block">
-          <h2>prod</h2>
-          <p id="sizeProd">—</p>
-        </div>
-      </section>
+      <div class="footer">
+        <section class="sizes" aria-label="Build sizes">
+          <div class="size-block">
+            <h2>debug</h2>
+            <p id="sizeDebug">—</p>
+          </div>
+          <div class="size-block">
+            <h2>prod</h2>
+            <p id="sizeProd">—</p>
+          </div>
+        </section>
 
-      <p class="status" id="statusLine" role="status">ready</p>
+        <p class="status" id="statusLine" role="status">ready</p>
+      </div>
     </main>
 
     <script type="module" src="/app.js"></script>

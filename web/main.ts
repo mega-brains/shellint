@@ -2,19 +2,49 @@ import { EditorView, basicSetup } from "codemirror";
 import { javascript } from "@codemirror/lang-javascript";
 import { EditorState } from "@codemirror/state";
 
+type Mode = "debug" | "prod";
+type Minify = "min" | "raw";
+
 const el = {
   editor: document.getElementById("editor")!,
   save: document.getElementById("btnSave") as HTMLButtonElement,
   build: document.getElementById("btnBuild") as HTMLButtonElement,
   deploy: document.getElementById("btnDeploy") as HTMLButtonElement,
+  deployMenuBtn: document.getElementById("btnDeployMenu") as HTMLButtonElement,
+  deployMenu: document.getElementById("deployMenu") as HTMLUListElement,
+  deploySplit: document.getElementById("deploySplit") as HTMLDivElement,
   probe: document.getElementById("btnProbe") as HTMLButtonElement,
-  mode: document.getElementById("modeSelect") as HTMLSelectElement,
-  minify: document.getElementById("minifySelect") as HTMLSelectElement,
   status: document.getElementById("statusLine")!,
   sizeDebug: document.getElementById("sizeDebug")!,
   sizeProd: document.getElementById("sizeProd")!,
   configLine: document.getElementById("configLine")!,
 };
+
+let deployChoice: { mode: Mode; minify: Minify } = {
+  mode: "debug",
+  minify: "min",
+};
+
+function minifyLabel(m: Minify): string {
+  return m === "raw" ? "non-minified" : "minified";
+}
+
+function shortMinify(m: Minify): string {
+  return m === "raw" ? "raw" : "min";
+}
+
+function syncDeployLabel() {
+  const { mode, minify } = deployChoice;
+  const short = shortMinify(minify);
+  const file = minify === "raw" ? `dist/${mode}.raw.js` : `dist/${mode}.js`;
+  el.deploy.textContent = `Deploy ${mode} · ${short}`;
+  el.deploy.title = `Upload ${file} (${mode}, ${minifyLabel(minify)}) to the Shelly script slot over WebSocket RPC`;
+}
+
+function setMenuOpen(open: boolean) {
+  el.deployMenu.hidden = !open;
+  el.deployMenuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+}
 
 function setStatus(msg: string, isError = false) {
   el.status.textContent = msg;
@@ -69,17 +99,19 @@ async function saveScript() {
 async function buildScript() {
   setStatus("building…");
   const data = await api<{
-    sizes: { debug: { raw?: number; min?: number }; prod: { raw?: number; min?: number } };
+    sizes: {
+      debug: { raw?: number; min?: number };
+      prod: { raw?: number; min?: number };
+    };
   }>("/api/build", { method: "POST", body: "{}" });
   el.sizeDebug.textContent = formatSizes(data.sizes.debug);
   el.sizeProd.textContent = formatSizes(data.sizes.prod);
   setStatus("build ok");
 }
 
-async function deployScript() {
-  const mode = el.mode.value;
-  const minify = el.minify.value === "raw" ? "raw" : "min";
-  const label = minify === "raw" ? "non-minified" : "minified";
+async function deployScript(choice = deployChoice) {
+  const { mode, minify } = choice;
+  const label = minifyLabel(minify);
   setStatus(`deploy ${mode}/${label}: connecting…`);
   const data = await api<{
     localBytes: number;
@@ -103,19 +135,35 @@ async function deployScript() {
 async function probeDevice() {
   setStatus("probing…");
   const data = await api<{
-    report: { results: { id: string; ok: boolean; result?: unknown; error?: string }[] };
+    report: {
+      results: {
+        id: string;
+        ok: boolean;
+        result?: unknown;
+        error?: string;
+      }[];
+    };
   }>("/api/probe", { method: "POST", body: "{}" });
   const lines = data.report.results.map((r) => {
     if (r.ok) return `${r.id}: ${JSON.stringify(r.result)}`;
     return `${r.id}: FAIL ${r.error}`;
   });
-  setStatus(`probe written to types/generated-probe.json\n${lines.join("\n")}`);
+  setStatus(
+    `probe written to types/generated-probe.json\n${lines.join("\n")}`,
+  );
 }
 
 function busy(on: boolean) {
-  for (const b of [el.save, el.build, el.deploy, el.probe]) b.disabled = on;
-  el.mode.disabled = on;
-  el.minify.disabled = on;
+  for (const b of [
+    el.save,
+    el.build,
+    el.deploy,
+    el.deployMenuBtn,
+    el.probe,
+  ]) {
+    b.disabled = on;
+  }
+  if (on) setMenuOpen(false);
 }
 
 async function withBusy(fn: () => Promise<void>) {
@@ -133,14 +181,30 @@ async function main() {
   view = new EditorView({
     state: EditorState.create({
       doc: "// loading…\n",
-      extensions: [basicSetup, javascript({ typescript: true }), EditorView.lineWrapping],
+      extensions: [
+        basicSetup,
+        javascript({ typescript: true }),
+        EditorView.lineWrapping,
+        EditorView.theme({
+          "&": { height: "100%", width: "100%" },
+          ".cm-scroller": { overflow: "auto" },
+        }),
+      ],
     }),
     parent: el.editor,
   });
 
+  syncDeployLabel();
+
   try {
     const cfg = await api<{
-      config: { deviceIp: string; scriptId: number; host: string; port: number; compiler: string };
+      config: {
+        deviceIp: string;
+        scriptId: number;
+        host: string;
+        port: number;
+        compiler: string;
+      };
     }>("/api/config");
     const c = cfg.config;
     el.configLine.textContent = `${c.deviceIp} · script ${c.scriptId} · ${c.host}:${c.port} · ${c.compiler}`;
@@ -150,8 +214,31 @@ async function main() {
 
   el.save.addEventListener("click", () => withBusy(saveScript));
   el.build.addEventListener("click", () => withBusy(buildScript));
-  el.deploy.addEventListener("click", () => withBusy(deployScript));
+  el.deploy.addEventListener("click", () => withBusy(() => deployScript()));
   el.probe.addEventListener("click", () => withBusy(probeDevice));
+
+  el.deployMenuBtn.addEventListener("click", (e) => {
+    e.stopPropagation();
+    setMenuOpen(el.deployMenu.hidden);
+  });
+
+  el.deployMenu.addEventListener("click", (e) => {
+    const btn = (e.target as HTMLElement).closest("button[data-mode]");
+    if (!(btn instanceof HTMLButtonElement)) return;
+    const mode = btn.dataset.mode === "prod" ? "prod" : "debug";
+    const minify = btn.dataset.minify === "raw" ? "raw" : "min";
+    deployChoice = { mode, minify };
+    syncDeployLabel();
+    setMenuOpen(false);
+    withBusy(() => deployScript(deployChoice));
+  });
+
+  document.addEventListener("click", (e) => {
+    if (!el.deploySplit.contains(e.target as Node)) setMenuOpen(false);
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") setMenuOpen(false);
+  });
 
   await withBusy(loadScript);
 }
