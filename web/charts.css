@@ -1,0 +1,75 @@
+/* Line charts and the debug-log panel — split out of panels.css for the line cap. */
+
+/* Inline-SVG line charts: size-over-time and live debug-log metrics. */
+.spark {
+  display: block;
+  width: 100%;
+  overflow: visible;
+}
+
+.spark-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.spark-line-1 { stroke: #8a6d1f; }
+.spark-line-2 { stroke: #4a6d8a; }
+.spark-line-3 { stroke: var(--danger); }
+
+.spark-label,
+.spark-axis {
+  font-family: var(--mono);
+  font-size: 0.62rem;
+  fill: var(--muted);
+}
+
+.spark-empty {
+  margin: 0.25rem 0 0;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.mem-compare { color: var(--muted); }
+.mem-compare.warn { color: var(--danger); }
+
+.logs-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.5rem;
+  margin: 0.35rem 0 0.3rem;
+}
+
+.logs-note {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.logs-note.warn { color: var(--danger); }
+
+.logs-list {
+  margin: 0.3rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  max-height: 9rem;
+  overflow: auto;
+  color: var(--ink);
+}
+
+.logs-list li {
+  padding: 0.1rem 0;
+  border-bottom: 1px solid rgba(212, 207, 196, 0.6);
+  white-space: pre-wrap;
+}
+
+.logs-list li:last-child { border-bottom: none; }
+.logs-list li.level-0,
+.logs-list li.level-1 { color: var(--danger); }
+.logs-list li.metric { color: var(--accent); }

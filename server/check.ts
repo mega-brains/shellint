@@ -13,6 +13,7 @@ import {
 import type { Finding } from "./lint-util.ts";
 import { checkBuildArtifacts } from "./dialect-check.ts";
 import { analyzeScriptFile, type ScriptStats } from "./script-stats.ts";
+import { summarizeChecks, type CheckRow } from "./check-catalog.ts";
 
 export type CheckProfileInfo = {
   source: "live" | "cache";
@@ -27,6 +28,8 @@ export type CheckReport = {
   ok: boolean;
   findings: Finding[];
   counts: { errors: number; warnings: number };
+  /** Every catalogued check with its verdict, findings or not. */
+  checks: CheckRow[];
   artifacts: string[];
   stats: ScriptStats | null;
   profile: CheckProfileInfo | null;
@@ -147,6 +150,10 @@ export async function runCheck(opts: CheckOptions = {}): Promise<CheckReport> {
     ok: errors === 0,
     findings,
     counts: { errors, warnings: findings.length - errors },
+    checks: summarizeChecks(findings, {
+      profile: profile !== null,
+      artifacts,
+    }),
     artifacts,
     stats,
     profile: profile

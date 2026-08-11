@@ -3,6 +3,7 @@ import {
   MAX_TIMERS,
   renderStatsBars,
 } from "./stats-chart";
+import { renderSparkline } from "./spark";
 
 export type ScriptStats = {
   apis: Record<string, number>;
@@ -32,6 +33,17 @@ export type HistoryRow = {
     timers: number;
     anonNest: number;
   };
+  memEstimate?: number;
+};
+
+export type MemoryEstimate = {
+  bytes: number;
+  breakdown: Record<string, number>;
+};
+
+export type MinFirmware = {
+  version: string;
+  reasons: { api: string; version: string }[];
 };
 
 export function formatStats(stats: ScriptStats | null | undefined): string {
@@ -71,6 +83,60 @@ export function renderHistoryList(host: HTMLElement, rows: HistoryRow[]): void {
   }
 }
 
+/** Newest-first rows, plotted oldest-left. Prefer the minified prod artifact. */
+export function renderSizeSpark(host: HTMLElement, rows: HistoryRow[]): void {
+  const points = [...rows]
+    .reverse()
+    .map((row) => {
+      const bytes = row.sizes.prod.min ?? row.sizes.prod.raw ?? null;
+      const at = new Date(row.ts).getTime();
+      return { x: Number.isNaN(at) ? 0 : at, y: bytes };
+    })
+    .filter((p) => p.x > 0);
+  renderSparkline(host, [{ label: "prod min", points }], {
+    height: 40,
+    formatY: (y) => `${y} B`,
+    formatX: (x) =>
+      new Date(x).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }),
+  });
+}
+
+export function formatEstimate(estimate: MemoryEstimate | null | undefined): string {
+  if (!estimate) return "—";
+  const parts = Object.entries(estimate.breakdown)
+    .filter(([, bytes]) => bytes > 0)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([name, bytes]) => `${name} ${bytes}`)
+    .join(" · ");
+  return `est RAM ~${estimate.bytes} B${parts ? `\n${parts}` : ""}`;
+}
+
+/**
+ * Estimate against the device's own `mem_peak`. Shown as a signed error so the
+ * cost model stays honest rather than quietly trusted.
+ */
+export function formatMemCompare(
+  estimate: MemoryEstimate | null | undefined,
+  memPeak: number | null | undefined,
+): string {
+  if (!estimate || memPeak == null || memPeak <= 0) return "";
+  const delta = estimate.bytes - memPeak;
+  const pct = Math.round((delta / memPeak) * 100);
+  const sign = delta > 0 ? "+" : "";
+  return `vs peak ${memPeak} B → ${sign}${delta} B (${sign}${pct}%)`;
+}
+
+export function formatMinFirmware(min: MinFirmware | null | undefined): string {
+  if (!min) return "—";
+  if (!min.reasons.length) return `min fw ${min.version} (baseline)`;
+  const why = min.reasons
+    .slice(0, 2)
+    .map((r) => r.api)
+    .join(", ");
+  return `min fw ${min.version} — ${why}`;
+}
+
 /** Prefer live ScriptStats; fall back to latest history summary if needed. */
 function resolveStats(
   stats: ScriptStats | null | undefined,
@@ -100,8 +166,15 @@ export function updateStatsPanel(opts: {
   summaryEl: HTMLElement;
   chartEl: HTMLElement;
   historyEl: HTMLElement;
+  sparkEl?: HTMLElement;
+  estimateEl?: HTMLElement;
+  compareEl?: HTMLElement;
+  minFwEl?: HTMLElement;
   stats?: ScriptStats | null;
   history: HistoryRow[];
+  estimate?: MemoryEstimate | null;
+  minFirmware?: MinFirmware | null;
+  memPeak?: number | null;
 }): void {
   const resolved = resolveStats(opts.stats, opts.history);
   if (opts.stats !== undefined || resolved) {
@@ -109,4 +182,18 @@ export function updateStatsPanel(opts: {
   }
   renderHistoryList(opts.historyEl, opts.history);
   renderStatsBars(opts.chartEl, resolved);
+  if (opts.sparkEl) renderSizeSpark(opts.sparkEl, opts.history);
+  if (opts.estimateEl && opts.estimate !== undefined) {
+    opts.estimateEl.textContent = formatEstimate(opts.estimate);
+  }
+  if (opts.minFwEl && opts.minFirmware !== undefined) {
+    opts.minFwEl.textContent = formatMinFirmware(opts.minFirmware);
+  }
+  if (opts.compareEl) {
+    const text = formatMemCompare(opts.estimate, opts.memPeak);
+    opts.compareEl.textContent = text;
+    // Over 50% off means the model, not the script, is the thing to distrust.
+    const off = text ? Math.abs(Number(text.match(/\(([+-]?\d+)%\)/)?.[1] ?? 0)) : 0;
+    opts.compareEl.classList.toggle("warn", off > 50);
+  }
 }

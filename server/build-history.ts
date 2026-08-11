@@ -21,6 +21,8 @@ export type BuildHistoryRow = {
     timers: number;
     anonNest: number;
   };
+  /** Static estimate at build time, kept so it can be calibrated later. */
+  memEstimate?: number;
 };
 
 const DIR = join(ROOT, ".devroom");
@@ -47,12 +49,14 @@ function summarizeStats(stats: ScriptStats | null | undefined) {
 export function appendBuildHistory(
   sizes: BuildSizes,
   stats?: ScriptStats | null,
+  memEstimate?: number,
 ): BuildHistoryRow {
   ensureDir();
   const row: BuildHistoryRow = {
     ts: new Date().toISOString(),
     sizes,
     stats: summarizeStats(stats),
+    memEstimate,
   };
   appendFileSync(FILE, `${JSON.stringify(row)}\n`, "utf8");
   trimHistory();

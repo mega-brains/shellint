@@ -162,9 +162,40 @@ button:disabled { opacity: 0.55; cursor: not-allowed; }
   filter: none;
 }
 
+.workspace {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  min-height: 0;
+  width: 100%;
+  gap: 0.75rem;
+}
+
+.splitter {
+  flex: 0 0 0.5rem;
+  align-self: stretch;
+  cursor: col-resize;
+  border-radius: 3px;
+  background:
+    linear-gradient(var(--line), var(--line)) center / 2px 100% no-repeat;
+  touch-action: none;
+}
+
+.splitter:hover,
+.splitter.dragging,
+.splitter:focus-visible {
+  background:
+    linear-gradient(var(--accent), var(--accent)) center / 2px 100% no-repeat;
+}
+
+.splitter:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Keep the col-resize cursor while dragging past the handle. */
+body.col-resizing { cursor: col-resize; user-select: none; }
+
 .editor {
   flex: 1 1 auto;
-  width: 100%;
+  min-width: 0;
   min-height: 0;
   border: 1px solid var(--line);
   background: var(--panel);

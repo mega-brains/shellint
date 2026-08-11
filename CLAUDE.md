@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - read [plans-in-project-dir](./.claude/memory/plans-in-project-dir.md)
 
 
-## Status: M0–M4 basic · M5–M10 done (lint Tier 1–5, incl. connected Tier 4)
+## Status: M0–M4 basic · M5–M10 done (lint Tier 1–5, incl. connected Tier 4) · M11 type-layer bans · M12 dashboard metrics
 
 Prefer **mise** tasks ([`mise.toml`](./mise.toml)). Verify with `ls` / `mise tasks`
 before assuming entrypoints exist.
@@ -23,14 +23,17 @@ build, test).
 |---|---|
 | Runtime | Node 22 via mise (`"type": "module"`) |
 | Task runner | mise (`start`/`dev`, `build`, `lint`, `test`, `beforeCommit`, `probe`, `clean`) |
-| Device compile | `tsc` → ES5, `module: none`, `noEmitHelpers` |
+| Device compile | `tsc` → ES5, `module: none`, `noEmitHelpers`, `noLib` + `types: []` |
 | Env gating | `meta.env` DCE → `*.raw.js`; then Terser minify → `*.js` |
 | Emit | Flat (no IIFE) → `dist/{debug,prod}.{raw.js,js}` |
-| Types | `types/shelly.d.ts`, `types/espruino-lib.d.ts`, `types/meta.d.ts` |
+| Types | `types/shelly.d.ts`, `types/espruino-lib.d.ts`, `types/meta.d.ts` — the whole stdlib for device code, since `noLib` drops `lib.es*` (M11) |
 | Config | `devroom.json` (`deviceIp`, `scriptId`, `host`, `port`, `compiler`) |
 | Server / UI | Hono + CodeMirror 6 |
 | Deploy | WS PutCode; mode debug/prod + artifact min/raw |
 | Live telemetry | `GET /api/device/status` + eco toggle (M5) |
+| Dashboard metrics | `/api/stats` → `estimate` (JsVar model) + `minFirmware`; size sparkline; estimate vs live `mem_peak` (M12) |
+| Debug logs | `GET`/`POST /api/device/logs` — server holds the one `/debug/log` socket, browser polls; `print("#m <series> <value>")` charts numerically (M12) |
+| Charts | Hand-rolled inline SVG (`web/spark.ts`). **No uPlot** — deliberately dependency-free |
 | Compliance | `POST /api/check` — source lint Tier 1–5 + post-compile dialect guard (M8–M10) |
 | Device profile | `types/device-profile.json` (`ListMethods` + components + gen/fw) drives Tier 4; refreshed when the device answers |
 | Auth | None for now |

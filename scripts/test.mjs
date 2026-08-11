@@ -3,7 +3,7 @@
  * Usage: node scripts/test.mjs
  */
 import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -28,6 +28,7 @@ function run(cmd, args) {
 
 run("npm", ["run", "build:shelly"]);
 run("npm", ["run", "build:web"]);
+run("node", ["--import", "tsx", "scripts/test-dashboard.mjs"]);
 
 for (const f of [
   "dist/debug.js",
@@ -52,6 +53,51 @@ if (same("dist/debug.raw.js", "dist/debug.js")) {
   fail("debug raw and min identical (minify noop?)");
 }
 
+// Unsupported globals are banned by the device tsconfig (`noLib` + `types: []`),
+// not by a lint rule — and re-adding @types/node there would silently undo it.
+{
+  const fixture = join(ROOT, "scripts", "banned-globals.fixture.ts");
+  const config = join(ROOT, "tsconfig.banned-globals.json");
+  writeFileSync(
+    fixture,
+    [
+      "var mapped = [1, 2].map(function (x: number) { return x; });",
+      'var matched = /x/.test("y");',
+      'var padded = "a".padStart(2, " ");',
+      "var promised = new Promise(function () {});",
+      "var uniq = new Set<number>();",
+      'var sym = Symbol("x");',
+      "",
+    ].join("\n"),
+  );
+  writeFileSync(
+    config,
+    JSON.stringify({
+      extends: "./tsconfig.shelly.json",
+      compilerOptions: { noEmit: true },
+      include: ["scripts/banned-globals.fixture.ts", "types/**/*.d.ts"],
+    }),
+  );
+  try {
+    const r = spawnSync(
+      "node",
+      ["node_modules/typescript/bin/tsc", "-p", "tsconfig.banned-globals.json"],
+      { cwd: ROOT, encoding: "utf8" },
+    );
+    if (r.status === 0) {
+      fail("device compile accepts Promise/Set/Symbol/RegExp/map — noLib or types:[] regressed");
+    }
+    for (const name of ["map", "RegExp", "padStart", "Promise", "Set", "Symbol"]) {
+      if (!r.stdout.includes(name)) {
+        fail(`device compile did not reject ${name}:\n${r.stdout}`);
+      }
+    }
+  } finally {
+    rmSync(fixture, { force: true });
+    rmSync(config, { force: true });
+  }
+}
+
 // The UI wires itself by id, so a renamed element fails only at runtime.
 {
   const html = readFileSync(join(ROOT, "web", "index.html"), "utf8");
@@ -73,7 +119,7 @@ const smoke = spawnSync(
     "-e",
     `
 import { readFileSync } from "node:fs";
-import { checkBuildArtifacts } from "./server/dialect-check.ts";
+import { checkBuildArtifacts, checkDialectSource } from "./server/dialect-check.ts";
 import { analyzeScriptFile } from "./server/script-stats.ts";
 import { inferChip } from "./server/device-status.ts";
 import { lintSource } from "./server/lint-source.ts";
@@ -89,6 +135,16 @@ if (bad.length) {
   console.error(JSON.stringify(bad, null, 2));
   process.exit(1);
 }
+const emitted = (src) => new Set(checkDialectSource(src, "emitted.js").findings.map((f) => f.rule));
+for (const src of ["var a = o.x, { b } = o;", "var [c] = arr;"]) {
+  if (!emitted(src).has("no-destructuring")) {
+    throw new Error("dialect guard missed no-destructuring in: " + src);
+  }
+}
+if (emitted("var d = arr[0];").has("no-destructuring")) {
+  throw new Error("dialect guard false positive no-destructuring on element access");
+}
+
 const stats = analyzeScriptFile();
 if (!stats.apis["Timer.set"]) throw new Error("expected Timer.set in sample stats");
 if (inferChip(2, "SNSW") !== "ESP32") throw new Error("inferChip gen2");

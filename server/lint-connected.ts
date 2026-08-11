@@ -1,4 +1,15 @@
+/**
+ * Tier 4 — capability profile of the *connected* device. Everything here needs
+ * `Shelly.ListMethods` / `Shelly.GetComponents` / `Shelly.GetDeviceInfo`, which
+ * is exactly what an offline linter cannot have.
+ */
 import ts from "typescript";
+import {
+  capabilityKeyFor,
+  compareVersion,
+  CAPABILITIES,
+  type Capability,
+} from "./capabilities.ts";
 import type { DeviceProfile } from "./device-profile.ts";
 import {
   calleeName,
@@ -10,68 +21,6 @@ import {
   type Finding,
   type Sink,
 } from "./lint-util.ts";
-
-/**
- * Tier 4 — capability profile of the *connected* device. Everything here needs
- * `Shelly.ListMethods` / `Shelly.GetComponents` / `Shelly.GetDeviceInfo`, which
- * is exactly what an offline linter cannot have.
- */
-type Capability = {
-  rule: string;
-  label: string;
-  /** First firmware that shipped the API — see the changelog table in plan 01. */
-  minFw?: string;
-  /** AES and ArrayBuffer are Gen3/Gen4 only. */
-  minGen?: number;
-  /** Namespace that must appear in ListMethods for the feature to exist. */
-  requiresMethodPrefix?: string;
-};
-
-const CAPABILITIES: Record<string, Capability> = {
-  aes: {
-    rule: "require-capability-aes",
-    label: "AES",
-    minFw: "1.6.0",
-    minGen: 3,
-  },
-  arrayBuffer: {
-    rule: "require-capability-array-buffer",
-    label: "ArrayBuffer",
-    minFw: "1.6.0",
-    minGen: 3,
-  },
-  storage: {
-    rule: "require-capability-storage",
-    label: "Script.storage",
-    minFw: "1.2.0",
-  },
-  virtual: {
-    rule: "require-capability-virtual",
-    label: "the Virtual scripting API",
-    minFw: "1.4.0",
-    requiresMethodPrefix: "Virtual.",
-  },
-  metaVc: {
-    rule: "require-capability-meta-vc",
-    label: "@meta virtual-component declarations",
-    minFw: "2.0.0",
-  },
-  rpcHandler: {
-    rule: "require-capability-rpc-handler",
-    label: "Script.addRpcHandler",
-    minFw: "1.5.0",
-  },
-  uptimeMs: {
-    rule: "require-capability-uptime",
-    label: "Shelly.getUptimeMs",
-    minFw: "1.5.0",
-  },
-  timerInfo: {
-    rule: "require-capability-timer-info",
-    label: "Timer.getInfo",
-    minFw: "1.5.0",
-  },
-};
 
 /** Namespaces whose shape may still change — worth a heads-up, not an error. */
 const PREVIEW_NAMESPACES = ["LNM."];
@@ -92,24 +41,6 @@ const NON_COMPONENT_NAMESPACES = new Set([
   "mqtt",
   "script",
 ]);
-
-function parseVersion(ver: string | null): number[] | null {
-  if (!ver) return null;
-  const match = /^(\d+)\.(\d+)\.(\d+)/.exec(ver.trim());
-  if (!match) return null;
-  return [Number(match[1]), Number(match[2]), Number(match[3])];
-}
-
-/** -1 / 0 / 1, or null when the device firmware string is unusable. */
-function compareVersion(ver: string | null, min: string): number | null {
-  const a = parseVersion(ver);
-  const b = parseVersion(min);
-  if (!a || !b) return null;
-  for (let i = 0; i < 3; i += 1) {
-    if (a[i]! !== b[i]!) return a[i]! < b[i]! ? -1 : 1;
-  }
-  return 0;
-}
 
 function capabilityGap(cap: Capability, profile: DeviceProfile): string | null {
   if (cap.minGen != null && profile.gen != null && profile.gen < cap.minGen) {
@@ -184,18 +115,6 @@ function checkRpcMethod(
       ? `"${method}" is not an RPC method on this device — did you mean "${near}"?`
       : `"${method}" is not in this device's Shelly.ListMethods (${profile.model ?? "device"} fw ${profile.ver})`,
   );
-}
-
-function capabilityKeyFor(name: string): string | null {
-  if (name.startsWith("AES.")) return "aes";
-  if (name.startsWith("Script.storage.")) return "storage";
-  if (name.startsWith("Virtual.") || name === "Script.getVcHandle") {
-    return "virtual";
-  }
-  if (name === "Script.addRpcHandler") return "rpcHandler";
-  if (name === "Shelly.getUptimeMs") return "uptimeMs";
-  if (name === "Timer.getInfo") return "timerInfo";
-  return null;
 }
 
 export function lintConnected(

@@ -9,6 +9,12 @@
  * methods (push/pop/indexOf/slice) in new code.
  */
 
+interface Object {
+  toString(): string;
+  valueOf(): unknown;
+  hasOwnProperty(v: string): boolean;
+}
+
 interface ObjectConstructor {
   new (value?: unknown): Object;
   (value?: unknown): Object;
@@ -30,6 +36,23 @@ interface FunctionConstructor {
 }
 
 declare var Function: FunctionConstructor;
+
+/**
+ * Globals tsc itself requires under `noLib`. They exist to satisfy the checker,
+ * not to describe device capability — hence the minimal bodies.
+ */
+interface CallableFunction extends Function {}
+interface NewableFunction extends Function {}
+interface IArguments {
+  [index: number]: unknown;
+  length: number;
+}
+/**
+ * Declared as a bare type with no constructor and no members on purpose: the
+ * device has no RegExp, so a literal or a method call on one must not typecheck.
+ * Rule 1.1 `no-regexp` gives the readable message.
+ */
+interface RegExp {}
 
 interface String {
   readonly length: number;

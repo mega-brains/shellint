@@ -3,14 +3,20 @@ import { javascript } from "@codemirror/lang-javascript";
 import { EditorState } from "@codemirror/state";
 import { createDevicePanel, type DeviceIdentity } from "./device-panel";
 import { createCollapsible } from "./collapsible";
+import { createSplitter } from "./splitter";
+import { createDashboard } from "./dashboard";
 import {
-  updateStatsPanel,
   type HistoryRow,
+  type MemoryEstimate,
+  type MinFirmware,
   type ScriptStats,
 } from "./stats-panel";
 import {
+  renderCatalog,
   renderFindings,
+  renderReport,
   summarize,
+  type CheckCatalog,
   type CheckReport,
   type Finding,
 } from "./check-panel";
@@ -28,14 +34,20 @@ const el = {
   deploySplit: document.getElementById("deploySplit") as HTMLDivElement,
   check: document.getElementById("btnCheck") as HTMLButtonElement,
   probe: document.getElementById("btnProbe") as HTMLButtonElement,
-  findingsPanel: document.getElementById("findingsPanel")!,
-  findingsSummary: document.getElementById("findingsSummary")!,
+  checkPanel: document.getElementById("checkPanel")!,
+  checkHead: document.getElementById("checkHead")!,
+  checkToggle: document.getElementById("checkToggle")!,
+  checkPeek: document.getElementById("checkPeek")!,
+  checkNote: document.getElementById("checkNote")!,
+  checkRules: document.getElementById("checkRules")!,
   findingsList: document.getElementById("findingsList")!,
   status: document.getElementById("statusLine")!,
+  workspace: document.getElementById("workspace")!,
+  side: document.getElementById("side")!,
+  splitter: document.getElementById("workspaceSplitter")!,
   buildPanel: document.getElementById("buildPanel")!,
   buildHead: document.getElementById("buildHead")!,
   buildToggle: document.getElementById("buildToggle")!,
-  buildPeek: document.getElementById("buildPeek")!,
   sizeDebug: document.getElementById("sizeDebug")!,
   sizeProd: document.getElementById("sizeProd")!,
   scriptStats: document.getElementById("scriptStats")!,
@@ -156,7 +168,10 @@ let deviceOnline = false;
 function onDeviceIdentity(id: DeviceIdentity) {
   deviceOnline = id.state !== "offline";
   syncConfigLine(id);
+  dashboard.update({ memPeak: id.memPeak });
 }
+
+const dashboard = createDashboard({ api, onStatus: setStatus });
 
 const device = createDevicePanel(
   {
@@ -187,11 +202,15 @@ const device = createDevicePanel(
   onDeviceIdentity,
 );
 
-const findingsEls = {
-  panel: el.findingsPanel,
-  summary: el.findingsSummary,
-  list: el.findingsList,
+const checkEls = {
+  peek: el.checkPeek,
+  note: el.checkNote,
+  findings: el.findingsList,
+  rules: el.checkRules,
 };
+
+/** Group labels and rule descriptions, fetched once so the panel is never blank. */
+let checkCatalog: CheckCatalog | null = null;
 
 createCollapsible(
   { panel: el.buildPanel, head: el.buildHead, toggle: el.buildToggle },
@@ -201,14 +220,22 @@ createCollapsible(
   },
 );
 
-/** Collapsed, the head has to carry the numbers the panel would have shown. */
-function syncBuildPeek() {
-  const debug = el.sizeDebug.textContent ?? "—";
-  const prod = el.sizeProd.textContent ?? "—";
-  el.buildPeek.textContent =
-    debug === "—" && prod === "—"
-      ? "no build yet — run Build"
-      : `debug ${debug} · prod ${prod}`;
+createCollapsible(
+  { panel: el.checkPanel, head: el.checkHead, toggle: el.checkToggle },
+  {
+    storageKey: "shelly-devroom.checkPanel.collapsed",
+    defaultCollapsed: true,
+  },
+);
+
+async function loadCheckCatalog() {
+  try {
+    const data = await api<CheckCatalog>("/api/checks");
+    checkCatalog = { groups: data.groups, checks: data.checks };
+    renderCatalog(checkEls, checkCatalog);
+  } catch {
+    el.checkNote.textContent = "check catalog unavailable";
+  }
 }
 
 /** After a reload the size blocks are empty until a build; history has them. */
@@ -226,24 +253,10 @@ function seedSizesFromHistory(history: HistoryRow[]) {
 async function loadHistory(stats?: ScriptStats | null) {
   try {
     const data = await api<{ history: HistoryRow[] }>("/api/history?limit=40");
-    updateStatsPanel({
-      summaryEl: el.scriptStats,
-      chartEl: el.statsChart,
-      historyEl: el.buildHistory,
-      stats,
-      history: data.history,
-    });
+    dashboard.update({ stats, history: data.history });
     seedSizesFromHistory(data.history);
-    syncBuildPeek();
   } catch {
-    updateStatsPanel({
-      summaryEl: el.scriptStats,
-      chartEl: el.statsChart,
-      historyEl: el.buildHistory,
-      stats,
-      history: [],
-    });
-    syncBuildPeek();
+    dashboard.update({ stats, history: [] });
   }
 }
 
@@ -274,34 +287,40 @@ async function buildScript() {
       prod: { raw?: number; min?: number };
     };
     stats?: ScriptStats;
+    estimate?: MemoryEstimate;
+    minFirmware?: MinFirmware | null;
     dialect?: { file: string; findings: Finding[] }[];
   }>("/api/build", { method: "POST", body: "{}" });
   el.sizeDebug.textContent = formatSizes(data.sizes.debug);
   el.sizeProd.textContent = formatSizes(data.sizes.prod);
-  syncBuildPeek();
+  dashboard.update({
+    estimate: data.estimate ?? null,
+    minFirmware: data.minFirmware ?? null,
+  });
   await loadHistory(data.stats ?? null);
   const dialect =
     data.dialect?.flatMap((r) =>
       r.findings.map((f) => ({ ...f, file: `dist/${r.file}` })),
     ) ?? [];
   if (dialect.length) {
-    renderFindings(findingsEls, dialect);
+    renderFindings(checkEls, dialect);
     setStatus("build ok — dialect guard reported findings (see check panel)", true);
     return;
   }
   setStatus("build ok");
 }
 
-async function checkScript() {
+async function checkScript({ quiet = false } = {}) {
   // Only ask for a live profile when polling says the device answers, so an
   // offline Check never stalls on an RPC timeout.
-  setStatus(deviceOnline ? "checking (with device)…" : "checking…");
+  if (!quiet) setStatus(deviceOnline ? "checking (with device)…" : "checking…");
   const data = await api<{ report: CheckReport }>("/api/check", {
     method: "POST",
     body: JSON.stringify({ connected: deviceOnline }),
   });
   const { report } = data;
-  renderFindings(findingsEls, report.findings, report.counts);
+  renderReport(checkEls, report, checkCatalog);
+  if (quiet) return;
   const scope = report.artifacts.length
     ? `scripts/main.ts + ${report.artifacts.join(", ")}`
     : "scripts/main.ts (no build artifacts)";
@@ -407,6 +426,17 @@ async function main() {
     parent: el.editor,
   });
 
+  createSplitter(
+    { root: el.workspace, handle: el.splitter, panel: el.side },
+    {
+      storageKey: "shelly-devroom.side.width",
+      cssVar: "--side-w",
+      minPanel: 168,
+      minEditor: 320,
+      onResize: () => view.requestMeasure(),
+    },
+  );
+
   syncDeployLabel();
 
   try {
@@ -429,7 +459,7 @@ async function main() {
   el.save.addEventListener("click", () => withBusy(saveScript));
   el.build.addEventListener("click", () => withBusy(buildScript));
   el.deploy.addEventListener("click", () => withBusy(() => deployScript()));
-  el.check.addEventListener("click", () => withBusy(checkScript));
+  el.check.addEventListener("click", () => withBusy(() => checkScript()));
   el.probe.addEventListener("click", () => withBusy(probeDevice));
   el.deployMenuBtn.addEventListener("click", (e) => {
     e.stopPropagation();
@@ -453,13 +483,13 @@ async function main() {
     if (e.key === "Escape") setMenuOpen(false);
   });
   device.startPoll();
-  try {
-    const data = await api<{ stats: ScriptStats }>("/api/stats");
-    await loadHistory(data.stats);
-  } catch {
-    await loadHistory();
-  }
+  await loadCheckCatalog();
+  await loadHistory(await dashboard.loadStats());
   await withBusy(loadScript);
+  // Fill the indicator with real verdicts without hijacking the status line.
+  void checkScript({ quiet: true }).catch(() => {
+    el.checkNote.textContent = "check could not run — press Check for the error";
+  });
 }
 
 main();

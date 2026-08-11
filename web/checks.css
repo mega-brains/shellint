@@ -1,0 +1,158 @@
+/* Compliance indicator: the check catalog, its verdicts, and the findings. */
+
+/* The head always carries the verdict, collapsed or not. */
+.checks {
+  flex: 0 0 auto;
+  border-top: 2px solid var(--line);
+  padding-top: 0.45rem;
+}
+
+.checks .panel-peek { color: var(--accent); }
+.checks .panel-peek.error { color: var(--danger); }
+
+.checks-body { margin-top: 0.35rem; }
+.checks.collapsed .checks-body { display: none; }
+
+.checks-note {
+  margin: 0 0 0.35rem;
+  font-family: var(--mono);
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.check-rules {
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check-group + .check-group {
+  margin-top: 0.5rem;
+  border-top: 1px solid var(--line);
+  padding-top: 0.4rem;
+}
+
+.check-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.78rem;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  font-weight: 600;
+}
+
+.check-group-meta {
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.check-group-about {
+  margin: 0.1rem 0 0.25rem;
+  font-size: 0.68rem;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.check-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.check {
+  display: grid;
+  grid-template-columns: 0.9rem minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 0.1rem 0.4rem;
+  padding: 0.15rem 0;
+}
+
+.check-mark {
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.check-rule {
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+.check-about {
+  grid-column: 2 / -1;
+  font-size: 0.68rem;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.check-count {
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--danger);
+}
+
+.check-pass .check-mark { color: var(--accent); }
+.check-warn .check-mark,
+.check-warn .check-rule { color: #8a6d1f; }
+.check-fail .check-mark,
+.check-fail .check-rule { color: var(--danger); }
+.check-skipped { opacity: 0.6; }
+.check-pending .check-mark { opacity: 0.5; }
+
+.findings-list {
+  margin: 0.35rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  max-height: 8rem;
+  overflow: auto;
+}
+
+.findings-list:empty { display: none; }
+
+.finding {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.15rem 0;
+  border-bottom: 1px solid rgba(212, 207, 196, 0.6);
+}
+
+.finding:last-child { border-bottom: none; }
+
+.finding-sev {
+  flex: 0 0 auto;
+  min-width: 3.2rem;
+  text-transform: uppercase;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+}
+
+.finding.error .finding-sev { color: var(--danger); }
+.finding.warn .finding-sev { color: #8a6d1f; }
+.finding.ok { color: var(--muted); }
+
+.finding-rule { color: var(--muted); }
+.finding-msg { flex: 1 1 100%; min-width: 0; }
+
+.finding-loc {
+  flex: 0 0 auto;
+  color: var(--muted);
+  font-size: 0.72rem;
+}
+
+/* Stacked under the editor there is width to spare, so use two columns. */
+@media (max-width: 1000px) {
+  .check-list { columns: 2; column-gap: 1.25rem; }
+  .check { break-inside: avoid; }
+}

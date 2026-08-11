@@ -161,6 +161,8 @@ export type DeviceIdentity = {
   deviceName: string | null;
   scriptName: string | null;
   state: "running" | "stopped" | "unknown" | "offline";
+  /** Measured high-water mark, for the dashboard to check its estimate against. */
+  memPeak: number | null;
 };
 
 export function createDevicePanel(
@@ -259,6 +261,7 @@ export function createDevicePanel(
       deviceName: status.device.name ?? status.device.id ?? null,
       scriptName: status.script.name,
       state: running == null ? "unknown" : running ? "running" : "stopped",
+      memPeak: status.script.mem_peak,
     });
   }
 
@@ -283,7 +286,12 @@ export function createDevicePanel(
       const short =
         msg.length > 48 ? `${msg.slice(0, 45)}…` : msg || "offline";
       setPeek(short, true);
-      onIdentity({ deviceName: null, scriptName: null, state: "offline" });
+      onIdentity({
+        deviceName: null,
+        scriptName: null,
+        state: "offline",
+        memPeak: null,
+      });
     }
   }
 

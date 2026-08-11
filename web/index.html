@@ -6,6 +6,8 @@
     <title>Shelly DevRoom</title>
     <link rel="stylesheet" href="/styles.css" />
     <link rel="stylesheet" href="/panels.css" />
+    <link rel="stylesheet" href="/checks.css" />
+    <link rel="stylesheet" href="/charts.css" />
   </head>
   <body>
     <header class="top">
@@ -113,56 +115,109 @@
         </button>
       </div>
 
-      <div id="editor" class="editor"></div>
+      <div class="workspace" id="workspace">
+        <div id="editor" class="editor"></div>
+
+        <div
+          class="splitter"
+          id="workspaceSplitter"
+          role="separator"
+          aria-orientation="vertical"
+          aria-label="Resize editor — drag, arrow keys, or double-click to reset"
+          title="Drag to resize the editor · arrow keys to nudge · double-click to reset"
+          tabindex="0"
+        ></div>
+
+        <aside class="side" id="side">
+          <section class="build" aria-label="Build sizes" id="buildPanel">
+            <div
+              class="panel-head"
+              id="buildHead"
+              role="button"
+              tabindex="0"
+              aria-expanded="true"
+              aria-controls="buildBody"
+              title="Show or hide build sizes, script stats and history"
+            >
+              <span class="panel-toggle" id="buildToggle" aria-hidden="true">▾</span>
+              <h2>build</h2>
+            </div>
+            <div class="sizes" id="buildBody">
+              <div class="size-block">
+                <h2>debug</h2>
+                <p id="sizeDebug">—</p>
+              </div>
+              <div class="size-block">
+                <h2>prod</h2>
+                <p id="sizeProd">—</p>
+              </div>
+              <div class="size-block size-stats">
+                <h2>stats</h2>
+                <p id="scriptStats" class="stats-summary">—</p>
+                <p
+                  id="memEstimate"
+                  class="stats-summary"
+                  title="Static RAM estimate from an Espruino JsVar cost model — an estimate, not a measurement"
+                >
+                  —
+                </p>
+                <p
+                  id="memCompare"
+                  class="stats-summary mem-compare"
+                  title="Estimate versus the mem_peak the device actually reported for the running script"
+                ></p>
+                <p
+                  id="minFirmware"
+                  class="stats-summary"
+                  title="Lowest Shelly firmware that implements every API this script uses"
+                >
+                  —
+                </p>
+                <div
+                  id="statsChart"
+                  class="stats-chart"
+                  aria-label="Resource usage versus Shelly device caps"
+                ></div>
+              </div>
+              <div class="size-block size-history">
+                <h2>history</h2>
+                <div
+                  id="historySpark"
+                  aria-label="Minified script size over recent builds"
+                ></div>
+                <ol id="buildHistory" class="history-list"></ol>
+              </div>
+            </div>
+          </section>
+
+          <section
+            class="checks collapsed"
+            aria-label="Compliance checks"
+            id="checkPanel"
+          >
+            <div
+              class="panel-head"
+              id="checkHead"
+              role="button"
+              tabindex="0"
+              aria-expanded="false"
+              aria-controls="checkBody"
+              title="Show or hide every compliance check, what it enforces and its verdict"
+            >
+              <span class="panel-toggle" id="checkToggle" aria-hidden="true">▸</span>
+              <h2>check</h2>
+              <p class="panel-peek" id="checkPeek">not run yet</p>
+            </div>
+            <div class="checks-body" id="checkBody">
+              <p class="checks-note" id="checkNote">—</p>
+              <ol class="findings-list" id="findingsList"></ol>
+              <ul class="check-rules" id="checkRules"></ul>
+            </div>
+          </section>
+        </aside>
+      </div>
 
       <div class="footer">
-        <section class="build" aria-label="Build sizes" id="buildPanel">
-          <div
-            class="panel-head"
-            id="buildHead"
-            role="button"
-            tabindex="0"
-            aria-expanded="true"
-            aria-controls="buildBody"
-            title="Show or hide build sizes, script stats and history"
-          >
-            <span class="panel-toggle" id="buildToggle" aria-hidden="true">▾</span>
-            <h2>build</h2>
-            <p class="panel-peek" id="buildPeek">—</p>
-          </div>
-          <div class="sizes" id="buildBody">
-            <div class="size-block">
-              <h2>debug</h2>
-              <p id="sizeDebug">—</p>
-            </div>
-            <div class="size-block">
-              <h2>prod</h2>
-              <p id="sizeProd">—</p>
-            </div>
-            <div class="size-block size-stats">
-              <h2>stats</h2>
-              <p id="scriptStats" class="stats-summary">—</p>
-              <div
-                id="statsChart"
-                class="stats-chart"
-                aria-label="Resource usage versus Shelly device caps"
-              ></div>
-            </div>
-            <div class="size-block size-history">
-              <h2>history</h2>
-              <ol id="buildHistory" class="history-list"></ol>
-            </div>
-          </div>
-        </section>
-
-        <section class="findings" aria-label="Compliance findings" id="findingsPanel" hidden>
-          <div class="findings-head">
-            <h2>check</h2>
-            <p class="findings-summary" id="findingsSummary">—</p>
-          </div>
-          <ol class="findings-list" id="findingsList"></ol>
-        </section>
-
         <section
           class="device collapsed"
           aria-label="Device telemetry"
@@ -223,6 +278,38 @@
               </div>
             </dl>
             <p class="device-err" id="deviceErr" hidden></p>
+          </div>
+        </section>
+
+        <section class="device collapsed" aria-label="Device debug log" id="logsPanel">
+          <div
+            class="panel-head"
+            id="logsHead"
+            role="button"
+            tabindex="0"
+            aria-expanded="false"
+            aria-controls="logsBody"
+            title="Show or hide the device debug log and the charts parsed from it"
+          >
+            <span class="panel-toggle" id="logsToggle" aria-hidden="true">▸</span>
+            <h2>logs</h2>
+            <p class="panel-peek" id="logsPeek">—</p>
+          </div>
+          <div class="device-body" id="logsBody">
+            <div class="logs-toolbar">
+              <button
+                type="button"
+                id="btnLogs"
+                title="Enable sys.debug.websocket on the device and stream ws://<ip>/debug/log"
+              >
+                start stream
+              </button>
+              <p class="logs-note" id="logsNote">
+                chart numeric values with print("#m &lt;series&gt; &lt;value&gt;")
+              </p>
+            </div>
+            <div id="logsSpark" aria-label="Numeric series parsed from the debug log"></div>
+            <ol class="logs-list" id="logsList"></ol>
           </div>
         </section>
 

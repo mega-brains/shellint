@@ -42,6 +42,20 @@ if the configured slot is not running it creates a throwaway `devroom-probe`
 slot and deletes it again. Footer polls live device telemetry (script
 mem/cpu, RAM/FS, latency, RSSI) and has an **eco** toggle.
 
+The build panel also shows a **static RAM estimate** (a JsVar cost model — an
+estimate, shown next to the device's measured `mem_peak` so the error stays
+visible), the **minimum firmware** the script's API use requires, and script size
+over recent builds. The **logs** panel enables `sys.debug.websocket` on the device
+and streams `ws://<ip>/debug/log`; numeric series are charted from a print
+convention:
+
+```js
+print("#m temp " + tC); // "#m <series> <value>"
+```
+
+Charts are hand-rolled inline SVG — no charting dependency. The device's log buffer
+is circular, so dropped lines render as gaps rather than interpolated lines.
+
 ```bash
 mise run build
 mise run deploy -- debug min    # or: prod raw

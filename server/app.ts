@@ -16,6 +16,10 @@ import { analyzeScriptFile } from "./script-stats.ts";
 import { appendBuildHistory, readBuildHistory } from "./build-history.ts";
 import { checkBuildArtifacts } from "./dialect-check.ts";
 import { runCheck } from "./check.ts";
+import { CHECK_CATALOG, CHECK_GROUPS } from "./check-catalog.ts";
+import { estimateMemoryFile } from "./memory-estimate.ts";
+import { minFirmware } from "./min-firmware.ts";
+import { readLogs, startLogStream, stopLogStream } from "./debug-log.ts";
 
 export function createApp() {
   const app = new Hono();
@@ -55,12 +59,15 @@ export function createApp() {
       } catch {
         /* stats are best-effort */
       }
-      const historyRow = appendBuildHistory(sizes, stats);
+      const estimate = estimateMemoryFile();
+      const historyRow = appendBuildHistory(sizes, stats, estimate.bytes);
       const dialect = checkBuildArtifacts();
       return c.json({
         ok: true,
         sizes,
         stats,
+        estimate,
+        minFirmware: stats ? minFirmware(stats.apis) : null,
         historyRow,
         dialect,
         stdout,
@@ -104,10 +111,20 @@ export function createApp() {
   app.post("/api/check", check);
   app.get("/api/check", check);
 
+  // The catalog alone, so the UI can list every check before the first run.
+  app.get("/api/checks", (c) => {
+    return c.json({ ok: true, groups: CHECK_GROUPS, checks: CHECK_CATALOG });
+  });
+
   app.get("/api/stats", (c) => {
     try {
       const stats = analyzeScriptFile();
-      return c.json({ ok: true, stats });
+      return c.json({
+        ok: true,
+        stats,
+        estimate: estimateMemoryFile(),
+        minFirmware: minFirmware(stats.apis),
+      });
     } catch (e) {
       return c.json(
         { ok: false, error: e instanceof Error ? e.message : String(e) },
@@ -123,6 +140,37 @@ export function createApp() {
       Number.isFinite(limit) ? Math.min(100, Math.max(1, limit)) : 20,
     );
     return c.json({ ok: true, history });
+  });
+
+  app.get("/api/device/logs", (c) => {
+    const sinceRaw = Number(c.req.query("since"));
+    const since = Number.isFinite(sinceRaw) ? Math.max(0, sinceRaw) : 0;
+    return c.json({ ok: true, stream: readLogs(since) });
+  });
+
+  app.post("/api/device/logs", async (c) => {
+    let action = "start";
+    try {
+      const body = (await c.req.json()) as { action?: unknown };
+      if (body.action === "stop") action = "stop";
+    } catch {
+      /* default to start */
+    }
+    if (action === "stop") {
+      stopLogStream();
+      return c.json({ ok: true, connected: false });
+    }
+    try {
+      return c.json({ ok: true, ...(await startLogStream()) });
+    } catch (e) {
+      if (e instanceof CompilerNotWiredError) {
+        return c.json({ ok: false, error: e.message }, 400);
+      }
+      return c.json(
+        { ok: false, error: e instanceof Error ? e.message : String(e) },
+        500,
+      );
+    }
   });
 
   app.post("/api/deploy", async (c) => {

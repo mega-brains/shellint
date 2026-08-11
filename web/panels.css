@@ -8,7 +8,20 @@
 }
 
 #buildPanel,
+#checkPanel,
 #devicePanel { font-family: var(--sans-narrow); }
+
+/* The editor's right-hand sidebar: build sizes on top, check indicator below. */
+.side {
+  flex: 0 0 var(--side-w, clamp(15rem, 24vw, 21rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 0;
+  overflow: auto;
+  padding: 0.45rem 0 0.45rem 0.75rem;
+  border-left: 2px solid var(--line);
+}
 
 /* Collapsible panel chrome, shared by the build and device sections. */
 .panel-head {
@@ -56,27 +69,28 @@
 .panel-peek.error { color: var(--danger); }
 
 /* Peek stands in for the body; expanded, it would just repeat it. */
-.build:not(.collapsed) .panel-peek,
 .device:not(.collapsed) .panel-peek { display: none; }
 
-.build {
-  border-top: 2px solid var(--line);
-  padding-top: 0.45rem;
-}
+.build { flex: 0 0 auto; }
 
 .build.collapsed .sizes { display: none; }
 
 .sizes {
   display: grid;
-  grid-template-columns: 1fr 1fr 1.8fr 1.1fr;
-  gap: 0.75rem;
+  grid-template-columns: 1fr;
+  gap: 0.6rem;
   margin: 0.45rem 0 0;
 }
 
-/* The panel head already carries the top rule for this group. */
+/* The panel head already carries the rule for this group. */
 .build .size-block {
   border-top: none;
   padding-top: 0;
+}
+
+.build .size-block + .size-block {
+  border-top: 1px solid var(--line);
+  padding-top: 0.4rem;
 }
 
 .size-block {
@@ -172,7 +186,7 @@
   list-style: none;
   font-family: var(--mono);
   font-size: 0.78rem;
-  max-height: 5.5rem;
+  max-height: 12rem;
   overflow: auto;
   color: var(--ink);
 }
@@ -183,79 +197,6 @@
 }
 
 .history-list li:last-child { border-bottom: none; }
-
-.findings {
-  border-top: 2px solid var(--line);
-  padding-top: 0.45rem;
-}
-
-.findings[hidden] { display: none; }
-
-.findings-head {
-  display: flex;
-  align-items: baseline;
-  gap: 0.75rem;
-}
-
-.findings h2 {
-  margin: 0;
-  font-size: 0.85rem;
-  text-transform: lowercase;
-  letter-spacing: 0.04em;
-  color: var(--muted);
-  font-weight: 600;
-}
-
-.findings-summary {
-  margin: 0;
-  font-family: var(--mono);
-  font-size: 0.8rem;
-  color: var(--accent);
-}
-
-.findings-summary.error { color: var(--danger); }
-
-.findings-list {
-  margin: 0.35rem 0 0;
-  padding: 0;
-  list-style: none;
-  font-family: var(--mono);
-  font-size: 0.78rem;
-  max-height: 8rem;
-  overflow: auto;
-}
-
-.finding {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.4rem;
-  padding: 0.15rem 0;
-  border-bottom: 1px solid rgba(212, 207, 196, 0.6);
-}
-
-.finding:last-child { border-bottom: none; }
-
-.finding-sev {
-  flex: 0 0 auto;
-  min-width: 3.2rem;
-  text-transform: uppercase;
-  font-size: 0.68rem;
-  letter-spacing: 0.04em;
-}
-
-.finding.error .finding-sev { color: var(--danger); }
-.finding.warn .finding-sev { color: #8a6d1f; }
-.finding.ok { color: var(--muted); }
-
-.finding-rule { color: var(--muted); }
-.finding-msg { flex: 1 1 14rem; min-width: 0; }
-
-.finding-loc {
-  flex: 0 0 auto;
-  color: var(--muted);
-  font-size: 0.72rem;
-}
 
 .device {
   border-top: 2px solid var(--line);
@@ -348,8 +289,29 @@
   color: var(--danger);
 }
 
-@media (max-width: 1100px) {
+/* Too narrow for a sidebar — drop it back under the editor. */
+@media (max-width: 1000px) {
+  .workspace { flex-direction: column; }
+
+  .splitter { display: none; }
+
+  .side {
+    flex: 0 0 auto;
+    overflow: visible;
+    padding: 0.45rem 0 0;
+    border-left: none;
+    border-top: 2px solid var(--line);
+  }
+
   .sizes { grid-template-columns: 1fr 1fr; }
+
+  .history-list { max-height: 5.5rem; }
+
+  .build .size-block + .size-block {
+    border-top: none;
+    padding-top: 0;
+  }
+
   .size-stats,
   .size-history { grid-column: 1 / -1; }
 }

@@ -9,7 +9,12 @@
     "useDefineForClassFields": false,
     "isolatedModules": false,
     "skipLibCheck": true,
-    "lib": ["ES5"],
+    // No lib.es*.d.ts at all: types/espruino-lib.d.ts is the whole standard library,
+    // so Promise/Set/Symbol/RegExp/[].map are type errors rather than runtime crashes.
+    "noLib": true,
+    // Device code must not see @types/node either — it is auto-included otherwise,
+    // and it references lib.es2015…es2020, which re-declares what noLib removed.
+    "types": [],
     "removeComments": false,
     "rootDir": "./scripts",
     "outDir": "./.tsc-out"

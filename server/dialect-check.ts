@@ -75,6 +75,9 @@ export function checkDialectSource(
     ) {
       add(node, "no-async", "error", "async functions not supported");
     }
+    if (ts.isObjectBindingPattern(node) || ts.isArrayBindingPattern(node)) {
+      add(node, "no-destructuring", "error", "destructuring not supported");
+    }
     if (ts.isSpreadElement(node) || ts.isSpreadAssignment(node)) {
       add(node, "no-spread-rest", "error", "spread not supported");
     }
