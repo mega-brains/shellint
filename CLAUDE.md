@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - read [plans-in-project-dir](./.claude/memory/plans-in-project-dir.md)
 
 
-## Status: M0–M4 basic · M5–M10 done (lint Tier 1–5, incl. connected Tier 4) · M11 type-layer bans · M12 dashboard metrics
+## Status: M0–M4 basic · M5–M10 done (lint Tier 1–5, incl. connected Tier 4) · M11 type-layer bans · M12 dashboard metrics · post-M12 UI (editor sidebar, permanent check indicator)
 
 Prefer **mise** tasks ([`mise.toml`](./mise.toml)). Verify with `ls` / `mise tasks`
 before assuming entrypoints exist.
@@ -34,7 +34,8 @@ build, test).
 | Dashboard metrics | `/api/stats` → `estimate` (JsVar model) + `minFirmware`; size sparkline; estimate vs live `mem_peak` (M12) |
 | Debug logs | `GET`/`POST /api/device/logs` — server holds the one `/debug/log` socket, browser polls; `print("#m <series> <value>")` charts numerically (M12) |
 | Charts | Hand-rolled inline SVG (`web/spark.ts`). **No uPlot** — deliberately dependency-free |
-| Compliance | `POST /api/check` — source lint Tier 1–5 + post-compile dialect guard (M8–M10) |
+| Compliance | `POST /api/check` — source lint Tier 1–5 + post-compile dialect guard (M8–M10). `server/check-catalog.ts` names all 59 checks; each run reports pass/warn/fail/**skipped** per rule, and `GET /api/checks` serves the catalog alone |
+| UI layout | Editor + resizable sidebar (`build`, `check`); footer keeps device telemetry, logs, status |
 | Device profile | `types/device-profile.json` (`ListMethods` + components + gen/fw) drives Tier 4; refreshed when the device answers |
 | Auth | None for now |
 

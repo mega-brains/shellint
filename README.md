@@ -34,18 +34,22 @@ mise run start
 Open `http://127.0.0.1:8787` — edit `scripts/main.ts`, **Save → Build → Deploy**.
 Deploy is a split button: main click reuses last choice; ▾ picks
 **debug|prod** × **minified|non-minified**. **Check** runs the Shelly/Espruino
-compliance pass and lists findings in the footer — it works offline, and when
-the device is answering it also checks RPC method names, component ids and
-firmware capabilities against that device. **Probe** runs `Script.Eval` checks and
+compliance pass — it works offline, and when the device is answering it also
+checks RPC method names, component ids and firmware capabilities against that
+device. **Probe** runs `Script.Eval` checks and
 writes `types/generated-probe.json`; it never overwrites stored device scripts —
 if the configured slot is not running it creates a throwaway `devroom-probe`
-slot and deletes it again. Footer polls live device telemetry (script
+slot and deletes it again. The footer polls live device telemetry (script
 mem/cpu, RAM/FS, latency, RSSI) and has an **eco** toggle.
 
-The build panel also shows a **static RAM estimate** (a JsVar cost model — an
-estimate, shown next to the device's measured `mem_peak` so the error stays
-visible), the **minimum firmware** the script's API use requires, and script size
-over recent builds. The **logs** panel enables `sys.debug.websocket` on the device
+A resizable sidebar beside the editor holds two panels. **build** carries sizes per
+mode, script counters, resource gauges against the device caps, a **static RAM
+estimate** (a JsVar cost model — an estimate, drawn against the device's measured
+`mem_peak` so the error stays visible), the **minimum firmware** the script's API use
+requires, and size plus estimate over recent builds. **check** is a permanent
+indicator: it lists every compliance check with a one-line rationale and its verdict,
+including the ones **skipped** for want of a device profile or a build. The **logs**
+panel enables `sys.debug.websocket` on the device
 and streams `ws://<ip>/debug/log`; numeric series are charted from a print
 convention:
 
