@@ -11,6 +11,10 @@ import { SCRIPT_PATH, WEB_DIR, ROOT } from "./paths.ts";
 import { runBuild } from "./build.ts";
 import { deploy, AuthNotSupportedError } from "./deploy.ts";
 import { runProbe } from "./probe.ts";
+import { fetchDeviceStatus, setEcoMode } from "./device-status.ts";
+import { analyzeScriptFile } from "./script-stats.ts";
+import { appendBuildHistory, readBuildHistory } from "./build-history.ts";
+import { checkBuildArtifacts } from "./dialect-check.ts";
 
 export function createApp() {
   const app = new Hono();
@@ -44,7 +48,23 @@ export function createApp() {
   app.post("/api/build", async (c) => {
     try {
       const { sizes, stdout, stderr } = await runBuild();
-      return c.json({ ok: true, sizes, stdout, stderr });
+      let stats = null;
+      try {
+        stats = analyzeScriptFile();
+      } catch {
+        /* stats are best-effort */
+      }
+      const historyRow = appendBuildHistory(sizes, stats);
+      const dialect = checkBuildArtifacts();
+      return c.json({
+        ok: true,
+        sizes,
+        stats,
+        historyRow,
+        dialect,
+        stdout,
+        stderr,
+      });
     } catch (e) {
       if (e instanceof CompilerNotWiredError) {
         return c.json({ ok: false, error: e.message }, 400);
@@ -54,6 +74,27 @@ export function createApp() {
         500,
       );
     }
+  });
+
+  app.get("/api/stats", (c) => {
+    try {
+      const stats = analyzeScriptFile();
+      return c.json({ ok: true, stats });
+    } catch (e) {
+      return c.json(
+        { ok: false, error: e instanceof Error ? e.message : String(e) },
+        500,
+      );
+    }
+  });
+
+  app.get("/api/history", (c) => {
+    const limitRaw = c.req.query("limit");
+    const limit = limitRaw ? Number(limitRaw) : 20;
+    const history = readBuildHistory(
+      Number.isFinite(limit) ? Math.min(100, Math.max(1, limit)) : 20,
+    );
+    return c.json({ ok: true, history });
   });
 
   app.post("/api/deploy", async (c) => {
@@ -113,6 +154,54 @@ export function createApp() {
     try {
       const report = await runProbe();
       return c.json({ ok: true, report });
+    } catch (e) {
+      if (e instanceof AuthNotSupportedError) {
+        return c.json({ ok: false, error: "auth not supported yet" }, 401);
+      }
+      if (e instanceof CompilerNotWiredError) {
+        return c.json({ ok: false, error: e.message }, 400);
+      }
+      return c.json(
+        { ok: false, error: e instanceof Error ? e.message : String(e) },
+        500,
+      );
+    }
+  });
+
+  app.get("/api/device/status", async (c) => {
+    try {
+      const status = await fetchDeviceStatus();
+      return c.json({ ok: true, status });
+    } catch (e) {
+      if (e instanceof AuthNotSupportedError) {
+        return c.json({ ok: false, error: "auth not supported yet" }, 401);
+      }
+      if (e instanceof CompilerNotWiredError) {
+        return c.json({ ok: false, error: e.message }, 400);
+      }
+      return c.json(
+        { ok: false, error: e instanceof Error ? e.message : String(e) },
+        500,
+      );
+    }
+  });
+
+  app.post("/api/device/eco", async (c) => {
+    let body: { eco_mode?: unknown };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json(
+        { ok: false, error: "expected JSON body { eco_mode: boolean }" },
+        400,
+      );
+    }
+    if (typeof body.eco_mode !== "boolean") {
+      return c.json({ ok: false, error: "eco_mode must be a boolean" }, 400);
+    }
+    try {
+      const result = await setEcoMode(body.eco_mode);
+      return c.json({ ok: true, ...result });
     } catch (e) {
       if (e instanceof AuthNotSupportedError) {
         return c.json({ ok: false, error: "auth not supported yet" }, 401);

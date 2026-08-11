@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - read [plans-in-project-dir](./.claude/memory/plans-in-project-dir.md)
 
 
-## Status: M0–M1 done · M2–M4 UI/deploy present
+## Status: M0–M4 basic · M5–M7 post-basic · M8 dialect guard (lint pack TBD)
 
 Prefer **mise** tasks ([`mise.toml`](./mise.toml)). Verify with `ls` / `mise tasks`
 before assuming entrypoints exist.
@@ -27,6 +27,7 @@ before assuming entrypoints exist.
 | Config | `devroom.json` (`deviceIp`, `scriptId`, `host`, `port`, `compiler`) |
 | Server / UI | Hono + CodeMirror 6 |
 | Deploy | WS PutCode; mode debug/prod + artifact min/raw |
+| Live telemetry | `GET /api/device/status` + eco toggle (M5) |
 | Auth | None for now |
 
 Default compiler is clean-room DevRoom (`compiler: "devroom"`). Setting

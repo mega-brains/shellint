@@ -34,7 +34,8 @@ mise run start
 Open `http://127.0.0.1:8787` — edit `scripts/main.ts`, **Save → Build → Deploy**.
 Deploy is a split button: main click reuses last choice; ▾ picks
 **debug|prod** × **minified|non-minified**. **Probe** runs `Script.Eval` checks and
-writes `types/generated-probe.json`.
+writes `types/generated-probe.json`. Footer polls live device telemetry (script
+mem/cpu, RAM/FS, latency, RSSI) and has an **eco** toggle.
 
 ```bash
 mise run build

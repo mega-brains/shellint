@@ -5,3 +5,4 @@ node_modules/
 dist/
 .tsc-out/
 web/dist/
+.devroom/
