@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "target": "ES5",
+    "module": "None",
+    "strict": true,
+    "noEmitHelpers": true,
+    "importHelpers": false,
+    "downlevelIteration": false,
+    "useDefineForClassFields": false,
+    "isolatedModules": false,
+    "skipLibCheck": true,
+    "lib": ["ES5"],
+    "removeComments": false,
+    "rootDir": "./scripts",
+    "outDir": "./.tsc-out"
+  },
+  "include": ["scripts/main.ts", "types/**/*.d.ts"]
+}

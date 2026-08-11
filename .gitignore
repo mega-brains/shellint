@@ -1,3 +1,7 @@
 .idea/
 .DS_Store
 .claude/.*
+node_modules/
+dist/
+.tsc-out/
+web/dist/

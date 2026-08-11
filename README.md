@@ -2,6 +2,40 @@
 
 Small, simple development room (playground) for developing shelly scripts
 
+## How to run
+
+1. Copy or edit `devroom.json`:
+
+```json
+{
+  "deviceIp": "192.168.1.100",
+  "scriptId": 1,
+  "host": "0.0.0.0",
+  "port": 8787,
+  "compiler": "devroom"
+}
+```
+
+| Field | Meaning |
+|---|---|
+| `deviceIp` | Shelly Gen2+ address on your LAN |
+| `scriptId` | Existing script slot to overwrite (no Create) |
+| `host` / `port` | DevRoom HTTP bind (default `0.0.0.0:8787`) |
+| `compiler` | Must be `"devroom"` for now (`shelly-forge` not wired) |
+
+2. Install and start:
+
+```bash
+npm install
+npm run dev
+```
+
+Open `http://127.0.0.1:8787` — edit `scripts/main.ts`, **Save → Build → Deploy** (pick debug|prod). **Probe** runs `Script.Eval` checks and writes `types/generated-probe.json`.
+
+CLI helpers: `npm run build:shelly`, `npm run deploy -- [debug|prod]`, `npm run probe`.
+
+Unauthenticated devices only; a 401 surfaces as **auth not supported yet**.
+
 ## Ideas / Features
 
 - node.js server app with code editor

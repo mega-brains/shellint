@@ -9,14 +9,42 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - read [plans-in-project-dir](./.claude/memory/plans-in-project-dir.md)
 
 
-## Status: greenfield
+## Status: M0–M1 scaffolded
 
-This project currently contains **only `README.md`** — no source, no package manifest,
-no tooling, no tests. Everything in the README is intent, not implementation.
+Scaffold + dual-build pipeline landed. Hono UI / deploy / probe are M2–M4 (see
+[`.claude/plans/2026-08-11_06_basic-implementation.md`](./.claude/plans/2026-08-11_06_basic-implementation.md)).
+Verify with `ls` before assuming any file exists.
 
-There are therefore **no build/lint/test commands yet**. Do not invent or document
-them here; when the first stack lands (the README points at Node.js), add the real
-commands to this file at that time. Verify with `ls` before assuming any file exists.
+## Stack (committed)
+
+| Layer | Choice |
+|---|---|
+| Runtime | Node.js ≥20 (`"type": "module"`) |
+| Device compile | `tsc` → ES5, `module: none`, `noEmitHelpers` |
+| Minify | Terser tier-2 (dual `meta.env` via `global_defs`) |
+| Emit | Flat (no IIFE) → `dist/debug.js` + `dist/prod.js` |
+| Types | `types/shelly.d.ts`, `types/espruino-lib.d.ts`, `types/meta.d.ts` |
+| Config | `devroom.json` (`deviceIp`, `scriptId`, `host`, `port`, `compiler`) |
+| Server / UI | Hono + CodeMirror 6 (M2+) |
+| Auth | None for now |
+
+Default compiler is clean-room DevRoom (`compiler: "devroom"`). Setting
+`compiler` to anything else prints `shelly-forge path not wired yet`.
+
+## Commands
+
+```bash
+npm install              # uses project .npmrc → registry.npmjs.org
+npm run build:shelly     # tsc → Terser×2 → dist/debug.js + dist/prod.js; prints byte sizes
+npm run lint             # tsc -p tsconfig.shelly.json --noEmit
+npm run test             # alias: build:shelly
+npm run dev              # Hono + web UI (M2+; host/port from devroom.json)
+npm run deploy           # CLI deploy helper (M3+)
+npm run probe            # Script.Eval capability probe (M4+)
+```
+
+Build config: `tsconfig.shelly.json`. Entry: `scripts/main.ts`. Pipeline:
+`scripts/build-shelly.mjs`.
 
 ## What this project is
 

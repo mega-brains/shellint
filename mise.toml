@@ -1,0 +1,60 @@
+[tools]
+node = "22"
+
+[tasks.install]
+description = "Install npm dependencies"
+run = "npm install"
+
+[tasks.start]
+description = "Start DevRoom server (host/port from devroom.json)"
+alias = "dev"
+run = "npm run dev"
+
+[tasks.build]
+description = "Dual meta.env Shelly build → dist/debug.js + dist/prod.js"
+run = "npm run build:shelly"
+
+[tasks.deploy]
+description = "Build then deploy (MODE=debug|prod, MINIFY=min|raw)"
+# Usage: mise run deploy -- debug min   OR   MODE=prod MINIFY=raw mise run deploy
+run = """
+mode="${1:-${MODE:-debug}}"
+minify="${2:-${MINIFY:-min}}"
+npm run build:shelly
+npm run deploy -- --mode "$mode" --minify "$minify"
+"""
+
+[tasks.lint]
+description = "Typecheck Shelly script (tsc, no emit)"
+run = "npx tsc -p tsconfig.shelly.json --noEmit"
+
+[tasks.test]
+description = "Verify dual build + meta.env DCE + raw≠min"
+run = """
+npm run build:shelly
+for f in dist/debug.js dist/prod.js dist/debug.raw.js dist/prod.raw.js; do
+  test -f "$f" || { echo "FAIL: missing $f" >&2; exit 1; }
+done
+if cmp -s dist/debug.js dist/prod.js; then
+  echo "FAIL: debug and prod min outputs identical (meta.env DCE broken?)" >&2
+  exit 1
+fi
+if cmp -s dist/debug.raw.js dist/prod.raw.js; then
+  echo "FAIL: debug and prod raw outputs identical (meta.env DCE broken?)" >&2
+  exit 1
+fi
+if cmp -s dist/debug.raw.js dist/debug.js; then
+  echo "FAIL: debug raw and min identical (minify noop?)" >&2
+  exit 1
+fi
+echo "OK: four artifacts; debug≠prod; raw≠min"
+wc -c dist/debug.raw.js dist/debug.js dist/prod.raw.js dist/prod.js
+"""
+
+[tasks.probe]
+description = "Run Script.Eval capability probe against device"
+run = "npm run probe"
+
+[tasks.clean]
+description = "Remove Shelly build artifacts"
+run = "rm -rf dist"

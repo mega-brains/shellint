@@ -1,0 +1,38 @@
+{
+  "name": "shelly-devroom",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Local playground for authoring Shelly Gen2 device scripts",
+  "scripts": {
+    "build:shelly": "node scripts/build-shelly.mjs",
+    "build:web": "node scripts/build-web.mjs",
+    "dev": "npm run build:web && node --import tsx server/index.ts",
+    "deploy": "node --import tsx server/cli-deploy.ts",
+    "probe": "node --import tsx server/cli-probe.ts",
+    "lint": "tsc -p tsconfig.shelly.json --noEmit",
+    "test": "npm run build:shelly"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.0",
+    "hono": "^4.7.0",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@codemirror/commands": "^6.8.0",
+    "@codemirror/lang-javascript": "^6.2.2",
+    "@codemirror/language": "^6.10.8",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.36.2",
+    "@types/node": "^22.13.0",
+    "@types/ws": "^8.5.14",
+    "codemirror": "^6.0.1",
+    "esbuild": "^0.25.0",
+    "terser": "^5.49.2",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.2"
+  }
+}

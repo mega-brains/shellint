@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Shelly DevRoom</title>
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <header class="top">
+      <h1>Shelly DevRoom</h1>
+      <p class="sub" id="configLine">loading config…</p>
+    </header>
+
+    <main>
+      <div class="toolbar">
+        <button type="button" id="btnSave">Save</button>
+        <button type="button" id="btnBuild">Build</button>
+        <label class="mode">
+          Mode
+          <select id="modeSelect">
+            <option value="debug">debug</option>
+            <option value="prod">prod</option>
+          </select>
+        </label>
+        <div class="deploy-group">
+          <button type="button" id="btnDeploy">Deploy</button>
+          <label class="mode deploy-minify">
+            Artifact
+            <select id="minifySelect" aria-label="Deploy artifact">
+              <option value="min">minified</option>
+              <option value="raw">non-minified</option>
+            </select>
+          </label>
+        </div>
+        <button type="button" id="btnProbe">Probe</button>
+      </div>
+
+      <div id="editor" class="editor"></div>
+
+      <section class="sizes" aria-label="Build sizes">
+        <div class="size-block">
+          <h2>debug</h2>
+          <p id="sizeDebug">—</p>
+        </div>
+        <div class="size-block">
+          <h2>prod</h2>
+          <p id="sizeProd">—</p>
+        </div>
+      </section>
+
+      <p class="status" id="statusLine" role="status">ready</p>
+    </main>
+
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
