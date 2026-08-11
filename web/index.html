@@ -157,16 +157,54 @@
               </li>
             </ul>
           </div>
-          <button
-            type="button"
-            id="btnProbe"
-            title="Run Script.Eval capability checks on the device and write types/generated-probe.json — stored device scripts are never overwritten"
-          >
-            Probe
-          </button>
+          <div class="split" id="probeSplit">
+            <button
+              type="button"
+              id="btnProbe"
+              title="Run Script.Eval capability checks on the device and write types/generated-probe.json — stored device scripts are never overwritten"
+            >
+              Probe
+            </button>
+            <button
+              type="button"
+              id="btnProbeLog"
+              class="split-toggle"
+              aria-haspopup="true"
+              aria-expanded="false"
+              aria-controls="probeLog"
+              title="Show the last probe run's per-feature results"
+            >
+              ▾
+            </button>
+            <div class="menu probe-log" id="probeLog" hidden>
+              <p class="probe-log-note" id="probeLogNote">not run yet</p>
+              <div class="probe-log-row">
+                <input
+                  type="search"
+                  id="probeLogFilter"
+                  class="probe-log-filter"
+                  placeholder="filter…"
+                  aria-label="Filter probe results"
+                />
+                <button
+                  type="button"
+                  id="probeLogFailBtn"
+                  class="probe-log-quick"
+                  aria-pressed="false"
+                  title="Show only failed / unavailable probes"
+                >
+                  failed only
+                </button>
+              </div>
+              <ol class="probe-log-list" id="probeLogList"></ol>
+            </div>
+          </div>
         </div>
       </div>
       <p class="device-meta" id="deviceMeta">—</p>
+      <div class="gauge probe-progress" id="probeProgress" hidden>
+        <div class="gauge-fill" id="probeProgressFill"></div>
+      </div>
       <p class="status" id="statusLine" role="status">ready</p>
     </header>
 
@@ -323,7 +361,18 @@
               <p class="panel-peek" id="checkPeek">not run yet</p>
             </div>
             <div class="checks-body" id="checkBody">
-              <p class="checks-note" id="checkNote">—</p>
+              <div class="checks-note-row">
+                <p class="checks-note" id="checkNote">—</p>
+                <button
+                  type="button"
+                  class="copy-findings"
+                  id="copyFindings"
+                  title="Copy all findings to clipboard"
+                  hidden
+                >
+                  ⧉ copy
+                </button>
+              </div>
               <ol class="findings-list" id="findingsList"></ol>
               <div class="check-rules" id="checkRules"></div>
             </div>

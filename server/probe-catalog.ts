@@ -183,6 +183,35 @@ const MEMORY: Probe[] = [
   },
 ];
 
+/**
+ * Virtual component API (https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Virtual).
+ * `getHandle` on a key that almost certainly does not exist is side-effect-free
+ * (returns null, no RPC); if the device happens to have one, reading `typeof` on
+ * its methods never invokes them, so this stays safe either way.
+ */
+const VIRTUAL: Probe[] = [
+  {
+    id: "virtual.getHandle.call",
+    group: "device",
+    code:
+      '(function () { try { var h = Virtual.getHandle("boolean:200");' +
+      ' return h === null ? "null" : typeof h; }' +
+      ' catch (e) { return "throws:" + (e.message || e); } })()',
+    note: '"null" = no component at that key (expected on most devices); "object" = one exists — either way proves getHandle is callable',
+  },
+  {
+    id: "virtual.instance.methods",
+    group: "device",
+    code:
+      '(function () { try { var h = Virtual.getHandle("boolean:200");' +
+      ' if (!h) return "no-handle";' +
+      ' return typeof h.setValue + "/" + typeof h.getValue + "/" + typeof h.getStatus' +
+      ' + "/" + typeof h.getConfig + "/" + typeof h.setConfig + "/" + typeof h.on + "/" + typeof h.off; }' +
+      ' catch (e) { return "throws:" + (e.message || e); } })()',
+    note: 'setValue/getValue/getStatus/getConfig/setConfig/on/off in that order; only reachable when a boolean:200 component exists',
+  },
+];
+
 export const PROBES: Probe[] = [
   // Item 1 — the prototype surface a real script reaches for.
   ...proto("array", "[]", [
@@ -281,6 +310,8 @@ export const PROBES: Probe[] = [
     "Script.storage",
     "Script.addRpcHandler",
     "Script.getVcHandle",
+    "Virtual",
+    "Virtual.getHandle",
     "HTTPServer",
     "MQTT",
     "BLE",
@@ -295,5 +326,6 @@ export const PROBES: Probe[] = [
   },
   ...HOISTING,
   ...TYPED_ARRAY,
+  ...VIRTUAL,
   ...MEMORY,
 ];

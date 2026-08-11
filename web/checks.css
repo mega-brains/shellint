@@ -42,11 +42,42 @@
 .checks-body { margin-top: 0.35rem; }
 .checks.collapsed .checks-body { display: none; }
 
+.checks-note-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
 .checks-note {
   margin: 0 0 0.35rem;
   font-family: var(--mono);
   font-size: 0.78rem;
   color: var(--muted);
+}
+
+.copy-findings {
+  flex: 0 0 auto;
+  margin-bottom: 0.35rem;
+  padding: 0 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  background: none;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.copy-findings:hover,
+.copy-findings:focus-visible {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
+.copy-findings.copied {
+  color: var(--accent);
+  border-color: var(--accent);
 }
 
 .check-rules { margin-top: 0.35rem; }

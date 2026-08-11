@@ -1,14 +1,13 @@
 {
   "probed": true,
-  "at": "2026-08-11T20:48:04.486Z",
-  "deviceIp": "192.168.2.209",
+  "at": "2026-08-11T22:45:15.188Z",
+  "deviceIp": "192.168.3.106",
   "scriptId": 1,
   "configuredScriptId": 1,
   "strategy": "configured",
   "existingScriptIds": [
     1,
-    2,
-    3
+    2
   ],
   "scratchScriptId": null,
   "scratchRemoved": false,
@@ -498,13 +497,25 @@
       "id": "Script.addRpcHandler",
       "code": "typeof Script.addRpcHandler",
       "ok": true,
-      "result": "undefined"
+      "result": "function"
     },
     {
       "id": "Script.getVcHandle",
       "code": "typeof Script.getVcHandle",
       "ok": true,
-      "result": "undefined"
+      "result": "function"
+    },
+    {
+      "id": "Virtual",
+      "code": "typeof Virtual",
+      "ok": true,
+      "result": "function"
+    },
+    {
+      "id": "Virtual.getHandle",
+      "code": "typeof Virtual.getHandle",
+      "ok": true,
+      "result": "function"
     },
     {
       "id": "HTTPServer",
@@ -619,6 +630,18 @@
       "code": "(function () { try { var a = new Uint8Array(1); return typeof a.set + \"/\" + typeof a.fill + \"/\" + typeof a.subarray + \"/\" + typeof a.slice; } catch (e) { return \"throws:\" + (e.message || e); } })()",
       "ok": true,
       "result": "function/undefined/undefined/undefined"
+    },
+    {
+      "id": "virtual.getHandle.call",
+      "code": "(function () { try { var h = Virtual.getHandle(\"boolean:200\"); return h === null ? \"null\" : typeof h; } catch (e) { return \"throws:\" + (e.message || e); } })()",
+      "ok": true,
+      "result": "null"
+    },
+    {
+      "id": "virtual.instance.methods",
+      "code": "(function () { try { var h = Virtual.getHandle(\"boolean:200\"); if (!h) return \"no-handle\"; return typeof h.setValue + \"/\" + typeof h.getValue + \"/\" + typeof h.getStatus + \"/\" + typeof h.getConfig + \"/\" + typeof h.setConfig + \"/\" + typeof h.on + \"/\" + typeof h.off; } catch (e) { return \"throws:\" + (e.message || e); } })()",
+      "ok": true,
+      "result": "no-handle"
     },
     {
       "id": "process",

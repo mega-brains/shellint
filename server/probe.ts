@@ -7,6 +7,13 @@ import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
 // evaluated inside a script the user owns.
 import { PROBES } from "./probe-catalog.ts";
 
+/** Live progress of the in-flight (or most recent) probe run, polled by the UI. */
+let progressState = { done: 0, total: 0 };
+
+export function getProbeProgress(): { done: number; total: number } {
+  return { ...progressState };
+}
+
 /** Temporary slot created by the probe. Only ever a freshly created id. */
 const SCRATCH_NAME = "devroom-probe";
 /** A registered handler guarantees the slot stays `running` while we evaluate. */
@@ -208,6 +215,7 @@ export async function runProbe(): Promise<ProbeReport> {
   const rpc = new ShellyRpc(cfg.deviceIp);
   const results: ProbeEntry[] = [];
   let scratchRemoved = false;
+  progressState = { done: 0, total: PROBES.length };
 
   try {
     await rpc.connect();
@@ -229,6 +237,7 @@ export async function runProbe(): Promise<ProbeReport> {
           if (e instanceof AuthNotSupportedError) throw e;
           results.push({ id: p.id, code: p.code, ok: false, error: msg(e) });
         }
+        progressState.done += 1;
       }
     } finally {
       if (host.scratchScriptId != null) {

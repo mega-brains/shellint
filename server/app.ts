@@ -10,7 +10,7 @@ import {
 import { SCRIPT_PATH, WEB_DIR, ROOT } from "./paths.ts";
 import { runBuild } from "./build.ts";
 import { deploy, AuthNotSupportedError } from "./deploy.ts";
-import { runProbe } from "./probe.ts";
+import { runProbe, getProbeProgress } from "./probe.ts";
 import {
   fetchDeviceStatus,
   setEcoMode,
@@ -251,6 +251,10 @@ export function createApp() {
         500,
       );
     }
+  });
+
+  app.get("/api/probe/progress", (c) => {
+    return c.json({ ok: true, ...getProbeProgress() });
   });
 
   app.post("/api/probe", async (c) => {

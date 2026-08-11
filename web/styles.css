@@ -259,7 +259,6 @@ button.running .btn-progress {
 
 .menu button {
   display: block;
-  width: 100%;
   text-align: left;
   background: transparent;
   color: var(--ink);

@@ -1,6 +1,6 @@
 /**
  * GENERATED FILE — do not edit by hand. Regenerate with `mise run probe`.
- * Source: types/generated-probe.json (192.168.2.209 fw 1.7.5, probed 2026-08-11T20:48:04.486Z).
+ * Source: types/generated-probe.json (192.168.3.106 fw unknown, probed 2026-08-11T22:45:15.188Z).
  *
  * ADVISORY ONLY. It is not part of the device compile and does not stand in
  * for types/espruino-lib.d.ts: every declaration sits inside one namespace,
@@ -141,6 +141,14 @@ declare namespace ProbedDevice {
     const id: number;
     /** `typeof Script.storage` → "object" */
     const storage: object;
+    /** `typeof Script.addRpcHandler` → "function" */
+    const addRpcHandler: (...args: unknown[]) => unknown;
+    /** `typeof Script.getVcHandle` → "function" */
+    const getVcHandle: (...args: unknown[]) => unknown;
+  }
+  namespace Virtual {
+    /** `typeof Virtual.getHandle` → "function" */
+    const getHandle: (...args: unknown[]) => unknown;
   }
   /** `typeof HTTPServer` → "function" */
   const HTTPServer: (...args: unknown[]) => unknown;

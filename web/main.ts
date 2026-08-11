@@ -49,6 +49,15 @@ const el = {
   deployMenu: document.getElementById("deployMenu") as HTMLUListElement,
   deploySplit: document.getElementById("deploySplit") as HTMLDivElement,
   probe: document.getElementById("btnProbe") as HTMLButtonElement,
+  probeProgress: document.getElementById("probeProgress") as HTMLDivElement,
+  probeProgressFill: document.getElementById("probeProgressFill") as HTMLDivElement,
+  probeSplit: document.getElementById("probeSplit") as HTMLDivElement,
+  probeLogToggle: document.getElementById("btnProbeLog") as HTMLButtonElement,
+  probeLog: document.getElementById("probeLog") as HTMLDivElement,
+  probeLogNote: document.getElementById("probeLogNote")!,
+  probeLogFilter: document.getElementById("probeLogFilter") as HTMLInputElement,
+  probeLogFailBtn: document.getElementById("probeLogFailBtn") as HTMLButtonElement,
+  probeLogList: document.getElementById("probeLogList")!,
   checkPanel: document.getElementById("checkPanel")!,
   checkHead: document.getElementById("checkHead")!,
   checkToggle: document.getElementById("checkToggle")!,
@@ -56,6 +65,7 @@ const el = {
   checkNote: document.getElementById("checkNote")!,
   checkRules: document.getElementById("checkRules")!,
   findingsList: document.getElementById("findingsList")!,
+  copyFindings: document.getElementById("copyFindings") as HTMLButtonElement,
   status: document.getElementById("statusLine")!,
   buildPanel: document.getElementById("buildPanel")!,
   buildHead: document.getElementById("buildHead")!,
@@ -229,6 +239,7 @@ const checkEls = {
   note: el.checkNote,
   findings: el.findingsList,
   rules: el.checkRules,
+  copyFindings: el.copyFindings,
 };
 
 /** Group labels and rule descriptions, fetched once so the panel is never blank. */
@@ -394,42 +405,106 @@ async function deployScript(choice = deployChoice) {
   void device.refresh();
 }
 
+type ProbeResult = { id: string; ok: boolean; result?: unknown; error?: string };
+
+let lastProbeResults: ProbeResult[] = [];
+let probeLogFailOnly = false;
+
+/** RPC succeeded but the probed feature reads back as absent — not a pass. */
+function probeAvailable(r: ProbeResult): boolean {
+  if (!r.ok || r.result == null || r.result === "undefined" || r.result === "null" || r.result === "unavailable") return false;
+  return !(typeof r.result === "string" && r.result.startsWith("throws:"));
+}
+
+function renderProbeLogList(results: ProbeResult[]) {
+  const q = el.probeLogFilter.value.trim().toLowerCase();
+  let shown = q ? results.filter((r) => r.id.toLowerCase().includes(q)) : results;
+  if (probeLogFailOnly) shown = shown.filter((r) => !probeAvailable(r));
+  el.probeLogList.innerHTML = "";
+  for (const r of shown) {
+    const li = document.createElement("li");
+    li.className = probeAvailable(r) ? "ok" : "fail";
+    const id = document.createElement("span");
+    id.className = "probe-log-id";
+    id.textContent = r.id;
+    const val = document.createElement("span");
+    val.className = "probe-log-val";
+    val.textContent = r.ok ? JSON.stringify(r.result) : `FAIL ${r.error}`;
+    li.append(id, val);
+    el.probeLogList.append(li);
+  }
+}
+
+function renderProbeLog(scriptId: number, strategy: string, results: ProbeResult[]) {
+  lastProbeResults = results;
+  const passed = results.filter(probeAvailable).length;
+  el.probeLogNote.textContent =
+    `slot ${scriptId} (${strategy}) · ${passed}/${results.length} available`;
+  renderProbeLogList(results);
+}
+
+function closeProbeLog() {
+  el.probeLog.hidden = true;
+  el.probeLogToggle.setAttribute("aria-expanded", "false");
+}
+
+function setProbeProgress(done: number, total: number) {
+  const pct = total > 0 ? Math.min(100, Math.round((done / total) * 100)) : 0;
+  el.probeProgressFill.style.width = `${pct}%`;
+  setStatus(total > 0 ? `probing… ${done}/${total} (${pct}%)` : "probing…");
+}
+
 async function probeDevice() {
-  setStatus("probing…");
-  const data = await api<{
-    report: {
-      scriptId: number;
-      strategy: string;
-      notes?: string[];
-      results: {
-        id: string;
-        ok: boolean;
-        result?: unknown;
-        error?: string;
-      }[];
-    };
-  }>("/api/probe", { method: "POST", body: "{}" });
-  const report = data.report;
-  const lines = report.results.map((r) =>
-    r.ok
-      ? `${r.id}: ${JSON.stringify(r.result)}`
-      : `${r.id}: FAIL ${r.error}`,
-  );
-  setStatus(
-    [
-      `probe written to types/generated-probe.json · slot ${report.scriptId} (${report.strategy})`,
-      ...(report.notes ?? []),
-      ...lines,
-    ].join("\n"),
-  );
+  el.probeProgress.hidden = false;
+  setProbeProgress(0, 0);
+  const poll = setInterval(() => {
+    void api<{ done: number; total: number }>("/api/probe/progress")
+      .then((p) => setProbeProgress(p.done, p.total))
+      .catch(() => {});
+  }, 300);
+  try {
+    const data = await api<{
+      report: {
+        scriptId: number;
+        strategy: string;
+        notes?: string[];
+        results: {
+          id: string;
+          ok: boolean;
+          result?: unknown;
+          error?: string;
+        }[];
+      };
+    }>("/api/probe", { method: "POST", body: "{}" });
+    const report = data.report;
+    renderProbeLog(report.scriptId, report.strategy, report.results);
+    const lines = report.results.map((r) =>
+      r.ok
+        ? `${r.id}: ${JSON.stringify(r.result)}`
+        : `${r.id}: FAIL ${r.error}`,
+    );
+    setStatus(
+      [
+        `probe written to types/generated-probe.json · slot ${report.scriptId} (${report.strategy})`,
+        ...(report.notes ?? []),
+        ...lines,
+      ].join("\n"),
+    );
+  } finally {
+    clearInterval(poll);
+    el.probeProgress.hidden = true;
+  }
 }
 
 function busy(on: boolean) {
-  for (const b of [el.save, el.build, el.buildMenuBtn, el.deploy, el.deployMenuBtn, el.probe]) {
+  for (const b of [el.save, el.build, el.buildMenuBtn, el.deploy, el.deployMenuBtn, el.probe, el.probeLogToggle]) {
     const gated = (b === el.deploy || b === el.deployMenuBtn) && !deployGate.ready();
     b.disabled = on || (b === el.save && artifacts?.previewing() === true) || gated;
   }
-  if (on) closeAllMenus();
+  if (on) {
+    closeAllMenus();
+    closeProbeLog();
+  }
   else syncDeployLabel();
 }
 
@@ -498,6 +573,29 @@ async function main() {
   el.build.addEventListener("click", () => withBusy(() => runBuildAction()));
   el.deploy.addEventListener("click", () => withBusy(() => deployScript()));
   el.probe.addEventListener("click", () => withBusy(probeDevice));
+  el.probeLogFilter.addEventListener("input", () => renderProbeLogList(lastProbeResults));
+  el.probeLogFailBtn.addEventListener("click", () => {
+    probeLogFailOnly = !probeLogFailOnly;
+    el.probeLogFailBtn.setAttribute("aria-pressed", probeLogFailOnly ? "true" : "false");
+    renderProbeLogList(lastProbeResults);
+  });
+  el.probeLogToggle.addEventListener("click", (e) => {
+    e.stopPropagation();
+    const willOpen = el.probeLog.hidden;
+    closeAllMenus();
+    if (willOpen) {
+      el.probeLog.hidden = false;
+      el.probeLogToggle.setAttribute("aria-expanded", "true");
+    } else {
+      closeProbeLog();
+    }
+  });
+  document.addEventListener("click", (e) => {
+    if (!el.probeSplit.contains(e.target as Node)) closeProbeLog();
+  });
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape") closeProbeLog();
+  });
 
   createSplitButton(
     { root: el.buildSplit, toggle: el.buildMenuBtn, menu: el.buildMenu },

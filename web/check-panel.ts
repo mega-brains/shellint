@@ -48,6 +48,7 @@ export type CheckPanelEls = {
   note: HTMLElement;
   findings: HTMLElement;
   rules: HTMLElement;
+  copyFindings: HTMLButtonElement;
 };
 
 const MARK: Record<CheckStatus, string> = {
@@ -66,6 +67,31 @@ const WHY_SKIPPED: Record<string, string> = {
 function location(f: Finding): string {
   if (!f.file) return "";
   return f.line != null ? `${f.file}:${f.line}` : f.file;
+}
+
+function findingsAsText(findings: Finding[]): string {
+  return findings
+    .map((f) => {
+      const where = location(f);
+      const sev = f.severity.toUpperCase();
+      const loc = where ? ` @ ${where}` : "";
+      return `${sev} [${f.rule}] ${f.message}${loc}`;
+    })
+    .join("\n");
+}
+
+/** Re-bound per render so the handler always closes over the current list. */
+function bindCopyFindings(btn: HTMLButtonElement, findings: Finding[]): void {
+  btn.onclick = () => {
+    navigator.clipboard.writeText(findingsAsText(findings)).then(() => {
+      btn.classList.add("copied");
+      btn.textContent = "⧉ copied";
+      setTimeout(() => {
+        btn.classList.remove("copied");
+        btn.textContent = "⧉ copy";
+      }, 1200);
+    });
+  };
 }
 
 /** Verdicts read as badges rather than prose; `label` stays for screen readers. */
@@ -248,11 +274,14 @@ function renderFindingList(els: CheckPanelEls, findings: Finding[]) {
   document.dispatchEvent(
     new CustomEvent<Finding[]>(FINDINGS_EVENT, { detail: findings }),
   );
+  els.copyFindings.hidden = findings.length === 0;
   if (!findings.length) return;
 
-  const ordered = [...findings].sort((a, b) =>
-    a.severity === b.severity ? 0 : a.severity === "error" ? -1 : 1,
-  );
+  const ordered = [...findings].sort((a, b) => {
+    if (a.severity !== b.severity) return a.severity === "error" ? -1 : 1;
+    return (a.line ?? Infinity) - (b.line ?? Infinity);
+  });
+  bindCopyFindings(els.copyFindings, ordered);
   for (const f of ordered) {
     const li = document.createElement("li");
     li.className = `finding ${f.severity}`;
