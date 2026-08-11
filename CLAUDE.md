@@ -14,12 +14,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Prefer **mise** tasks ([`mise.toml`](./mise.toml)). Verify with `ls` / `mise tasks`
 before assuming entrypoints exist.
 
+Pre-commit gate: `mise run beforeCommit` (line limit ≤500, typecheck shelly/server/web,
+build, test).
+
 ## Stack (committed)
 
 | Layer | Choice |
 |---|---|
 | Runtime | Node 22 via mise (`"type": "module"`) |
-| Task runner | mise (`start`/`dev`, `build`, `deploy`, `lint`, `test`, `probe`, `clean`) |
+| Task runner | mise (`start`/`dev`, `build`, `lint`, `test`, `beforeCommit`, `probe`, `clean`) |
 | Device compile | `tsc` → ES5, `module: none`, `noEmitHelpers` |
 | Env gating | `meta.env` DCE → `*.raw.js`; then Terser minify → `*.js` |
 | Emit | Flat (no IIFE) → `dist/{debug,prod}.{raw.js,js}` |
@@ -38,17 +41,20 @@ Default compiler is clean-room DevRoom (`compiler: "devroom"`). Setting
 ```bash
 mise install
 mise run install          # npm install
-mise run build            # → dist/debug.{raw.js,js} + dist/prod.{raw.js,js}
-mise run lint             # tsc --noEmit (Shelly script)
-mise run test             # build + assert debug≠prod and raw≠min
+mise run build            # Shelly dual artifacts + web bundle
+mise run lint             # typecheck shelly + server + web
+mise run typecheck        # same as lint
+mise run check:lines      # source files ≤ 500 lines
+mise run test             # DCE/minify asserts + web + server smoke
+mise run beforeCommit     # check:lines → typecheck → build → test
 mise run start            # DevRoom server (alias: mise run dev)
 mise run deploy -- debug min   # MODE + MINIFY=min|raw
 mise run probe
 mise run clean
 ```
 
-Also available via `npm run …` (`build:shelly`, `build:web`, `dev`, …).
-Build config: `tsconfig.shelly.json`. Entry: `scripts/main.ts`. Pipeline:
+Also available via `npm run …` (`build:shelly`, `build:web`, `dev`, `beforeCommit`, …).
+Build config: `tsconfig.shelly.json` / `tsconfig.server.json` / `tsconfig.web.json`. Entry: `scripts/main.ts`. Pipeline:
 `scripts/build-shelly.mjs`.
 
 ## What this project is

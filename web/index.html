@@ -119,7 +119,12 @@
           </div>
           <div class="size-block size-stats">
             <h2>stats</h2>
-            <p id="scriptStats">—</p>
+            <p id="scriptStats" class="stats-summary">—</p>
+            <div
+              id="statsChart"
+              class="stats-chart"
+              aria-label="Resource usage versus Shelly device caps"
+            ></div>
           </div>
           <div class="size-block size-history">
             <h2>history</h2>
@@ -127,26 +132,47 @@
           </div>
         </section>
 
-        <section class="device" aria-label="Device telemetry" id="devicePanel">
-          <div class="device-head">
+        <section
+          class="device collapsed"
+          aria-label="Device telemetry"
+          id="devicePanel"
+        >
+          <div
+            class="device-head"
+            id="deviceHead"
+            role="button"
+            tabindex="0"
+            aria-expanded="false"
+            aria-controls="deviceBody"
+            title="Show or hide full device telemetry"
+          >
+            <span class="device-toggle" id="deviceToggle" aria-hidden="true">▸</span>
             <h2>device</h2>
-            <p class="device-meta" id="deviceMeta">—</p>
-            <label class="eco" title="Sys.config.device.eco_mode — lower CPU clock + WiFi power-save; raises latency">
-              <input type="checkbox" id="ecoToggle" disabled />
-              eco
-            </label>
+            <p class="device-peek" id="devicePeek">—</p>
           </div>
-          <dl class="device-grid" id="deviceGrid">
-            <div><dt>script</dt><dd id="dRunning">—</dd></div>
-            <div><dt>mem used / peak / free</dt><dd id="dMem">—</dd></div>
-            <div><dt>cpu</dt><dd id="dCpu">—</dd></div>
-            <div><dt>ram free / size</dt><dd id="dRam">—</dd></div>
-            <div><dt>fs free / size</dt><dd id="dFs">—</dd></div>
-            <div><dt>latency</dt><dd id="dLatency">—</dd></div>
-            <div><dt>temp</dt><dd id="dTemp">—</dd></div>
-            <div><dt>rssi</dt><dd id="dRssi">—</dd></div>
-          </dl>
-          <p class="device-err" id="deviceErr" hidden></p>
+          <div class="device-body" id="deviceBody">
+            <div class="device-toolbar">
+              <p class="device-meta" id="deviceMeta">—</p>
+              <label
+                class="eco"
+                title="Sys.config.device.eco_mode — lower CPU clock + WiFi power-save; raises latency"
+              >
+                <input type="checkbox" id="ecoToggle" disabled />
+                eco
+              </label>
+            </div>
+            <dl class="device-grid" id="deviceGrid">
+              <div><dt>script</dt><dd id="dRunning">—</dd></div>
+              <div><dt>mem used / peak / free</dt><dd id="dMem">—</dd></div>
+              <div><dt>cpu</dt><dd id="dCpu">—</dd></div>
+              <div><dt>ram free / size</dt><dd id="dRam">—</dd></div>
+              <div><dt>fs free / size</dt><dd id="dFs">—</dd></div>
+              <div><dt>latency</dt><dd id="dLatency">—</dd></div>
+              <div><dt>temp</dt><dd id="dTemp">—</dd></div>
+              <div><dt>rssi</dt><dd id="dRssi">—</dd></div>
+            </dl>
+            <p class="device-err" id="deviceErr" hidden></p>
+          </div>
         </section>
 
         <p class="status" id="statusLine" role="status">ready</p>

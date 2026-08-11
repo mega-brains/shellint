@@ -7,11 +7,18 @@
   "scripts": {
     "build:shelly": "node scripts/build-shelly.mjs",
     "build:web": "node scripts/build-web.mjs",
+    "build": "npm run build:shelly && npm run build:web",
     "dev": "npm run build:web && node --import tsx server/index.ts",
     "deploy": "node --import tsx server/cli-deploy.ts",
     "probe": "node --import tsx server/cli-probe.ts",
-    "lint": "tsc -p tsconfig.shelly.json --noEmit",
-    "test": "npm run build:shelly"
+    "typecheck:shelly": "tsc -p tsconfig.shelly.json --noEmit",
+    "typecheck:server": "tsc -p tsconfig.server.json",
+    "typecheck:web": "tsc -p tsconfig.web.json",
+    "typecheck": "npm run typecheck:shelly && npm run typecheck:server && npm run typecheck:web",
+    "lint": "npm run typecheck",
+    "check:lines": "node scripts/check-line-limit.mjs",
+    "test": "node scripts/test.mjs",
+    "beforeCommit": "npm run check:lines && npm run typecheck && npm run build && npm run test"
   },
   "engines": {
     "node": ">=20"

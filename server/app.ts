@@ -15,6 +15,7 @@ import { fetchDeviceStatus, setEcoMode } from "./device-status.ts";
 import { analyzeScriptFile } from "./script-stats.ts";
 import { appendBuildHistory, readBuildHistory } from "./build-history.ts";
 import { checkBuildArtifacts } from "./dialect-check.ts";
+import { runCheck } from "./check.ts";
 
 export function createApp() {
   const app = new Hono();
@@ -75,6 +76,20 @@ export function createApp() {
       );
     }
   });
+
+  const check = (c: Context) => {
+    try {
+      return c.json({ ok: true, ...runCheck() });
+    } catch (e) {
+      return c.json(
+        { ok: false, error: e instanceof Error ? e.message : String(e) },
+        500,
+      );
+    }
+  };
+
+  app.post("/api/check", check);
+  app.get("/api/check", check);
 
   app.get("/api/stats", (c) => {
     try {

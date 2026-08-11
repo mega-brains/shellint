@@ -42,6 +42,7 @@ mise run build
 mise run deploy -- debug min    # or: prod raw
 mise run probe
 mise run test
+mise run beforeCommit           # lines + typecheck + build + test
 ```
 
 Unauthenticated devices only; a 401 surfaces as **auth not supported yet**.
