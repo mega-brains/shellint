@@ -35,6 +35,7 @@ export function App() {
   const [previewing, setPreviewing] = useState(false);
   const [deployReady, setDeployReady] = useState(false);
   const [buildAction, setBuildAction] = useState<BuildAction>("both");
+  const [skipTypeCheck, setSkipTypeCheck] = useState(false);
   const [deployChoice, setDeployChoice] = useState<{
     mode: Mode;
     minify: Minify;
@@ -143,7 +144,7 @@ export function App() {
     setStatus(`saved (${new TextEncoder().encode(source).length} B)`);
   }, [setStatus, scriptHistory, slotImport]);
 
-  const buildScript = useCallback(async () => {
+  const buildScript = useCallback(async (skipTypes = false) => {
     const view = viewRef.current;
     if (!view) return;
     setStatus("building…");
@@ -157,7 +158,10 @@ export function App() {
       estimate?: DashboardPatch["estimate"];
       minFirmware?: DashboardPatch["minFirmware"];
       dialect?: { file: string; findings: Finding[] }[];
-    }>("/api/build", { method: "POST", body: "{}" }).catch((e) =>
+    }>("/api/build", {
+      method: "POST",
+      body: JSON.stringify({ skipTypeCheck: skipTypes }),
+    }).catch((e) =>
       reportBuildFailure(view, e),
     );
     setSizeDebug(data.sizes.debug ?? {});
@@ -208,17 +212,17 @@ export function App() {
   }, [deployGate, setStatus, syncDeployReady]);
 
   const runBuildAction = useCallback(
-    async (action = buildAction) => {
+    async (action = buildAction, skipTypes = skipTypeCheck) => {
       setBuildRunning(true);
       try {
         if (action === "check") return await checkScript();
-        await buildScript();
+        await buildScript(skipTypes);
         if (action === "both") await checkScript();
       } finally {
         setBuildRunning(false);
       }
     },
-    [buildAction, buildScript, checkScript],
+    [buildAction, buildScript, checkScript, skipTypeCheck],
   );
 
   const deployScript = useCallback(
@@ -386,8 +390,10 @@ export function App() {
           deployReady={deployReady}
           buildAction={buildAction}
           buildRunning={buildRunning}
+          skipTypeCheck={skipTypeCheck}
           deployChoice={deployChoice}
           autoBuildCheck={autoBuildCheck}
+          onSkipTypeCheckChange={setSkipTypeCheck}
           onAutoChange={(on) => {
             setAutoBuildCheck(on);
             localStorage.setItem(AUTO_KEY, on ? "1" : "0");

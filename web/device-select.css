@@ -1,51 +1,63 @@
 /* Header device/slot pickers + the add-device manager modal. */
 
-/* Sits where the old config line did, right of the title. Shrinkable so the
-   pickers stay narrow in a tight header but widen back out when there is room
-   (device label + IP, slot id + name) instead of truncating for good. */
+/* Sits where the old config line did, right of the title. The controls are
+   deliberately compact: their names are useful context, but the editor and
+   toolbar should retain the header's visual weight. */
 .device-picker-row {
   display: flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.25rem;
   min-width: 0;
   flex: 0 1 auto;
 }
 
 .device-select,
 .slot-select {
-  font: inherit;
+  font-family: var(--sans-narrow);
   font-size: 0.78rem;
+  line-height: 1.1;
   /* Room on the right for the caret drawn by the background image. */
-  padding: 0.2rem 1.25rem 0.2rem 0.5rem;
+  padding: 0.25rem 1.35rem 0.25rem 0.45rem;
   border: 1px solid var(--line);
-  border-radius: 5px;
-  background: var(--panel);
+  border-radius: 2px;
+  background-color: var(--panel);
   color: var(--ink);
   cursor: pointer;
+  box-shadow: inset 0 -2px 0 rgba(15, 107, 92, 0.18);
   /* Strip the OS field chrome so it reads as a button, then draw our caret. */
   appearance: none;
   background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
     linear-gradient(135deg, currentColor 50%, transparent 50%);
-  background-position: right 0.55rem center, right 0.35rem center;
+  background-position: right 0.6rem center, right 0.4rem center;
   background-size: 0.22rem 0.22rem, 0.22rem 0.22rem;
   background-repeat: no-repeat;
-  /* Content-sized, but free to shrink first when the header runs out of room. */
-  width: auto;
+  /* Compact enough for the header, with the selected name elided when needed. */
+  width: 10.5rem;
   flex: 0 1 auto;
-  min-width: 4.5rem;
-  max-width: 15rem;
+  min-width: 0;
+  max-width: 10.5rem;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.slot-select { max-width: 11rem; }
+.slot-select {
+  width: 8rem;
+  max-width: 8rem;
+}
 
 .device-select:hover,
-.slot-select:hover { border-color: var(--accent); }
+.slot-select:hover {
+  border-color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
 
 .device-select:focus-visible,
-.slot-select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.slot-select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+  box-shadow: inset 0 -2px 0 var(--accent);
+}
 
 .picker-fail { color: var(--danger); }
 

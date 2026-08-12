@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "preact/hooks";
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { DiffModal, type DiffOption } from "./diff-modal";
 import { fmtBytes } from "./device-format";
 
@@ -45,13 +45,17 @@ export function ScriptHistoryModal(props: ScriptHistoryModalProps) {
     }
   }, [props.open]);
 
+  // Declared above the early return — hook order must not depend on `open`.
+  const load = useCallback(
+    async (id: string) =>
+      id === CURRENT_ID ? props.currentSource : props.loadVersion(id),
+    [props.currentSource, props.loadVersion],
+  );
+
   // Unmounted (not just visually hidden) while closed, so the nested
   // DiffModal doesn't leave a second set of diff-testid nodes in the DOM
   // alongside the artifact-preview DiffModal in editor-host.tsx.
   if (!props.open) return null;
-
-  const load = async (id: string) =>
-    id === CURRENT_ID ? props.currentSource : props.loadVersion(id);
 
   const diffOptions: DiffOption[] = [
     { id: CURRENT_ID, label: "current editor buffer" },

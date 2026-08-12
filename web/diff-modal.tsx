@@ -246,6 +246,13 @@ export function DiffModal(props: DiffModalProps) {
   const gen = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // Held in a ref, not an effect dep: callers that build the loader inline
+  // hand us a new function identity on every parent render, and the parent
+  // rerenders every 2 s from the log poll. As a dep that refetched both
+  // sides and reset scrollTop mid-read.
+  const loadRef = useRef(props.load);
+  loadRef.current = props.load;
+
   useEffect(() => {
     if (props.open) {
       setLeftId(props.left);
@@ -264,8 +271,8 @@ export function DiffModal(props: DiffModalProps) {
     void (async () => {
       try {
         const texts = await Promise.all([
-          props.load(leftId),
-          props.load(rightId),
+          loadRef.current(leftId),
+          loadRef.current(rightId),
         ]);
         if (mine !== gen.current) return;
         setSizes({ left: measure(texts[0]), right: measure(texts[1]) });
@@ -285,7 +292,7 @@ export function DiffModal(props: DiffModalProps) {
         }
       }
     })();
-  }, [props.open, leftId, rightId, props.load]);
+  }, [props.open, leftId, rightId]);
 
   return (
     <dialog

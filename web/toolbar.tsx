@@ -30,8 +30,10 @@ export type ToolbarProps = {
   deployReady: boolean;
   buildAction: BuildAction;
   buildRunning: boolean;
+  skipTypeCheck: boolean;
   deployChoice: { mode: Mode; minify: Minify };
   autoBuildCheck: boolean;
+  onSkipTypeCheckChange: (skip: boolean) => void;
   onAutoChange: (on: boolean) => void;
   onSave: () => void;
   onHistory: () => void;
@@ -222,6 +224,23 @@ export function Toolbar(props: ToolbarProps) {
               </button>
             </li>
             <li role="none" class="menu-sep" />
+            <li role="none">
+              <label
+                class="logs-follow menu-check"
+                title="Skip TypeScript type checking during Build"
+              >
+                <input
+                  type="checkbox"
+                  id="skipTypeCheck"
+                  checked={props.skipTypeCheck}
+                  onChange={(e: JSX.TargetedEvent<HTMLInputElement>) =>
+                    props.onSkipTypeCheckChange(e.currentTarget.checked)
+                  }
+                  onClick={(e) => e.stopPropagation()}
+                />
+                skip TypeScript type check
+              </label>
+            </li>
             <li role="none">
               <label
                 class="logs-follow menu-check"
