@@ -19,6 +19,19 @@ const VOLATILE = [
   "#optionsPeek",
 ];
 
+/**
+ * macOS shows either overlay scrollbars (0px) or classic ones (15px) depending
+ * on the machine's "Show scroll bars" setting / attached mouse. `#side` reserves
+ * that width via `scrollbar-gutter: stable`, and its `.stats-bars` auto-fit grid
+ * flips between one and two columns right around the difference — so baselines
+ * recorded on one machine fail on the other. Styling `::-webkit-scrollbar` opts
+ * Chrome out of overlay behaviour, pinning the gutter to 0 everywhere.
+ */
+const PIN_SCROLLBARS = `
+*::-webkit-scrollbar { width: 0; height: 0; }
+*::-webkit-scrollbar-thumb, *::-webkit-scrollbar-track { background: transparent; }
+`;
+
 async function openSettled(page: Page) {
   await mockDeviceApis(page);
   await page.addInitScript(() => {
@@ -26,6 +39,7 @@ async function openSettled(page: Page) {
   });
   await page.clock.install({ time: new Date("2023-11-14T22:13:20.000Z") });
   await page.goto("/");
+  await page.addStyleTag({ content: PIN_SCROLLBARS });
   await expect(page.locator("#editor .cm-content")).toBeVisible();
   await expect(page.locator("#statusLine")).toContainText("loaded", {
     timeout: 30_000,

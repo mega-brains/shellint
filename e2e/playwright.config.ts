@@ -41,9 +41,15 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: "npm run build:web && node --import tsx server/index.ts",
+    // build:shelly too: a dist/ older than scripts/main.ts trips the
+    // `artifacts-stale` check, which expands the inputs group and moves the
+    // check panel under the design baselines.
+    command:
+      "npm run build:shelly && npm run build:web && node --import tsx server/index.ts",
     cwd: ROOT,
     url: BASE,
+    // A dev server already on :8787 is reused as-is — including its web bundle.
+    // Restart it after touching web/ or the baselines compare against stale UI.
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },
