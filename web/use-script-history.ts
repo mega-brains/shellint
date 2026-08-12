@@ -14,6 +14,7 @@ export type UseScriptHistory = {
   closeHistory: () => void;
   loadHistoryVersion: (id: string) => Promise<string>;
   restoreVersion: (id: string) => Promise<void>;
+  checkpoint: () => Promise<void>;
 };
 
 /**
@@ -67,6 +68,19 @@ export function useScriptHistory(
     [viewRef, setStatus, checkScriptQuiet],
   );
 
+  const checkpoint = useCallback(async () => {
+    const data = await api<{ created: boolean }>("/api/script/checkpoint", {
+      method: "POST",
+    });
+    setStatus(data.created ? "checkpoint saved" : "checkpoint skipped (unchanged)");
+    if (historyOpen) {
+      const refreshed = await api<{ rows: ScriptHistoryRow[] }>(
+        "/api/script/history",
+      );
+      setHistoryRows(refreshed.rows);
+    }
+  }, [historyOpen, setStatus]);
+
   return {
     historyOpen,
     historyRows,
@@ -77,5 +91,6 @@ export function useScriptHistory(
     closeHistory: () => setHistoryOpen(false),
     loadHistoryVersion,
     restoreVersion,
+    checkpoint,
   };
 }

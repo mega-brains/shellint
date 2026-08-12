@@ -17,6 +17,8 @@ export type ScriptHistoryRow = {
 const DIR = join(ROOT, ".devroom");
 const FILE = join(DIR, "script-history.jsonl");
 const MAX_ROWS = 10;
+/** Autosave snapshots within this long of the last row are coalesced away. */
+export const COALESCE_WINDOW_MS = 60_000;
 
 function ensureDir() {
   if (!existsSync(DIR)) mkdirSync(DIR, { recursive: true });
@@ -46,29 +48,58 @@ function writeAllRows(rows: ScriptHistoryRow[]) {
   );
 }
 
+function appendRow(
+  rows: ScriptHistoryRow[],
+  source: string,
+  now: number,
+): ScriptHistoryRow {
+  ensureDir();
+  const row: ScriptHistoryRow = {
+    id: new Date(now).toISOString(),
+    source,
+    bytes: Buffer.byteLength(source, "utf8"),
+  };
+  const trimmed = [...rows, row].slice(-MAX_ROWS);
+  writeAllRows(trimmed);
+  return row;
+}
+
 /**
  * Snapshots the content currently on disk before it gets overwritten by
  * `newSource`, so a save/restore never destroys the version it replaces.
- * Skipped when the current content is unchanged from `newSource` (no-op
- * save) or matches the most recent history row (repeated autosave on
- * unchanged text) — a real edit always produces exactly one row.
+ * Skipped when: the current content is unchanged from `newSource` (no-op
+ * save); it matches the most recent history row (repeated autosave on
+ * unchanged text); or the most recent row is younger than
+ * `COALESCE_WINDOW_MS` (an editing burst under autosave's debounce
+ * shouldn't consume most of the 10 slots). `now` is injectable for tests.
  */
 export function snapshotBeforeWrite(
   currentSource: string,
   newSource: string,
+  now: number = Date.now(),
 ): void {
   if (currentSource === newSource) return;
-  ensureDir();
   const rows = readAllRows();
   const last = rows[rows.length - 1];
   if (last && last.source === currentSource) return;
-  rows.push({
-    id: new Date().toISOString(),
-    source: currentSource,
-    bytes: Buffer.byteLength(currentSource, "utf8"),
-  });
-  const trimmed = rows.length > MAX_ROWS ? rows.slice(rows.length - MAX_ROWS) : rows;
-  writeAllRows(trimmed);
+  if (last && now - new Date(last.id).getTime() < COALESCE_WINDOW_MS) return;
+  appendRow(rows, currentSource, now);
+}
+
+/**
+ * Explicit "checkpoint now" — unlike `snapshotBeforeWrite`, bypasses the
+ * coalescing window since it's a deliberate user action, not an autosave
+ * tick. Still dedupes against an identical most-recent row. Returns the
+ * created row, or null if deduped.
+ */
+export function checkpointNow(
+  currentSource: string,
+  now: number = Date.now(),
+): ScriptHistoryRow | null {
+  const rows = readAllRows();
+  const last = rows[rows.length - 1];
+  if (last && last.source === currentSource) return null;
+  return appendRow(rows, currentSource, now);
 }
 
 export function listScriptHistory(): { id: string; bytes: number; ts: string }[] {

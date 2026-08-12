@@ -380,6 +380,7 @@ export function App() {
           }}
           onSave={() => void withBusy(saveScript)}
           onHistory={() => void withBusy(scriptHistory.openHistory)}
+          onCheckpoint={() => void withBusy(scriptHistory.checkpoint)}
           onBuild={() => void withBusy(() => runBuildAction())}
           onBuildPick={(action) => {
             setBuildAction(action);

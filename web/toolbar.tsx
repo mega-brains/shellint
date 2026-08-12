@@ -35,6 +35,7 @@ export type ToolbarProps = {
   onAutoChange: (on: boolean) => void;
   onSave: () => void;
   onHistory: () => void;
+  onCheckpoint: () => void;
   onBuild: () => void;
   onBuildPick: (action: BuildAction) => void;
   onDeploy: () => void;
@@ -45,6 +46,7 @@ export type ToolbarProps = {
 };
 
 export function Toolbar(props: ToolbarProps) {
+  const [saveOpen, setSaveOpen] = useState(false);
   const [buildOpen, setBuildOpen] = useState(false);
   const [deployOpen, setDeployOpen] = useState(false);
   const [probeOpen, setProbeOpen] = useState(false);
@@ -53,6 +55,7 @@ export function Toolbar(props: ToolbarProps) {
 
   useEffect(() => {
     const close = () => {
+      setSaveOpen(false);
       setBuildOpen(false);
       setDeployOpen(false);
       setProbeOpen(false);
@@ -92,15 +95,47 @@ export function Toolbar(props: ToolbarProps) {
 
   return (
     <div class="toolbar">
-      <button
-        type="button"
-        id="btnSave"
-        title="Save editor contents to scripts/main.ts"
+      <SplitButton
+        rootId="saveSplit"
+        toggleId="btnSaveMenu"
+        menuId="saveMenu"
+        open={saveOpen}
+        onOpenChange={(o) => {
+          if (o) {
+            setBuildOpen(false);
+            setDeployOpen(false);
+            setProbeOpen(false);
+          }
+          setSaveOpen(o);
+        }}
         disabled={saveDisabled}
-        onClick={props.onSave}
-      >
-        Save
-      </button>
+        toggleTitle="Save a checkpoint independent of the next Save"
+        onPick={() => props.onCheckpoint()}
+        primary={
+          <button
+            type="button"
+            id="btnSave"
+            title="Save editor contents to scripts/main.ts"
+            disabled={saveDisabled}
+            onClick={props.onSave}
+          >
+            Save
+          </button>
+        }
+        menu={
+          <ul class="menu" id="saveMenu" role="menu">
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                title="Save a version-history checkpoint of the file on disk right now, independent of the next Save"
+              >
+                checkpoint
+              </button>
+            </li>
+          </ul>
+        }
+      />
 
       <button
         type="button"
@@ -119,6 +154,7 @@ export function Toolbar(props: ToolbarProps) {
         open={buildOpen}
         onOpenChange={(o) => {
           if (o) {
+            setSaveOpen(false);
             setDeployOpen(false);
             setProbeOpen(false);
           }
@@ -205,6 +241,7 @@ export function Toolbar(props: ToolbarProps) {
         open={deployOpen}
         onOpenChange={(o) => {
           if (o) {
+            setSaveOpen(false);
             setBuildOpen(false);
             setProbeOpen(false);
           }
@@ -246,6 +283,7 @@ export function Toolbar(props: ToolbarProps) {
         open={probeOpen}
         onOpenChange={(o) => {
           if (o) {
+            setSaveOpen(false);
             setBuildOpen(false);
             setDeployOpen(false);
           }
