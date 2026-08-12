@@ -39,6 +39,7 @@ run("node", ["scripts/test-device-minify-options.mjs"]);
 run("node", ["--import", "tsx", "scripts/test-intern-strings.mjs"]);
 run("node", ["scripts/test-web-assets.mjs"]);
 run("node", ["--import", "tsx", "scripts/test-script-history.mjs"]);
+run("node", ["--import", "tsx", "scripts/test-devices.mjs"]);
 
 for (const f of [
   "dist/debug.js",

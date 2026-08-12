@@ -2,7 +2,8 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { DIST_DIR } from "./paths.ts";
 import { loadConfig, assertDevroomCompiler } from "./config.ts";
-import { AuthNotSupportedError, ShellyRpc, RpcError } from "./rpc.ts";
+import { requireActive } from "./devices.ts";
+import { AuthNotSupportedError, AuthFailedError, ShellyRpc, RpcError } from "./rpc.ts";
 
 const CHUNK_SIZE = 1024;
 
@@ -54,9 +55,10 @@ export async function deploy(
 
   const code = readFileSync(path, "utf8");
   const localBytes = Buffer.byteLength(code, "utf8");
-  const scriptId = cfg.scriptId;
+  const target = requireActive();
+  const scriptId = target.slot;
 
-  const rpc = new ShellyRpc(cfg.deviceIp);
+  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
   try {
     onProgress("connecting");
     await rpc.connect();
@@ -111,4 +113,4 @@ export async function deploy(
   }
 }
 
-export { AuthNotSupportedError };
+export { AuthNotSupportedError, AuthFailedError };

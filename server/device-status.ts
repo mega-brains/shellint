@@ -1,9 +1,11 @@
 import { loadConfig, assertDevroomCompiler } from "./config.ts";
 import { readDeviceProfile } from "./device-profile.ts";
+import { requireActive } from "./devices.ts";
 import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
 
 export type DeviceStatus = {
   deviceIp: string;
+  deviceId: string;
   scriptId: number;
   latencyMs: number;
   device: {
@@ -111,8 +113,10 @@ async function softCall(
 export async function fetchDeviceStatus(): Promise<DeviceStatus> {
   const cfg = loadConfig();
   assertDevroomCompiler(cfg);
+  const target = requireActive();
+  const scriptId = target.slot;
 
-  const rpc = new ShellyRpc(cfg.deviceIp);
+  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
   const rtts: number[] = [];
 
   try {
@@ -123,7 +127,7 @@ export async function fetchDeviceStatus(): Promise<DeviceStatus> {
     const info = (infoCall?.result ?? {}) as Record<string, unknown>;
 
     const scriptCall = await timedCall(rpc, "Script.GetStatus", {
-      id: cfg.scriptId,
+      id: scriptId,
     });
     rtts.push(scriptCall.ms);
     const script = (scriptCall.result ?? {}) as Record<string, unknown>;
@@ -151,7 +155,7 @@ export async function fetchDeviceStatus(): Promise<DeviceStatus> {
     const list = (listCall?.result ?? {}) as { scripts?: unknown };
     const slot = (Array.isArray(list.scripts) ? list.scripts : []).find(
       (s): s is Record<string, unknown> =>
-        !!s && typeof s === "object" && (s as { id?: unknown }).id === cfg.scriptId,
+        !!s && typeof s === "object" && (s as { id?: unknown }).id === scriptId,
     );
 
     // A dedicated sensor is the real reading; a relay's own die temperature is
@@ -187,8 +191,9 @@ export async function fetchDeviceStatus(): Promise<DeviceStatus> {
         : 0;
 
     return {
-      deviceIp: cfg.deviceIp,
-      scriptId: cfg.scriptId,
+      deviceIp: target.device.ip,
+      deviceId: target.device.id,
+      scriptId,
       latencyMs,
       device: {
         id: str(info.id) ?? undefined,
@@ -201,7 +206,7 @@ export async function fetchDeviceStatus(): Promise<DeviceStatus> {
         chipInferred: true,
       },
       script: {
-        id: cfg.scriptId,
+        id: scriptId,
         name: slot ? str(slot.name) : null,
         running: bool(script.running),
         mem_used: num(script.mem_used),
@@ -242,8 +247,9 @@ export type EcoResult = {
 export async function setEcoMode(eco_mode: boolean): Promise<EcoResult> {
   const cfg = loadConfig();
   assertDevroomCompiler(cfg);
+  const target = requireActive();
 
-  const rpc = new ShellyRpc(cfg.deviceIp);
+  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
   try {
     await rpc.connect();
     const result = (await rpc.call("Sys.SetConfig", {
@@ -276,16 +282,18 @@ export async function setScriptRunning(
 ): Promise<ScriptRunResult> {
   const cfg = loadConfig();
   assertDevroomCompiler(cfg);
+  const target = requireActive();
+  const scriptId = target.slot;
 
-  const rpc = new ShellyRpc(cfg.deviceIp);
+  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
   try {
     await rpc.connect();
     await rpc.call(running ? "Script.Start" : "Script.Stop", {
-      id: cfg.scriptId,
+      id: scriptId,
     });
-    const status = await softCall(rpc, "Script.GetStatus", { id: cfg.scriptId });
+    const status = await softCall(rpc, "Script.GetStatus", { id: scriptId });
     const result = (status?.result ?? {}) as Record<string, unknown>;
-    return { running: bool(result.running), scriptId: cfg.scriptId };
+    return { running: bool(result.running), scriptId };
   } finally {
     rpc.close();
   }
@@ -298,8 +306,9 @@ export async function setScriptRunning(
 export async function rebootDevice(): Promise<void> {
   const cfg = loadConfig();
   assertDevroomCompiler(cfg);
+  const target = requireActive();
 
-  const rpc = new ShellyRpc(cfg.deviceIp);
+  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
   try {
     await rpc.connect();
     await rpc.call("Shelly.Reboot", {});

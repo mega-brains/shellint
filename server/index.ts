@@ -1,9 +1,19 @@
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.ts";
 import { loadConfig } from "./config.ts";
+import { requireActive } from "./devices.ts";
 
 const cfg = loadConfig();
 const app = createApp();
+
+function activeSummary(): string {
+  try {
+    const target = requireActive();
+    return `device ${target.device.label} (${target.device.ip}) · slot ${target.slot}`;
+  } catch {
+    return "no device selected — add one from the UI";
+  }
+}
 
 serve(
   {
@@ -14,6 +24,6 @@ serve(
   (info) => {
     const host = cfg.host === "0.0.0.0" ? "127.0.0.1" : cfg.host;
     console.log(`Shelly DevRoom listening on http://${host}:${info.port}`);
-    console.log(`  bind ${cfg.host}:${cfg.port} · device ${cfg.deviceIp} · scriptId ${cfg.scriptId} · compiler ${cfg.compiler}`);
+    console.log(`  bind ${cfg.host}:${cfg.port} · ${activeSummary()} · compiler ${cfg.compiler}`);
   },
 );

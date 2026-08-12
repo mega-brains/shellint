@@ -1,6 +1,18 @@
-import type { Hono } from "hono";
+import type { Context, Hono } from "hono";
 import { CompilerNotWiredError } from "./config.ts";
-import { deploy, AuthNotSupportedError } from "./deploy.ts";
+import {
+  addDevice,
+  DuplicateDeviceError,
+  listDevices,
+  loadDevices,
+  NoDeviceError,
+  removeDevice,
+  resolveTarget,
+  sanitizeDevice,
+  updateDevice,
+} from "./devices.ts";
+import { ShellyRpc } from "./rpc.ts";
+import { deploy, AuthNotSupportedError, AuthFailedError } from "./deploy.ts";
 import { runProbe, getProbeProgress } from "./probe.ts";
 import {
   fetchDeviceStatus,
@@ -12,8 +24,129 @@ import { readLogs, startLogStream, stopLogStream } from "./debug-log.ts";
 import { expandLogText, loadLogMap } from "./log-map.ts";
 import { writeGeneratedTypings } from "./probe-typings.ts";
 
+/**
+ * Shared error → response mapping for every route that talks to a device:
+ * `NoDeviceError` → 409, `AuthFailedError` → 401 (wrong password),
+ * `AuthNotSupportedError` → 401 (non-digest challenge), `CompilerNotWiredError`
+ * → 400, everything else → 500.
+ */
+function deviceError(c: Context, e: unknown) {
+  if (e instanceof NoDeviceError) {
+    return c.json({ ok: false, error: e.message }, 409);
+  }
+  if (e instanceof AuthFailedError) {
+    return c.json({ ok: false, error: e.message }, 401);
+  }
+  if (e instanceof AuthNotSupportedError) {
+    return c.json({ ok: false, error: "auth not supported yet" }, 401);
+  }
+  if (e instanceof CompilerNotWiredError) {
+    return c.json({ ok: false, error: e.message }, 400);
+  }
+  return c.json(
+    { ok: false, error: e instanceof Error ? e.message : String(e) },
+    500,
+  );
+}
+
 /** Device telemetry, logs, probe, deploy. Split out of app.ts to stay under the 500-line cap. */
 export function registerDeviceRoutes(app: Hono) {
+  app.get("/api/devices", (c) => {
+    const file = loadDevices();
+    return c.json({
+      ok: true,
+      devices: listDevices().map(sanitizeDevice),
+      active: file.active,
+    });
+  });
+
+  app.post("/api/devices", async (c) => {
+    let body: { ip?: string; label?: string; password?: string };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json(
+        { ok: false, error: "expected JSON body { ip, label?, password? }" },
+        400,
+      );
+    }
+    if (typeof body.ip !== "string" || body.ip.length === 0) {
+      return c.json({ ok: false, error: "body.ip must be a non-empty string" }, 400);
+    }
+    try {
+      const device = await addDevice({
+        ip: body.ip,
+        label: typeof body.label === "string" ? body.label : undefined,
+        password: typeof body.password === "string" ? body.password : undefined,
+      });
+      return c.json({ ok: true, device: sanitizeDevice(device) });
+    } catch (e) {
+      if (e instanceof DuplicateDeviceError) {
+        return c.json({ ok: false, error: e.message }, 409);
+      }
+      return deviceError(c, e);
+    }
+  });
+
+  app.patch("/api/devices/:id", async (c) => {
+    let body: { label?: string; ip?: string; password?: string | null };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ ok: false, error: "expected JSON body" }, 400);
+    }
+    try {
+      const device = updateDevice(c.req.param("id"), body);
+      return c.json({ ok: true, device: sanitizeDevice(device) });
+    } catch (e) {
+      return c.json(
+        { ok: false, error: e instanceof Error ? e.message : String(e) },
+        404,
+      );
+    }
+  });
+
+  app.delete("/api/devices/:id", (c) => {
+    removeDevice(c.req.param("id"));
+    return c.json({ ok: true });
+  });
+
+  app.post("/api/devices/:id/test", async (c) => {
+    const id = c.req.param("id");
+    let target;
+    try {
+      target = resolveTarget(id);
+    } catch (e) {
+      return deviceError(c, e);
+    }
+    const rpc = new ShellyRpc(target);
+    const t0 = performance.now();
+    try {
+      await rpc.connect();
+      const info = ((await rpc.call("Shelly.GetDeviceInfo", {})) ?? {}) as Record<
+        string,
+        unknown
+      >;
+      return c.json({
+        ok: true,
+        online: true,
+        info,
+        latencyMs: Math.round(performance.now() - t0),
+      });
+    } catch (e) {
+      if (e instanceof AuthFailedError || e instanceof AuthNotSupportedError) {
+        return deviceError(c, e);
+      }
+      return c.json({
+        ok: true,
+        online: false,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    } finally {
+      rpc.close();
+    }
+  });
+
   app.get("/api/device/logs", (c) => {
     const sinceRaw = Number(c.req.query("since"));
     const since = Number.isFinite(sinceRaw) ? Math.max(0, sinceRaw) : 0;
@@ -43,13 +176,7 @@ export function registerDeviceRoutes(app: Hono) {
     try {
       return c.json({ ok: true, ...(await startLogStream()) });
     } catch (e) {
-      if (e instanceof CompilerNotWiredError) {
-        return c.json({ ok: false, error: e.message }, 400);
-      }
-      return c.json(
-        { ok: false, error: e instanceof Error ? e.message : String(e) },
-        500,
-      );
+      return deviceError(c, e);
     }
   });
 
@@ -93,16 +220,7 @@ export function registerDeviceRoutes(app: Hono) {
         status: lastStatus === "running" ? "running" : lastStatus,
       });
     } catch (e) {
-      if (e instanceof AuthNotSupportedError) {
-        return c.json({ ok: false, error: "auth not supported yet" }, 401);
-      }
-      if (e instanceof CompilerNotWiredError) {
-        return c.json({ ok: false, error: e.message }, 400);
-      }
-      return c.json(
-        { ok: false, error: e instanceof Error ? e.message : String(e) },
-        500,
-      );
+      return deviceError(c, e);
     }
   });
 
@@ -117,16 +235,7 @@ export function registerDeviceRoutes(app: Hono) {
       const typings = writeGeneratedTypings();
       return c.json({ ok: true, report, typings });
     } catch (e) {
-      if (e instanceof AuthNotSupportedError) {
-        return c.json({ ok: false, error: "auth not supported yet" }, 401);
-      }
-      if (e instanceof CompilerNotWiredError) {
-        return c.json({ ok: false, error: e.message }, 400);
-      }
-      return c.json(
-        { ok: false, error: e instanceof Error ? e.message : String(e) },
-        500,
-      );
+      return deviceError(c, e);
     }
   });
 
@@ -135,16 +244,7 @@ export function registerDeviceRoutes(app: Hono) {
       const status = await fetchDeviceStatus();
       return c.json({ ok: true, status });
     } catch (e) {
-      if (e instanceof AuthNotSupportedError) {
-        return c.json({ ok: false, error: "auth not supported yet" }, 401);
-      }
-      if (e instanceof CompilerNotWiredError) {
-        return c.json({ ok: false, error: e.message }, 400);
-      }
-      return c.json(
-        { ok: false, error: e instanceof Error ? e.message : String(e) },
-        500,
-      );
+      return deviceError(c, e);
     }
   });
 
@@ -164,16 +264,7 @@ export function registerDeviceRoutes(app: Hono) {
     try {
       return c.json({ ok: true, ...(await setScriptRunning(body.running)) });
     } catch (e) {
-      if (e instanceof AuthNotSupportedError) {
-        return c.json({ ok: false, error: "auth not supported yet" }, 401);
-      }
-      if (e instanceof CompilerNotWiredError) {
-        return c.json({ ok: false, error: e.message }, 400);
-      }
-      return c.json(
-        { ok: false, error: e instanceof Error ? e.message : String(e) },
-        500,
-      );
+      return deviceError(c, e);
     }
   });
 
@@ -194,16 +285,7 @@ export function registerDeviceRoutes(app: Hono) {
       const result = await setEcoMode(body.eco_mode);
       return c.json({ ok: true, ...result });
     } catch (e) {
-      if (e instanceof AuthNotSupportedError) {
-        return c.json({ ok: false, error: "auth not supported yet" }, 401);
-      }
-      if (e instanceof CompilerNotWiredError) {
-        return c.json({ ok: false, error: e.message }, 400);
-      }
-      return c.json(
-        { ok: false, error: e instanceof Error ? e.message : String(e) },
-        500,
-      );
+      return deviceError(c, e);
     }
   });
 
@@ -213,16 +295,7 @@ export function registerDeviceRoutes(app: Hono) {
       await rebootDevice();
       return c.json({ ok: true });
     } catch (e) {
-      if (e instanceof AuthNotSupportedError) {
-        return c.json({ ok: false, error: "auth not supported yet" }, 401);
-      }
-      if (e instanceof CompilerNotWiredError) {
-        return c.json({ ok: false, error: e.message }, 400);
-      }
-      return c.json(
-        { ok: false, error: e instanceof Error ? e.message : String(e) },
-        500,
-      );
+      return deviceError(c, e);
     }
   });
 }

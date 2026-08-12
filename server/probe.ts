@@ -2,6 +2,7 @@ import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
 import { PROBE_PATH } from "./paths.ts";
 import { loadConfig, assertDevroomCompiler } from "./config.ts";
+import { requireActive } from "./devices.ts";
 import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
 // Script.Eval expressions, and they must stay side-effect-free: they may be
 // evaluated inside a script the user owns.
@@ -211,15 +212,16 @@ export async function acquireHost(
 export async function runProbe(): Promise<ProbeReport> {
   const cfg = loadConfig();
   assertDevroomCompiler(cfg);
+  const target = requireActive();
 
-  const rpc = new ShellyRpc(cfg.deviceIp);
+  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
   const results: ProbeEntry[] = [];
   let scratchRemoved = false;
   progressState = { done: 0, total: PROBES.length };
 
   try {
     await rpc.connect();
-    const host = await acquireHost(rpc, cfg.scriptId);
+    const host = await acquireHost(rpc, target.slot);
 
     try {
       for (const p of PROBES) {
@@ -255,9 +257,9 @@ export async function runProbe(): Promise<ProbeReport> {
     const report: ProbeReport = {
       probed: true,
       at: new Date().toISOString(),
-      deviceIp: cfg.deviceIp,
+      deviceIp: target.device.ip,
       scriptId: host.scriptId,
-      configuredScriptId: cfg.scriptId,
+      configuredScriptId: target.slot,
       strategy: host.strategy,
       existingScriptIds: host.existingScriptIds,
       scratchScriptId: host.scratchScriptId,

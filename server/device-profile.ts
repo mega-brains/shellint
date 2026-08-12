@@ -2,6 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { DEVICE_PROFILE_PATH } from "./paths.ts";
 import { loadConfig, assertDevroomCompiler } from "./config.ts";
+import { requireActive } from "./devices.ts";
 import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
 
 /**
@@ -48,8 +49,9 @@ async function fetchComponents(rpc: ShellyRpc): Promise<string[]> {
 export async function fetchDeviceProfile(): Promise<DeviceProfile> {
   const cfg = loadConfig();
   assertDevroomCompiler(cfg);
+  const target = requireActive();
 
-  const rpc = new ShellyRpc(cfg.deviceIp);
+  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
   try {
     await rpc.connect();
     const info = ((await rpc.call("Shelly.GetDeviceInfo", {})) ??
@@ -64,7 +66,7 @@ export async function fetchDeviceProfile(): Promise<DeviceProfile> {
 
     const profile: DeviceProfile = {
       at: new Date().toISOString(),
-      deviceIp: cfg.deviceIp,
+      deviceIp: target.device.ip,
       gen: typeof info.gen === "number" ? info.gen : null,
       ver: str(info, "ver"),
       model: str(info, "model"),

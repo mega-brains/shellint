@@ -1,9 +1,18 @@
 import WebSocket from "ws";
+import { buildAuthFrame, NonceCounter, type DigestChallenge } from "./auth-digest.ts";
 
 export class AuthNotSupportedError extends Error {
-  constructor() {
-    super("auth not supported yet");
+  constructor(detail?: string) {
+    super(detail ? `auth not supported yet — ${detail}` : "auth not supported yet");
     this.name = "AuthNotSupportedError";
+  }
+}
+
+/** Digest auth was attempted (password configured, `auth_type:"digest"`) and failed twice. */
+export class AuthFailedError extends Error {
+  constructor(detail?: string) {
+    super(detail ? `wrong device password — ${detail}` : "wrong device password");
+    this.name = "AuthFailedError";
   }
 }
 
@@ -16,19 +25,47 @@ export class RpcError extends Error {
   }
 }
 
+export type RpcTarget = {
+  ip: string;
+  auth?: { username?: string; password: string };
+};
+
 type Pending = {
   resolve: (result: unknown) => void;
   reject: (err: Error) => void;
   /** Cleared on settle, otherwise it holds the event loop open until it fires. */
   timer: ReturnType<typeof setTimeout>;
+  method: string;
+  params: Record<string, unknown>;
+  retried: boolean;
 };
 
 const CONNECT_TIMEOUT_MS = 9_000;
 const RPC_TIMEOUT_MS = 10_000;
 
+function parseChallenge(message: string): DigestChallenge | null {
+  try {
+    const parsed = JSON.parse(message) as Record<string, unknown>;
+    if (parsed.auth_type !== "digest") return null;
+    if (typeof parsed.realm !== "string") return null;
+    if (typeof parsed.nonce !== "number" && typeof parsed.nonce !== "string") {
+      return null;
+    }
+    return {
+      realm: parsed.realm,
+      nonce: parsed.nonce,
+      stale: parsed.stale === true,
+    };
+  } catch {
+    return null;
+  }
+}
+
 /**
- * Unauthenticated Shelly Gen2 WebSocket RPC client.
- * Sends ≥1 request with valid `src` on connect (Shelly WS requirement).
+ * Shelly Gen2 WebSocket RPC client. Sends ≥1 request with valid `src` on
+ * connect (Shelly WS requirement). Optional digest auth: a 401 challenge with
+ * `auth_type:"digest"` is answered once per request; a second 401 on the
+ * retry becomes `AuthFailedError`.
  */
 export class ShellyRpc {
   private ws: WebSocket | null = null;
@@ -36,15 +73,25 @@ export class ShellyRpc {
   private pending = new Map<number, Pending>();
   private readonly src = "shelly-devroom";
   private openPromise: Promise<void> | null = null;
+  private readonly ip: string;
+  private readonly auth?: { username?: string; password: string };
+  private nonces = new NonceCounter();
 
-  constructor(private readonly deviceIp: string) {}
+  constructor(target: string | RpcTarget) {
+    if (typeof target === "string") {
+      this.ip = target;
+    } else {
+      this.ip = target.ip;
+      this.auth = target.auth;
+    }
+  }
 
   async connect(): Promise<void> {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
     if (this.openPromise) return this.openPromise;
 
     this.openPromise = new Promise<void>((resolve, reject) => {
-      const url = `ws://${this.deviceIp}/rpc`;
+      const url = `ws://${this.ip}/rpc`;
       const ws = new WebSocket(url);
       this.ws = ws;
       let settled = false;
@@ -73,7 +120,7 @@ export class ShellyRpc {
         this.call("Shelly.GetDeviceInfo", {})
           .then(() => ok())
           .catch((err: unknown) => {
-            if (err instanceof AuthNotSupportedError) {
+            if (err instanceof AuthNotSupportedError || err instanceof AuthFailedError) {
               fail(err);
               return;
             }
@@ -152,7 +199,7 @@ export class ShellyRpc {
       const code = msg.error.code ?? -1;
       const message = msg.error.message ?? "RPC error";
       if (code === 401 || /auth_type|digest|Unauthorized/i.test(message)) {
-        pending.reject(new AuthNotSupportedError());
+        this.handleChallenge(pending, message);
         return;
       }
       pending.reject(new RpcError(code, message));
@@ -161,27 +208,85 @@ export class ShellyRpc {
     pending.resolve(msg.result);
   }
 
+  private handleChallenge(pending: Pending, message: string): void {
+    const challenge = parseChallenge(message);
+    if (!challenge) {
+      pending.reject(new AuthNotSupportedError());
+      return;
+    }
+    if (!this.auth?.password) {
+      pending.reject(
+        new AuthFailedError("device requires a password but none is configured"),
+      );
+      return;
+    }
+    if (pending.retried) {
+      pending.reject(new AuthFailedError());
+      return;
+    }
+    if (challenge.stale) this.nonces.reset();
+
+    const nc = this.nonces.next(challenge.nonce);
+    const authFrame = buildAuthFrame({
+      realm: challenge.realm,
+      nonce: challenge.nonce,
+      password: this.auth.password,
+      nc,
+      username: this.auth.username,
+    });
+
+    this.send(pending.method, pending.params, {
+      resolve: pending.resolve,
+      reject: pending.reject,
+      retried: true,
+      auth: authFrame,
+    });
+  }
+
   async call(method: string, params: Record<string, unknown> = {}): Promise<unknown> {
+    return new Promise((resolve, reject) => {
+      this.send(method, params, { resolve, reject, retried: false });
+    });
+  }
+
+  private send(
+    method: string,
+    params: Record<string, unknown>,
+    ctx: {
+      resolve: (result: unknown) => void;
+      reject: (err: Error) => void;
+      retried: boolean;
+      auth?: ReturnType<typeof buildAuthFrame>;
+    },
+  ): void {
     if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
-      throw new Error("WebSocket not connected");
+      ctx.reject(new Error("WebSocket not connected"));
+      return;
     }
     const id = this.nextId++;
-    const frame = {
+    const frame: Record<string, unknown> = {
       jsonrpc: "2.0",
       id,
       src: this.src,
       method,
       params,
     };
-    return new Promise((resolve, reject) => {
-      const timer = setTimeout(() => {
-        if (this.pending.delete(id)) {
-          reject(new Error(`RPC timeout: ${method}`));
-        }
-      }, RPC_TIMEOUT_MS);
-      this.pending.set(id, { resolve, reject, timer });
-      this.ws!.send(JSON.stringify(frame));
+    if (ctx.auth) frame.auth = ctx.auth;
+
+    const timer = setTimeout(() => {
+      if (this.pending.delete(id)) {
+        ctx.reject(new Error(`RPC timeout: ${method}`));
+      }
+    }, RPC_TIMEOUT_MS);
+    this.pending.set(id, {
+      resolve: ctx.resolve,
+      reject: ctx.reject,
+      timer,
+      method,
+      params,
+      retried: ctx.retried,
     });
+    this.ws.send(JSON.stringify(frame));
   }
 
   close() {
