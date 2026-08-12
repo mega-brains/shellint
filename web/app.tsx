@@ -43,7 +43,6 @@ export function App() {
     () => localStorage.getItem(AUTO_KEY) === "1",
   );
   const [deviceIp, setDeviceIp] = useState("");
-  const [configBase, setConfigBase] = useState("");
   const [configFail, setConfigFail] = useState<string | undefined>();
   const [identity, setIdentity] = useState<DeviceIdentity | null>(null);
   const [deviceMeta, setDeviceMeta] = useState("—");
@@ -279,7 +278,6 @@ export function App() {
           config: { deviceIp: string; scriptId: number };
         }>("/api/config");
         setDeviceIp(cfg.config.deviceIp);
-        setConfigBase(`script ${cfg.config.scriptId}`);
       } catch {
         setConfigFail("config unavailable");
       }
@@ -344,7 +342,6 @@ export function App() {
     <>
       <Header
         deviceIp={deviceIp}
-        configBase={configBase}
         configFail={configFail}
         identity={identity}
         onToggleRun={(running) =>

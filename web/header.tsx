@@ -2,8 +2,6 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import type { DeviceIdentity } from "./device-panel";
 
-const MAX_SCRIPT_NAME = 28;
-
 const STATE_GLYPH = { running: "▶", stopped: "■", offline: "✕" } as const;
 type RunState = keyof typeof STATE_GLYPH;
 
@@ -15,7 +13,6 @@ const ACTION: Record<RunState, string> = {
 
 export type HeaderProps = {
   deviceIp: string;
-  configBase: string;
   configFail?: string;
   identity?: DeviceIdentity | null;
   onToggleRun?: (running: boolean) => void;
@@ -33,15 +30,6 @@ export function Header(props: HeaderProps) {
   useEffect(() => setStatusHidden(false), [props.status]);
 
   const id = props.identity;
-  const name =
-    id?.scriptName && id.scriptName.length > MAX_SCRIPT_NAME
-      ? `${id.scriptName.slice(0, MAX_SCRIPT_NAME - 1)}…`
-      : id?.scriptName;
-
-  let configText = props.configFail ?? "";
-  if (!props.configFail && props.configBase) {
-    configText = name ? `${props.configBase} · “${name}”` : props.configBase;
-  }
 
   const warn =
     id?.state === "offline" || id?.state === "stopped" ? "warn" : "";
@@ -77,25 +65,23 @@ export function Header(props: HeaderProps) {
             ) : null}
           </p>
           <h1>Shelly DevRoom</h1>
-          {props.deviceSelector ? (
-            <div class="device-picker-row">{props.deviceSelector}</div>
+        </div>
+        <div class={`sub device-picker-row ${warn}`} id="configLine">
+          {props.configFail ? (
+            <span class="picker-fail">{props.configFail}</span>
+          ) : (
+            props.deviceSelector
+          )}
+          {id && id.state !== "unknown" && !props.configFail ? (
+            <RunIcon
+              state={id.state}
+              onToggle={
+                props.onToggleRun &&
+                (() => props.onToggleRun!(id.state !== "running"))
+              }
+            />
           ) : null}
         </div>
-        <p class={`sub ${warn}`} id="configLine">
-          {configText || "loading config…"}
-          {id && id.state !== "unknown" && !props.configFail ? (
-            <>
-              {" · "}
-              <RunIcon
-                state={id.state}
-                onToggle={
-                  props.onToggleRun &&
-                  (() => props.onToggleRun!(id.state !== "running"))
-                }
-              />
-            </>
-          ) : null}
-        </p>
         {props.children}
       </div>
       <p class="device-meta" id="deviceMeta">

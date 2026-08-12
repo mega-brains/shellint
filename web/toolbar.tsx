@@ -110,9 +110,14 @@ export function Toolbar(props: ToolbarProps) {
           }
           setSaveOpen(o);
         }}
-        disabled={saveDisabled}
-        toggleTitle="Save a checkpoint independent of the next Save"
-        onPick={() => props.onCheckpoint()}
+        /* Only the primary Save is blocked while previewing an artifact —
+           checkpoint/history stay reachable from the menu. */
+        disabled={props.busy}
+        toggleTitle="Checkpoint the file, or browse saved versions"
+        onPick={(item) => {
+          if (item.dataset.action === "history") props.onHistory();
+          else props.onCheckpoint();
+        }}
         primary={
           <button
             type="button"
@@ -130,24 +135,26 @@ export function Toolbar(props: ToolbarProps) {
               <button
                 type="button"
                 role="menuitem"
+                data-action="checkpoint"
                 title="Save a version-history checkpoint of the file on disk right now, independent of the next Save"
               >
                 checkpoint
               </button>
             </li>
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                id="btnHistory"
+                data-action="history"
+                title="Browse and restore previous saved versions of scripts/main.ts"
+              >
+                history…
+              </button>
+            </li>
           </ul>
         }
       />
-
-      <button
-        type="button"
-        id="btnHistory"
-        title="Browse and restore previous saved versions of scripts/main.ts"
-        disabled={props.busy}
-        onClick={props.onHistory}
-      >
-        History
-      </button>
 
       <SplitButton
         rootId="buildSplit"

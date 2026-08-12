@@ -172,10 +172,15 @@ export function registerDeviceRoutes(app: Hono) {
       );
     }
     try {
-      const active = setActive(body);
+      const target = setActive(body);
       // A new active device means the old one's log ring must not bleed into it.
       resetForDeviceSwitch();
-      return c.json({ ok: true, active });
+      // Same shape as `/api/devices` — a device *id*, not the record (which
+      // carries `auth.password` and would blank the header pickers).
+      return c.json({
+        ok: true,
+        active: { device: target.device.id, slot: target.slot, script: target.script },
+      });
     } catch (e) {
       return deviceError(c, e);
     }

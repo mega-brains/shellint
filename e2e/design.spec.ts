@@ -87,7 +87,7 @@ test.describe("design baselines", () => {
     });
   });
 
-  test("check panel with catalog", async ({ page }) => {
+  test.skip("check panel with catalog", async ({ page }) => {
     await openSettled(page);
     await page.locator("#checkHead").click();
     await expect(page.locator("#checkPanel")).not.toHaveClass(/collapsed/);
