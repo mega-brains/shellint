@@ -113,8 +113,13 @@ export function deviceGlobalDefs(profilePath = DEVICE_PROFILE_PATH) {
   return defs;
 }
 
-/** Apply meta.env (+ optional meta.device) literals and DCE only — readable, no mangle. */
-export async function envPass(code, { debug, prod }, deviceDefs) {
+/**
+ * Apply meta.env (+ optional meta.device) literals and DCE only — readable, no
+ * mangle. `dropConsole` is honored here too (not only in `minifyPass`) so the
+ * `*.raw.js` artifact shown in the editor's artifact preview matches what the
+ * shipped `*.js` actually contains.
+ */
+export async function envPass(code, { debug, prod }, deviceDefs, opts = {}) {
   const result = await minify(code, {
     compress: {
       defaults: false,
@@ -125,6 +130,7 @@ export async function envPass(code, { debug, prod }, deviceDefs) {
       if_return: true,
       join_vars: false,
       sequences: false,
+      drop_console: !!opts.dropConsole,
       global_defs: {
         "meta.env.debug": debug,
         "meta.env.prod": prod,
@@ -307,7 +313,12 @@ async function main() {
 
   const tsc = spawnSync(
     process.execPath,
-    [tscBin, "-p", TSCONFIG],
+    [
+      tscBin,
+      "-p",
+      TSCONFIG,
+      ...(process.argv.includes("--no-typecheck") ? ["--noCheck"] : []),
+    ],
     { cwd: root, encoding: "utf8" },
   );
   if (tsc.status !== 0) {

@@ -81,7 +81,14 @@ export function registerScriptBuildRoutes(app: Hono) {
 
   app.post("/api/build", async (c) => {
     try {
-      const { sizes, stdout, stderr } = await runBuild();
+      let skipTypeCheck = false;
+      try {
+        const body = (await c.req.json()) as { skipTypeCheck?: unknown };
+        skipTypeCheck = body.skipTypeCheck === true;
+      } catch {
+        /* body is optional */
+      }
+      const { sizes, stdout, stderr } = await runBuild({ skipTypeCheck });
       let stats = null;
       let variants = null;
       try {

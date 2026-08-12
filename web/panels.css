@@ -154,7 +154,6 @@ main:has(#logsPanel:not(.collapsed)) #logsPanel {
   font-size: 0.85rem;
   color: var(--ink);
   cursor: pointer;
-  user-select: none;
 }
 
 .options-item input { accent-color: var(--accent); }

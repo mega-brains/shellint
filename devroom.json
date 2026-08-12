@@ -6,7 +6,7 @@
   "port": 8787,
   "compiler": "devroom",
   "minify": {
-    "compress": true,
+    "compress": false,
     "mangle": true,
     "toplevel": true,
     "keepFnames": false,

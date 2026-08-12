@@ -227,7 +227,7 @@ export function Toolbar(props: ToolbarProps) {
             <li role="none">
               <label
                 class="logs-follow menu-check"
-                title="Skip TypeScript type checking during Build"
+                title="Skip TypeScript check during Build"
               >
                 <input
                   type="checkbox"
@@ -238,7 +238,7 @@ export function Toolbar(props: ToolbarProps) {
                   }
                   onClick={(e) => e.stopPropagation()}
                 />
-                skip TypeScript type check
+                skip TypeScript check
               </label>
             </li>
             <li role="none">

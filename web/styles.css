@@ -344,7 +344,7 @@ button.running .btn-progress {
   border: none;
   border-radius: 3px;
   padding: 0.45rem 0.6rem;
-  font-family: var(--mono);
+  font-family: var(--sans-narrow);
   font-size: 0.85rem;
 }
 
@@ -361,6 +361,7 @@ button.running .btn-progress {
 
 .menu .menu-check {
   padding: 0.35rem 0.6rem;
+  font-family: var(--sans-narrow);
   font-size: 0.85rem;
 }
 
