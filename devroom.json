@@ -12,6 +12,11 @@
     "keepFnames": false,
     "logMap": true,
     "debugLogMap": true,
-    "advanced": true
+    "advanced": true,
+    "dropConsole": false,
+    "passes": false,
+    "hoistProps": false,
+    "deviceDCE": false,
+    "internStrings": false
   }
 }

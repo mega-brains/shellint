@@ -91,6 +91,34 @@ test.describe("vanilla UI smoke", () => {
     }
   });
 
+  test("diff modal reports per-side size in chars and bytes", async ({
+    page,
+  }) => {
+    await openApp(page);
+    await page.locator(".artifact-bar").hover();
+    const sel = page.locator("#artifactSel");
+    await expect(sel).toBeVisible();
+    const values = await sel.locator("option").evaluateAll((els) =>
+      els.map((el) => (el as HTMLOptionElement).value),
+    );
+    // Only the side-by-side entry opens the modal; "diff:debug↔prod" renders
+    // inline in the editor and has no head of its own.
+    const diffValue = values.find((v) => v === "diff:side-by-side");
+    if (!diffValue) {
+      test.info().annotations.push({
+        type: "note",
+        description: "no side-by-side diff option — dist not built",
+      });
+      return;
+    }
+    await sel.selectOption(diffValue);
+    const size = /^\d+ ch · \d+ B$/;
+    await expect(page.getByTestId("diff-size-left")).toHaveText(size, {
+      timeout: 10_000,
+    });
+    await expect(page.getByTestId("diff-size-right")).toHaveText(size);
+  });
+
   test("collapsible build panel toggles aria-expanded", async ({ page }) => {
     await openApp(page);
     const panel = page.locator("#buildPanel");
@@ -129,6 +157,28 @@ test.describe("vanilla UI smoke", () => {
     );
     await page.getByTestId("opt-toplevel").click();
     await restore;
+  });
+
+  test("option tip stays inside the viewport on the last option", async ({
+    page,
+  }) => {
+    await openApp(page);
+    await page.locator("#optionsHead").click();
+    await expect(page.locator("#optionsPanel")).not.toHaveClass(/collapsed/);
+
+    // The last option sits lowest, so its tip is the one that can run off the
+    // bottom — the portal host is pointer-events:none, so overflow is unreachable.
+    const items = page.locator("#optionsBody .options-item");
+    await items.last().scrollIntoViewIfNeeded();
+    await items.last().hover();
+
+    const tip = page.getByTestId("opt-tip");
+    await expect(tip).toBeVisible();
+    const box = await tip.boundingBox();
+    const vh = page.viewportSize()?.height ?? 0;
+    expect(box).not.toBeNull();
+    expect(box!.y).toBeGreaterThanOrEqual(0);
+    expect(box!.y + box!.height).toBeLessThanOrEqual(vh);
   });
 
   test("device panel shows mocked mem/cpu; logs show mocked lines", async ({

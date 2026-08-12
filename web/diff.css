@@ -35,6 +35,23 @@
   color: var(--muted);
 }
 
+/* Per-side size of what is being compared — bytes are the device budget. */
+.diff-sizes {
+  margin: 0;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  color: var(--muted);
+  white-space: nowrap;
+}
+
+.diff-sizes-sep {
+  color: var(--line);
+}
+
 .diff-close,
 .diff-layout {
   padding: 0.25rem 0.6rem;

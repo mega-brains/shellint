@@ -1,5 +1,5 @@
 import { expect, test, type Locator, type Page } from "@playwright/test";
-import { mockDeviceApis } from "./helpers/mock-api";
+import { mockBuildApis, mockDeviceApis } from "./helpers/mock-api";
 
 const VOLATILE = [
   "#statusLine",
@@ -17,6 +17,13 @@ const VOLATILE = [
   "#probeProgress",
   // Live /api/config minify flags (smoke can toggle; peek text drifts).
   "#optionsPeek",
+  // Sits at (x≈18, y≈5) — right where a fresh page's un-moved cursor defaults
+  // to — and is a dotted underline plus a 4-direction text-shadow halo on
+  // small monospace text, which is the exact combination CDP/Chromium render
+  // with the least stable subpixel antialiasing. Content is deterministic
+  // (mocked device status + real, unmocked /api/config), only the
+  // rasterization isn't.
+  "#deviceIp",
 ];
 
 /**
@@ -34,6 +41,7 @@ const PIN_SCROLLBARS = `
 
 async function openSettled(page: Page) {
   await mockDeviceApis(page);
+  await mockBuildApis(page);
   await page.addInitScript(() => {
     localStorage.clear();
   });

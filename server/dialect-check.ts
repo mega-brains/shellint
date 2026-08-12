@@ -145,16 +145,20 @@ export function checkDialectSource(
   return { file: fileName, ok, findings };
 }
 
+/** Suffixes of every artifact the build can emit, in ship order. */
+const ARTIFACT_SUFFIXES = ["raw.js", "js", "adv.js"] as const;
+
 export function checkBuildArtifacts(
   modes: Array<"debug" | "prod"> = ["debug", "prod"],
 ): DialectReport[] {
   const reports: DialectReport[] = [];
   for (const mode of modes) {
-    const path = join(DIST_DIR, `${mode}.raw.js`);
-    if (!existsSync(path)) continue;
-    reports.push(
-      checkDialectSource(readFileSync(path, "utf8"), `${mode}.raw.js`),
-    );
+    for (const suffix of ARTIFACT_SUFFIXES) {
+      const fileName = `${mode}.${suffix}`;
+      const path = join(DIST_DIR, fileName);
+      if (!existsSync(path)) continue;
+      reports.push(checkDialectSource(readFileSync(path, "utf8"), fileName));
+    }
   }
   return reports;
 }

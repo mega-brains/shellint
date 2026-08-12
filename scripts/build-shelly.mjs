@@ -21,6 +21,12 @@ import { fileURLToPath } from "node:url";
 import { minify } from "terser";
 import { minifyAdvanced } from "./minify-adv.mjs";
 import { shortenLogStrings } from "./log-shorten.mjs";
+import { internStrings } from "./intern-strings.mjs";
+import {
+  DEFAULT_MINIFY,
+  MINIFY_KEYS,
+  MINIFY_OPTIONS,
+} from "../shared/minify-options.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -31,18 +37,7 @@ const MAIN_TS = path.join(root, "scripts", "main.ts");
 const TSC_OUT_DIR = path.join(root, ".tsc-out");
 const TSC_OUT_JS = path.join(TSC_OUT_DIR, "main.js");
 const DIST_DIR = path.join(root, "dist");
-
-/** Defaults match today's pipeline when `minify` is absent from devroom.json. */
-const DEFAULT_MINIFY = {
-  compress: true,
-  mangle: true,
-  toplevel: false,
-  keepFnames: false,
-  logMap: true,
-  /** Opt-in: also shorten log strings on the debug artifact. */
-  debugLogMap: false,
-  advanced: true,
-};
+const DEVICE_PROFILE_PATH = path.join(root, "types", "device-profile.json");
 
 function loadConfig() {
   if (!existsSync(CONFIG_PATH)) {
@@ -54,7 +49,7 @@ function loadConfig() {
       ? raw.minify
       : {};
   const minify = { ...DEFAULT_MINIFY };
-  for (const key of Object.keys(DEFAULT_MINIFY)) {
+  for (const key of MINIFY_KEYS) {
     if (typeof src[key] === "boolean") minify[key] = src[key];
   }
   return { ...raw, minify };
@@ -64,8 +59,62 @@ function byteLen(s) {
   return Buffer.byteLength(s, "utf8");
 }
 
-/** Apply meta.env literals + DCE only — readable, no mangle. */
-async function envPass(code, { debug, prod }) {
+/**
+ * `meta.device.*` global_defs sourced from `types/device-profile.json`, for
+ * `minify.deviceDCE`. A missing file, unparseable JSON, or a missing field
+ * substitutes *nothing* for that field — feeding `undefined` into
+ * `global_defs` would turn a live branch dead and silently delete working
+ * code, which is worse than leaving `meta.device.x` un-substituted. Absent or
+ * partial coverage prints a build warning and the build continues.
+ * @returns {Record<string, unknown>} zero, one, two, or three `meta.device.*` keys
+ */
+export function deviceGlobalDefs(profilePath = DEVICE_PROFILE_PATH) {
+  if (!existsSync(profilePath)) {
+    console.error(
+      `deviceDCE: ${path.relative(root, profilePath)} is missing (run \`mise run profile\`) — meta.device.* left un-substituted`,
+    );
+    return {};
+  }
+  let profile;
+  try {
+    profile = JSON.parse(readFileSync(profilePath, "utf8"));
+  } catch (err) {
+    console.error(
+      `deviceDCE: ${path.relative(root, profilePath)} is not valid JSON (${err.message}) — meta.device.* left un-substituted`,
+    );
+    return {};
+  }
+
+  /** @type {Record<string, unknown>} */
+  const defs = {};
+  const missing = [];
+  if (typeof profile.gen === "number") {
+    defs["meta.device.gen"] = profile.gen;
+  } else {
+    missing.push("gen");
+  }
+  if (typeof profile.model === "string") {
+    defs["meta.device.model"] = profile.model;
+  } else {
+    missing.push("model");
+  }
+  // device-profile.json's own field is `ver` (firmware version); meta.device.fw
+  // is this build pipeline's name for it.
+  if (typeof profile.ver === "string") {
+    defs["meta.device.fw"] = profile.ver;
+  } else {
+    missing.push("fw (device-profile.json field `ver`)");
+  }
+  if (missing.length) {
+    console.error(
+      `deviceDCE: device profile is missing [${missing.join(", ")}] — left un-substituted for those fields`,
+    );
+  }
+  return defs;
+}
+
+/** Apply meta.env (+ optional meta.device) literals and DCE only — readable, no mangle. */
+export async function envPass(code, { debug, prod }, deviceDefs) {
   const result = await minify(code, {
     compress: {
       defaults: false,
@@ -79,6 +128,7 @@ async function envPass(code, { debug, prod }) {
       global_defs: {
         "meta.env.debug": debug,
         "meta.env.prod": prod,
+        ...deviceDefs,
       },
     },
     mangle: false,
@@ -94,24 +144,54 @@ async function envPass(code, { debug, prod }) {
 }
 
 /**
- * Size minify on already-env-substituted code.
- * Options mirror `devroom.json` `minify.*` Terser knobs.
+ * Resolve the raw `minify.*` config down to what a given build variant should
+ * actually honor, per each option's declared `scope` in
+ * shared/minify-options.mjs. This is the only place `scope` is interpreted —
+ * `minifyPass` and the rest of `buildVariant` just consume the result and
+ * never branch on the variant name themselves.
+ * @param {typeof DEFAULT_MINIFY} minifyOpts
+ * @param {"debug" | "prod"} variantName
+ * @returns {typeof DEFAULT_MINIFY}
  */
-async function minifyPass(code, opts) {
+export function resolveVariantOptions(minifyOpts, variantName) {
+  const out = { ...minifyOpts };
+  for (const opt of MINIFY_OPTIONS) {
+    if (opt.scope === "both") continue;
+    if (opt.scope !== variantName) out[opt.key] = false;
+  }
+  return out;
+}
+
+/**
+ * Size minify on already-env-substituted code.
+ * Options mirror `devroom.json` `minify.*` Terser knobs. `opts` must already
+ * be resolved per-variant (see `resolveVariantOptions`) — this function does
+ * not know or care which variant it's minifying.
+ */
+export async function minifyPass(code, opts) {
   const compress = opts.compress !== false;
   const mangle = opts.mangle !== false;
   const toplevel = !!opts.toplevel;
   const keepFnames = !!opts.keepFnames;
+  const dropConsole = !!opts.dropConsole;
+  const passes = !!opts.passes;
+  const hoistProps = !!opts.hoistProps;
 
+  // ecma: 5 is pinned unconditionally on both compress and format so no
+  // combination of knobs can ever let Terser emit arrows/templates/etc. onto
+  // the device — the post-compile dialect guard (checkBuildArtifacts) then
+  // verifies this held.
   let compressOpt = false;
   if (compress) {
-    if (toplevel || keepFnames) {
-      compressOpt = {};
-      if (toplevel) compressOpt.toplevel = true;
-      if (keepFnames) compressOpt.keep_fnames = true;
-    } else {
-      compressOpt = true;
-    }
+    compressOpt = { ecma: 5 };
+    if (toplevel) compressOpt.toplevel = true;
+    if (keepFnames) compressOpt.keep_fnames = true;
+    // Prod-only by construction: opts is already scope-resolved, so
+    // dropConsole reads as false here on every debug build regardless of
+    // devroom.json — the debug artifact exists to be logged.
+    if (dropConsole) compressOpt.drop_console = true;
+    if (passes) compressOpt.passes = 3;
+    if (hoistProps) compressOpt.hoist_props = true;
   }
 
   let mangleOpt = false;
@@ -129,6 +209,7 @@ async function minifyPass(code, opts) {
     compress: compressOpt,
     mangle: mangleOpt,
     format: {
+      ecma: 5,
       comments: /@meta/,
     },
   });
@@ -152,18 +233,29 @@ function writeLogMap(map) {
  * @param {string} tscJs
  * @param {string} name
  * @param {{ debug: boolean, prod: boolean }} flags
- * @param {typeof DEFAULT_MINIFY} minifyOpts
+ * @param {typeof DEFAULT_MINIFY} minifyOpts raw config, not yet scope-resolved
  * @param {{ sharedIds: Map<string, string>, shorten: boolean }} logMapState
+ * @param {Record<string, unknown>} deviceDefs meta.device.* global_defs (possibly {})
  */
-async function buildVariant(tscJs, name, flags, minifyOpts, logMapState) {
-  let raw = await envPass(tscJs, flags);
+async function buildVariant(tscJs, name, flags, minifyOpts, logMapState, deviceDefs) {
+  const variantOpts = resolveVariantOptions(minifyOpts, name);
+  let raw = await envPass(tscJs, flags, deviceDefs);
   // Log strings cost RAM on device; the log panel re-expands the ids.
   if (logMapState.shorten) {
     const shortened = shortenLogStrings(raw, logMapState.sharedIds);
     raw = shortened.code;
   }
+  // Hoist repeated string literals into top-level vars — after log-shorten
+  // (so already-short log ids fall below break-even naturally) and before
+  // the Terser pass (which mangles the generated var names for free).
+  let interned = { interned: 0, savedBytes: 0 };
+  if (variantOpts.internStrings === true) {
+    const result = internStrings(raw);
+    raw = result.code;
+    interned = { interned: result.interned, savedBytes: result.savedBytes };
+  }
 
-  const min = await minifyPass(raw, minifyOpts);
+  const min = await minifyPass(raw, variantOpts);
   const rawPath = path.join(DIST_DIR, `${name}.raw.js`);
   const minPath = path.join(DIST_DIR, `${name}.js`);
   const advPath = path.join(DIST_DIR, `${name}.adv.js`);
@@ -174,7 +266,7 @@ async function buildVariant(tscJs, name, flags, minifyOpts, logMapState) {
   // can come out larger than tier 2, chained it never does.
   rmSync(advPath, { force: true });
   let adv = { ok: false, reason: "disabled in config" };
-  if (minifyOpts.advanced !== false) {
+  if (variantOpts.advanced !== false) {
     adv = await minifyAdvanced(min);
     if (adv.ok) writeFileSync(advPath, adv.code, "utf8");
   }
@@ -185,6 +277,8 @@ async function buildVariant(tscJs, name, flags, minifyOpts, logMapState) {
     minBytes: byteLen(min),
     advBytes: adv.ok ? byteLen(adv.code) : undefined,
     advSkipped: adv.ok ? undefined : adv.reason,
+    interned: interned.interned,
+    internedBytes: interned.savedBytes,
   };
 }
 
@@ -236,6 +330,11 @@ async function main() {
   const shortenProd = minifyOpts.logMap !== false;
   /** Shared across variants so one dist/prod.logmap.json covers both. */
   const sharedIds = new Map();
+  // Computed once (not per variant): meta.device.* is scope "both", so debug
+  // and prod get identical substitutions. {} is the exact no-op when
+  // deviceDCE is off — no profile read happens at all.
+  const deviceDefs =
+    minifyOpts.deviceDCE === true ? deviceGlobalDefs() : {};
 
   const debug = await buildVariant(
     tscJs,
@@ -243,6 +342,7 @@ async function main() {
     { debug: true, prod: false },
     minifyOpts,
     { sharedIds, shorten: shortenDebug },
+    deviceDefs,
   );
   const prod = await buildVariant(
     tscJs,
@@ -250,6 +350,7 @@ async function main() {
     { debug: false, prod: true },
     minifyOpts,
     { sharedIds, shorten: shortenProd },
+    deviceDefs,
   );
 
   if (shortenDebug || shortenProd) {
@@ -279,9 +380,30 @@ async function main() {
   console.log(
     `dist/prod.raw.js  ${prod.rawBytes} B  dist/prod.js  ${prod.minBytes} B  ${advText(prod)}`,
   );
+
+  if (minifyOpts.internStrings === true) {
+    console.log(
+      `internStrings: debug ${debug.interned} string(s) interned (${debug.internedBytes} B saved), prod ${prod.interned} string(s) interned (${prod.internedBytes} B saved)`,
+    );
+  }
+
+  if (minifyOpts.deviceDCE === true) {
+    const fields = Object.keys(deviceDefs).map((k) => k.split(".")[2]);
+    console.log(
+      fields.length
+        ? `deviceDCE: substituted meta.device.{${fields.join(", ")}} from ${path.relative(root, DEVICE_PROFILE_PATH)} — these artifacts are device-specific (see warnings above for any field left un-substituted)`
+        : `deviceDCE: on, but no meta.device.* field was substituted (see warning above) — artifacts are the same as deviceDCE off`,
+    );
+  }
 }
 
-main().catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+// Guarded so tests can `import` the pure functions above (envPass, minifyPass,
+// resolveVariantOptions, deviceGlobalDefs) without triggering a real build
+// against the live devroom.json as a side effect of the import.
+const isMain = process.argv[1] === fileURLToPath(import.meta.url);
+if (isMain) {
+  main().catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
+}

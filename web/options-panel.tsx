@@ -3,26 +3,15 @@ import type { JSX } from "preact";
 import { Collapsible } from "./collapsible";
 import { api } from "./api";
 import { OPT_TIPS, OptTip, tipStyleFor } from "./option-tip";
+import {
+  DEFAULT_MINIFY,
+  MINIFY_OPTIONS,
+  type MinifyConfig,
+} from "../shared/minify-options.mjs";
 
-export type MinifyOptions = {
-  compress: boolean;
-  mangle: boolean;
-  toplevel: boolean;
-  keepFnames: boolean;
-  logMap: boolean;
-  debugLogMap: boolean;
-  advanced: boolean;
-};
+export type MinifyOptions = MinifyConfig;
 
-const DEFAULTS: MinifyOptions = {
-  compress: true,
-  mangle: true,
-  toplevel: false,
-  keepFnames: false,
-  logMap: true,
-  debugLogMap: false,
-  advanced: true,
-};
+const DEFAULTS: MinifyOptions = { ...DEFAULT_MINIFY };
 
 type OptDef = {
   key: keyof MinifyOptions;
@@ -30,15 +19,15 @@ type OptDef = {
   label: string;
 };
 
-const OPTS: OptDef[] = [
-  { key: "compress", id: "optCompress", label: "compress" },
-  { key: "mangle", id: "optMangle", label: "mangle" },
-  { key: "toplevel", id: "optToplevel", label: "toplevel" },
-  { key: "keepFnames", id: "optKeepFnames", label: "keep fnames" },
-  { key: "logMap", id: "optLogMap", label: "prod log map" },
-  { key: "debugLogMap", id: "optDebugLogMap", label: "debug log map" },
-  { key: "advanced", id: "optAdvanced", label: "advanced minify" },
-];
+/** `optCompress`, `optKeepFnames`, … — derived so the DOM id can't drift from the schema. */
+const idFor = (key: keyof MinifyOptions) =>
+  `opt${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+
+const OPTS: OptDef[] = MINIFY_OPTIONS.map((o) => ({
+  key: o.key,
+  id: idFor(o.key),
+  label: o.label,
+}));
 
 const SAVE_MS = 350;
 

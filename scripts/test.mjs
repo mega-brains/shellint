@@ -28,11 +28,15 @@ function run(cmd, args) {
 
 run("npm", ["run", "build:shelly"]);
 run("npm", ["run", "build:web"]);
+run("node", ["scripts/test-dialect-artifacts.mjs"]);
 run("node", ["--import", "tsx", "scripts/test-dashboard.mjs"]);
 run("node", ["scripts/test-tier3.mjs"]);
 run("node", ["--import", "tsx", "scripts/test-logmap.mjs"]);
 run("node", ["--import", "tsx", "scripts/test-typings.mjs"]);
 run("node", ["--import", "tsx", "scripts/test-probe-catalog.mjs"]);
+run("node", ["--import", "tsx", "scripts/test-minify-options.mjs"]);
+run("node", ["scripts/test-device-minify-options.mjs"]);
+run("node", ["--import", "tsx", "scripts/test-intern-strings.mjs"]);
 run("node", ["scripts/test-web-assets.mjs"]);
 
 for (const f of [

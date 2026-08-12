@@ -186,6 +186,24 @@ function UnifiedTable(props: { rows: Row[] }) {
   );
 }
 
+type SideSize = { chars: number; bytes: number };
+
+/**
+ * Characters are code points, bytes are UTF-8 — they diverge on any non-ASCII
+ * literal (a "✅" in a log string is one character and three bytes), and the
+ * device budget is bytes.
+ */
+function measure(text: string): SideSize {
+  return {
+    chars: Array.from(text).length,
+    bytes: new TextEncoder().encode(text).length,
+  };
+}
+
+function sizeText(s: SideSize): string {
+  return `${s.chars} ch · ${s.bytes} B`;
+}
+
 const LAYOUT_KEY = "shelly-devroom.diff.unified";
 
 function storedUnified(): boolean {
@@ -219,6 +237,9 @@ export function DiffModal(props: DiffModalProps) {
   const [rightId, setRightId] = useState(props.right);
   const [unified, setUnified] = useState(storedUnified);
   const [churn, setChurn] = useState("comparing…");
+  const [sizes, setSizes] = useState<{ left: SideSize; right: SideSize } | null>(
+    null,
+  );
   const [rows, setRows] = useState<Row[]>([]);
   const gen = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -237,6 +258,7 @@ export function DiffModal(props: DiffModalProps) {
     if (!props.open) return;
     const mine = ++gen.current;
     setChurn("comparing…");
+    setSizes(null);
     void (async () => {
       try {
         const texts = await Promise.all([
@@ -244,6 +266,7 @@ export function DiffModal(props: DiffModalProps) {
           props.load(rightId),
         ]);
         if (mine !== gen.current) return;
+        setSizes({ left: measure(texts[0]), right: measure(texts[1]) });
         const next = pair(texts[0].split("\n"), texts[1].split("\n"));
         setRows(next);
         const removed = next.filter((r) => r.changed && r.left).length;
@@ -276,6 +299,17 @@ export function DiffModal(props: DiffModalProps) {
     >
       <div class="diff-head">
         <p class="diff-churn">{churn}</p>
+        <p class="diff-sizes" data-testid="diff-sizes">
+          <span data-testid="diff-size-left">
+            {sizes ? sizeText(sizes.left) : "—"}
+          </span>
+          <span class="diff-sizes-sep" aria-hidden="true">
+            →
+          </span>
+          <span data-testid="diff-size-right">
+            {sizes ? sizeText(sizes.right) : "—"}
+          </span>
+        </p>
         <button
           type="button"
           class="diff-layout"

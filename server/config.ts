@@ -1,24 +1,14 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { ROOT } from "./paths.ts";
+import {
+  DEFAULT_MINIFY,
+  MINIFY_KEYS,
+  type MinifyConfig,
+} from "../shared/minify-options.mjs";
 
-/** Knobs the Shelly build pipeline actually honors today. */
-export type MinifyConfig = {
-  /** Terser `compress` (defaults when true). */
-  compress: boolean;
-  /** Terser `mangle` (locals only — never properties). */
-  mangle: boolean;
-  /** Terser `toplevel` on compress + mangle. */
-  toplevel: boolean;
-  /** Terser `keep_fnames` on compress + mangle (pairs with toplevel). */
-  keepFnames: boolean;
-  /** Prod log-string shortening → `dist/prod.logmap.json`. */
-  logMap: boolean;
-  /** Also shorten log strings on the debug artifact (default off). */
-  debugLogMap: boolean;
-  /** Tier-3 `espruino --minify` → `*.adv.js`. */
-  advanced: boolean;
-};
+export type { MinifyConfig };
+export { DEFAULT_MINIFY };
 
 export type DevroomConfig = {
   deviceIp: string;
@@ -29,16 +19,6 @@ export type DevroomConfig = {
   minify: MinifyConfig;
 };
 
-export const DEFAULT_MINIFY: MinifyConfig = {
-  compress: true,
-  mangle: true,
-  toplevel: false,
-  keepFnames: false,
-  logMap: true,
-  debugLogMap: false,
-  advanced: true,
-};
-
 const DEFAULTS: DevroomConfig = {
   deviceIp: "192.168.1.100",
   scriptId: 1,
@@ -47,16 +27,6 @@ const DEFAULTS: DevroomConfig = {
   compiler: "devroom",
   minify: { ...DEFAULT_MINIFY },
 };
-
-const MINIFY_KEYS = [
-  "compress",
-  "mangle",
-  "toplevel",
-  "keepFnames",
-  "logMap",
-  "debugLogMap",
-  "advanced",
-] as const;
 
 function parseMinify(raw: unknown): MinifyConfig {
   const src =

@@ -167,3 +167,98 @@ export async function mockDeviceApis(page: Page): Promise<void> {
     });
   });
 }
+
+/**
+ * Fixed build sizes / script stats / memory estimate, shared by the
+ * `/api/stats` and `/api/history` mocks below so the two stay consistent
+ * with each other (e.g. log-call and string-byte totals line up).
+ */
+export const mockBuildSizes = {
+  debug: { raw: 9821, min: 3854, adv: 3708 },
+  prod: { raw: 9672, min: 3624, adv: 3624 },
+};
+
+export const mockScriptStats = {
+  apis: {
+    "Shelly.call": 3,
+    "Timer.set": 2,
+    "BLE.Scanner.Start": 1,
+    "HTTPServer.registerEndpoint": 1,
+    "Virtual.getHandle": 2,
+    print: 3,
+  },
+  registrations: {
+    timers: 2,
+    eventHandlers: 1,
+    statusHandlers: 1,
+    httpEndpoints: 1,
+    rpcHandlers: 0,
+  },
+  declarations: { vars: 67, functions: 11, anonFunctions: 2 },
+  literals: { strings: { count: 24, totalBytes: 780 } },
+  logging: { consoleLog: 5, print: 2 },
+  network: { shellyCall: 0 },
+  nesting: { maxAnonymousDepth: 1 },
+};
+
+export const mockMemoryEstimate = {
+  bytes: 10600,
+  breakdown: {
+    strings: 2700,
+    variables: 2400,
+    numbers: 1000,
+    functions: 400,
+    objects: 300,
+    logging: 3800,
+  },
+};
+
+// Short by design: `.stats-summary` is `white-space: pre-wrap` in a narrow
+// sidebar, so a longer reason list wraps onto extra lines and shifts every
+// pixel below it (the check-panel baseline scrolls to the sidebar's bottom).
+export const mockMinFirmware = {
+  version: "1.4.0",
+  reasons: [{ api: "Virtual.getHandle", version: "1.1.0" }],
+};
+
+/**
+ * `/api/stats` and `/api/history` are otherwise left live (see
+ * `mockDeviceApis` above) so most e2e specs exercise the real analyzer
+ * against the real `scripts/main.ts` fixture. But that fixture is a real,
+ * evolving demo script — every edit to it (or every local `mise run build`,
+ * which appends to the on-disk `.devroom/build-history.jsonl`) shifts the
+ * byte counts and memory estimate the dashboard renders, which has nothing
+ * to do with layout or styling. Design baselines need those numbers pinned,
+ * so this mock makes `/api/stats` + `/api/history` authoritative instead of
+ * masking most of the sidebar.
+ */
+export async function mockBuildApis(page: Page): Promise<void> {
+  await page.route("**/api/stats", (route) =>
+    json(route, {
+      ok: true,
+      stats: mockScriptStats,
+      variants: null,
+      estimate: mockMemoryEstimate,
+      minFirmware: mockMinFirmware,
+    }),
+  );
+
+  await page.route("**/api/history**", (route) =>
+    json(route, {
+      ok: true,
+      history: [
+        {
+          ts: "2023-11-14T22:00:00.000Z",
+          sizes: mockBuildSizes,
+          stats: {
+            apiCalls: 12,
+            consoleLog: mockScriptStats.logging.consoleLog,
+            timers: mockScriptStats.registrations.timers,
+            anonNest: mockScriptStats.nesting.maxAnonymousDepth,
+          },
+          memEstimate: mockMemoryEstimate.bytes,
+        },
+      ],
+    }),
+  );
+}

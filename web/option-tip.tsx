@@ -5,6 +5,7 @@ import {
   type JSX,
   type VNode,
 } from "preact";
+import { useLayoutEffect, useRef } from "preact/hooks";
 
 export type OptTipContent = {
   name: string;
@@ -100,6 +101,41 @@ export const OPT_TIPS: Record<string, OptTipContent> = {
     before: ["dist/prod.js"],
     after: ["dist/prod.adv.js"],
   },
+  dropConsole: {
+    name: "drop console",
+    blurb:
+      "Prod only, never debug: Terser deletes every console.* call outright instead of shortening its string. Measured −4.4% on prod. print() calls (including the #m metric channel) are untouched — this only removes console.*.",
+    before: ['console.log("polled status", st);'],
+    after: ["/* dropped */"],
+  },
+  passes: {
+    name: "3 compress passes",
+    blurb:
+      "Run Terser's compress step 3 times instead of once, so later passes can clean up what earlier ones exposed. ~0 on the current demo script, costs 2–3× the Terser wall time — worth trying on larger real scripts.",
+    before: ["1 compress pass"],
+    after: ["3 compress passes"],
+  },
+  hoistProps: {
+    name: "hoist props",
+    blurb:
+      "Terser inlines properties of object literals it can prove never escape the script. Measured 0 B on the current demo — it only pays off on scripts with larger non-escaping config objects.",
+    before: ["var cfg = { a: 1 };", "f(cfg.a);"],
+    after: ["var cfg_a = 1;", "f(cfg_a);"],
+  },
+  deviceDCE: {
+    name: "device DCE",
+    blurb:
+      "Extends the meta.env build-time substitution with meta.device.gen / model / fw, read from types/device-profile.json, so a generation-gated branch is dead-code-eliminated at build time. A missing or partial profile substitutes nothing for that field (never undefined) and prints a build warning. Artifacts become device-specific.",
+    before: ["if (meta.device.gen >= 3) {", "  useMatter();", "}"],
+    after: ["useMatter();"],
+  },
+  internStrings: {
+    name: "intern strings",
+    blurb:
+      "Hoist repeated string literals (RPC method names like Switch.Set) into a top-level var, one per repeat instead of paying for the whole literal each time. Only applied when the math says it saves bytes — skipped on the current demo script (its four repeats are all below break-even), pays off on scripts with more repeated RPC calls.",
+    before: ['Shelly.call("Switch.Set", a);', 'Shelly.call("Switch.Set", b);'],
+    after: ['var V1="Switch.Set";', "Shelly.call(V1, a);", "Shelly.call(V1, b);"],
+  },
 };
 
 export type OptTipProps = {
@@ -109,12 +145,34 @@ export type OptTipProps = {
   open: boolean;
 };
 
+/**
+ * Pull a rendered tip back inside the viewport. `tipStyleFor` runs before the
+ * tip exists, so it can only guess at the height; the last options in the list
+ * sit low enough that a tall tip runs off the bottom, and the portal host is
+ * `pointer-events: none` so there is nothing to scroll. Idempotent — safe to
+ * re-run on every render.
+ */
+export function clampTipTop(el: HTMLElement, gap = 8): void {
+  const vh = window.innerHeight;
+  const height = el.offsetHeight;
+  const top = el.getBoundingClientRect().top;
+  const wanted = Math.max(gap, Math.min(top, vh - gap - height));
+  if (Math.abs(wanted - top) >= 1) el.style.top = `${wanted}px`;
+}
+
 /** Fixed, non-interactive tip card (diff tint via existing .diff-del / .diff-add). */
 export function OptTip(props: OptTipProps) {
+  const ref = useRef<HTMLDivElement | null>(null);
+  // No dep array: content and anchor both change without the node remounting.
+  useLayoutEffect(() => {
+    if (ref.current) clampTipTop(ref.current);
+  });
+
   if (!props.open) return null;
   return (
     <BodyPortal>
       <div
+        ref={ref}
         class="opt-tip"
         style={props.style}
         role="tooltip"
@@ -155,11 +213,16 @@ export function tipStyleFor(anchor: DOMRect, tipW = 288): JSX.CSSProperties {
   let left = anchor.left - width - gap;
   if (left + width > maxRight) left = maxRight - width;
 
+  // Height is unknown until the tip renders — cap it here, then `clampTipTop`
+  // pulls the box up once the real height is measurable.
+  const maxHeight = Math.max(120, window.innerHeight - gap * 2);
+
   if (left >= gap) {
     return {
       top: Math.max(gap, anchor.top - 4),
       left,
       width,
+      maxHeight,
     };
   }
 
@@ -168,5 +231,6 @@ export function tipStyleFor(anchor: DOMRect, tipW = 288): JSX.CSSProperties {
     top: anchor.bottom + gap,
     left: Math.max(gap, Math.min(anchor.left, maxRight - width)),
     width: Math.min(width, Math.max(160, maxRight - gap)),
+    maxHeight,
   };
 }
