@@ -1,6 +1,7 @@
 import { RangeSet, StateEffect, StateField, type Extension } from "@codemirror/state";
 import { EditorView, GutterMarker, gutter } from "@codemirror/view";
 import { diffLines } from "./diff";
+import { cmHost, cmRender } from "./cm-host";
 
 /**
  * What changed since the last save, marked beside the line numbers, with each
@@ -79,35 +80,32 @@ function clip(text: string): string {
   );
 }
 
-function block(label: string, text: string, cls: string): HTMLElement {
-  const wrap = document.createElement("div");
-  wrap.className = "cm-dirty-tip-block";
-  const head = document.createElement("p");
-  head.className = "cm-dirty-tip-label";
-  head.textContent = label;
-  const pre = document.createElement("pre");
-  pre.className = `cm-dirty-tip-code ${cls}`;
-  pre.textContent = clip(text);
-  wrap.append(head, pre);
-  return wrap;
+function TipBlock(props: { label: string; text: string; cls: string }) {
+  return (
+    <div class="cm-dirty-tip-block">
+      <p class="cm-dirty-tip-label">{props.label}</p>
+      <pre class={`cm-dirty-tip-code ${props.cls}`}>{clip(props.text)}</pre>
+    </div>
+  );
 }
 
 function showTip(anchor: HTMLElement, hint: string, preview: Preview): void {
   if (!tip) {
-    tip = document.createElement("div");
-    tip.className = "cm-dirty-tip";
+    tip = cmHost("div", { class: "cm-dirty-tip", hidden: true });
     document.body.appendChild(tip);
   }
-  const head = document.createElement("p");
-  head.className = "cm-dirty-tip-head";
-  head.textContent = `${hint} · click to revert`;
-  tip.replaceChildren(head);
-  if (preview.current) {
-    tip.appendChild(block("now", preview.current, "cm-dirty-tip-now"));
-  }
-  if (preview.saved) {
-    tip.appendChild(block("saved", preview.saved, "cm-dirty-tip-saved"));
-  }
+  cmRender(
+    tip,
+    <>
+      <p class="cm-dirty-tip-head">{hint} · click to revert</p>
+      {preview.current ? (
+        <TipBlock label="now" text={preview.current} cls="cm-dirty-tip-now" />
+      ) : null}
+      {preview.saved ? (
+        <TipBlock label="saved" text={preview.saved} cls="cm-dirty-tip-saved" />
+      ) : null}
+    </>,
+  );
 
   const rect = anchor.getBoundingClientRect();
   tip.hidden = false;
@@ -132,10 +130,11 @@ class DirtyMarker extends GutterMarker {
   }
 
   override toDOM(): Node {
-    const span = document.createElement("span");
-    span.className = `cm-dirty cm-dirty-${this.kind}`;
-    span.textContent = this.kind === "del" ? "▔" : "▍";
-    span.setAttribute("aria-label", `${this.hint} since the last save`);
+    const span = cmHost("span", {
+      class: `cm-dirty cm-dirty-${this.kind}`,
+      "aria-label": `${this.hint} since the last save`,
+      children: this.kind === "del" ? "▔" : "▍",
+    });
     const { hint, preview } = this;
     span.addEventListener("mouseenter", () => showTip(span, hint, preview));
     span.addEventListener("mouseleave", hideTip);

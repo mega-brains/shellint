@@ -274,6 +274,43 @@ main:has(#logsPanel:not(.collapsed)) #logsPanel {
 
 .eco input { accent-color: var(--accent); }
 
+.device-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+
+.device-actions .eco { margin-left: 0; }
+
+.device-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.device-menu-btn {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  padding: 0.15rem 0.45rem;
+  min-width: 1.75rem;
+  border-radius: 4px;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.device-menu-btn:hover:not(:disabled) {
+  background: #e7efe9;
+  filter: none;
+}
+
+.device-menu .menu {
+  left: auto;
+  right: 0;
+  min-width: 10rem;
+}
+
 .device-grid {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));

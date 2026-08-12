@@ -40,8 +40,12 @@ run = "npm run check:lines"
 description = "Shelly DCE/minify asserts + web bundle + server smoke"
 run = "npm run test"
 
+[tasks."test:e2e"]
+description = "Playwright e2e (Chromium) against local DevRoom UI"
+run = "npm run test:e2e"
+
 [tasks.beforeCommit]
-description = "Pre-commit gate: line limit, typecheck, build, test"
+description = "Pre-commit gate: line limit, typecheck, build, test, e2e"
 run = "npm run beforeCommit"
 
 [tasks.probe]

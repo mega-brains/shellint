@@ -1,6 +1,7 @@
 import { RangeSet, StateEffect, StateField, type Extension } from "@codemirror/state";
 import { EditorView, GutterMarker, gutter } from "@codemirror/view";
-import type { Finding } from "./check-panel";
+import type { Finding } from "./check-types";
+import { cmHost, cmRender } from "./cm-host";
 
 /**
  * Check findings as markers beside the line numbers. Which findings belong to
@@ -12,13 +13,11 @@ export const FINDINGS_EVENT = "devroom:findings";
 const setFindings = StateEffect.define<Finding[]>();
 
 /** One shared tip — native `title` lags; this shows on pointerenter. */
-let tipEl: HTMLDivElement | null = null;
+let tipEl: HTMLElement | null = null;
 
-function tipHost(): HTMLDivElement {
+function tipHost(): HTMLElement {
   if (!tipEl) {
-    tipEl = document.createElement("div");
-    tipEl.className = "cm-finding-tip";
-    tipEl.hidden = true;
+    tipEl = cmHost("div", { class: "cm-finding-tip", hidden: true });
     document.body.appendChild(tipEl);
   }
   return tipEl;
@@ -30,7 +29,7 @@ function hideTip(): void {
 
 function showTip(anchor: HTMLElement, text: string, severity: Finding["severity"]): void {
   const el = tipHost();
-  el.textContent = text;
+  cmRender(el, text);
   el.classList.toggle("cm-finding-tip-error", severity === "error");
   el.hidden = false;
   const r = anchor.getBoundingClientRect();
@@ -48,10 +47,11 @@ class FindingMarker extends GutterMarker {
   }
 
   override toDOM(): Node {
-    const span = document.createElement("span");
-    span.className = `cm-finding cm-finding-${this.severity}`;
-    span.textContent = this.severity === "error" ? "✕" : "⚠";
-    span.setAttribute("aria-label", this.detail);
+    const span = cmHost("span", {
+      class: `cm-finding cm-finding-${this.severity}`,
+      "aria-label": this.detail,
+      children: this.severity === "error" ? "✕" : "⚠",
+    });
     if (this.detail) {
       span.addEventListener("pointerenter", () => {
         showTip(span, this.detail, this.severity);

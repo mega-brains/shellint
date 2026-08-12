@@ -1,9 +1,4 @@
-export type SplitterEls = {
-  /** Flex container holding the panel, the handle and whatever it trades with. */
-  root: HTMLElement;
-  handle: HTMLElement;
-  panel: HTMLElement;
-};
+import { useEffect, useRef } from "preact/hooks";
 
 export type SplitterOptions = {
   storageKey: string;
@@ -40,89 +35,115 @@ function writeWidth(key: string, px: number | null) {
 }
 
 /**
- * Drag (or arrow-key) the handle to trade width between the editor and the
- * side panel; double-click drops back to the stylesheet default.
+ * Drag (or arrow-key) the handle to trade size between the panel and its peer.
+ * Attaches listeners to refs — layout chrome stays declarative Preact.
  */
-export function createSplitter(els: SplitterEls, opts: SplitterOptions) {
-  const { root, handle, panel } = els;
-  const vertical = opts.axis === "y";
+export function useSplitter(
+  rootRef: { current: HTMLElement | null },
+  handleRef: { current: HTMLElement | null },
+  panelRef: { current: HTMLElement | null },
+  opts: SplitterOptions,
+) {
+  const optsRef = useRef(opts);
+  optsRef.current = opts;
 
-  /** The panel's own extent along the dragged axis. */
-  function panelSize(): number {
-    const rect = panel.getBoundingClientRect();
-    return vertical ? rect.height : rect.width;
-  }
+  useEffect(() => {
+    const root = rootRef.current;
+    const handle = handleRef.current;
+    const panel = panelRef.current;
+    if (!root || !handle || !panel) return;
 
-  function clamp(px: number): number {
-    const total = vertical ? root.clientHeight : root.clientWidth;
-    const handleSize = vertical ? handle.offsetHeight : handle.offsetWidth;
-    const room = total - handleSize - opts.minEditor;
-    return Math.min(Math.max(px, opts.minPanel), Math.max(opts.minPanel, room));
-  }
+    const vertical = optsRef.current.axis === "y";
 
-  function apply(px: number | null) {
-    if (px === null) root.style.removeProperty(opts.cssVar);
-    else root.style.setProperty(opts.cssVar, `${Math.round(px)}px`);
-    if (opts.sizedClass) root.classList.toggle(opts.sizedClass, px !== null);
-    handle.setAttribute("aria-valuenow", String(Math.round(panelSize())));
-    opts.onResize?.();
-  }
+    function panelSize(): number {
+      const rect = panel!.getBoundingClientRect();
+      return vertical ? rect.height : rect.width;
+    }
 
-  function set(px: number | null) {
-    const next = px === null ? null : clamp(px);
-    apply(next);
-    writeWidth(opts.storageKey, next);
-  }
+    function clamp(px: number): number {
+      const o = optsRef.current;
+      const total = vertical ? root!.clientHeight : root!.clientWidth;
+      const handleSize = vertical ? handle!.offsetHeight : handle!.offsetWidth;
+      const room = total - handleSize - o.minEditor;
+      return Math.min(Math.max(px, o.minPanel), Math.max(o.minPanel, room));
+    }
 
-  handle.addEventListener("pointerdown", (e) => {
-    // Only the primary button drags; keep context menus and middle-click alone.
-    if (e.button !== 0) return;
-    e.preventDefault();
-    handle.setPointerCapture(e.pointerId);
-    handle.classList.add("dragging");
-    document.body.classList.add(vertical ? "row-resizing" : "col-resizing");
-  });
+    function apply(px: number | null) {
+      const o = optsRef.current;
+      if (px === null) root!.style.removeProperty(o.cssVar);
+      else root!.style.setProperty(o.cssVar, `${Math.round(px)}px`);
+      if (o.sizedClass) root!.classList.toggle(o.sizedClass, px !== null);
+      handle!.setAttribute("aria-valuenow", String(Math.round(panelSize())));
+      o.onResize?.();
+    }
 
-  handle.addEventListener("pointermove", (e) => {
-    if (!handle.hasPointerCapture(e.pointerId)) return;
-    const box = root.getBoundingClientRect();
-    // The horizontal panel sits at the top, the vertical one on the right, so
-    // each measures from the edge it is anchored to.
-    apply(clamp(vertical ? e.clientY - box.top : box.right - e.clientX));
-  });
+    function set(px: number | null) {
+      const next = px === null ? null : clamp(px);
+      apply(next);
+      writeWidth(optsRef.current.storageKey, next);
+    }
 
-  function endDrag(e: PointerEvent) {
-    if (!handle.hasPointerCapture(e.pointerId)) return;
-    handle.releasePointerCapture(e.pointerId);
-    handle.classList.remove("dragging");
-    document.body.classList.remove(vertical ? "row-resizing" : "col-resizing");
-    set(panelSize());
-  }
+    const onPointerDown = (e: PointerEvent) => {
+      if (e.button !== 0) return;
+      e.preventDefault();
+      handle!.setPointerCapture(e.pointerId);
+      handle!.classList.add("dragging");
+      document.body.classList.add(vertical ? "row-resizing" : "col-resizing");
+    };
 
-  handle.addEventListener("pointerup", endDrag);
-  handle.addEventListener("pointercancel", endDrag);
+    const onPointerMove = (e: PointerEvent) => {
+      if (!handle!.hasPointerCapture(e.pointerId)) return;
+      const box = root!.getBoundingClientRect();
+      apply(clamp(vertical ? e.clientY - box.top : box.right - e.clientX));
+    };
 
-  handle.addEventListener("dblclick", () => set(null));
+    const endDrag = (e: PointerEvent) => {
+      if (!handle!.hasPointerCapture(e.pointerId)) return;
+      handle!.releasePointerCapture(e.pointerId);
+      handle!.classList.remove("dragging");
+      document.body.classList.remove(
+        vertical ? "row-resizing" : "col-resizing",
+      );
+      set(panelSize());
+    };
 
-  handle.addEventListener("keydown", (e) => {
-    const step = e.shiftKey ? 48 : 16;
-    const size = panelSize();
-    const grow = vertical ? "ArrowDown" : "ArrowLeft";
-    const shrink = vertical ? "ArrowUp" : "ArrowRight";
-    if (e.key === grow) set(size + step);
-    else if (e.key === shrink) set(size - step);
-    else if (e.key === "Home" || e.key === "End") set(null);
-    else return;
-    e.preventDefault();
-  });
+    const onDblClick = () => set(null);
 
-  // A stored width can outgrow a smaller window, so re-clamp on resize.
-  window.addEventListener("resize", () => {
-    const stored = readWidth(opts.storageKey);
-    if (stored !== null) apply(clamp(stored));
-  });
+    const onKeyDown = (e: KeyboardEvent) => {
+      const step = e.shiftKey ? 48 : 16;
+      const size = panelSize();
+      const grow = vertical ? "ArrowDown" : "ArrowLeft";
+      const shrink = vertical ? "ArrowUp" : "ArrowRight";
+      if (e.key === grow) set(size + step);
+      else if (e.key === shrink) set(size - step);
+      else if (e.key === "Home" || e.key === "End") set(null);
+      else return;
+      e.preventDefault();
+    };
 
-  apply(readWidth(opts.storageKey));
+    const onResize = () => {
+      const stored = readWidth(optsRef.current.storageKey);
+      if (stored !== null) apply(clamp(stored));
+    };
 
-  return { set };
+    handle.addEventListener("pointerdown", onPointerDown);
+    handle.addEventListener("pointermove", onPointerMove);
+    handle.addEventListener("pointerup", endDrag);
+    handle.addEventListener("pointercancel", endDrag);
+    handle.addEventListener("dblclick", onDblClick);
+    handle.addEventListener("keydown", onKeyDown);
+    window.addEventListener("resize", onResize);
+
+    apply(readWidth(optsRef.current.storageKey));
+
+    return () => {
+      handle.removeEventListener("pointerdown", onPointerDown);
+      handle.removeEventListener("pointermove", onPointerMove);
+      handle.removeEventListener("pointerup", endDrag);
+      handle.removeEventListener("pointercancel", endDrag);
+      handle.removeEventListener("dblclick", onDblClick);
+      handle.removeEventListener("keydown", onKeyDown);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [rootRef, handleRef, panelRef]);
 }

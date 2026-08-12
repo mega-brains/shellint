@@ -8,7 +8,9 @@
     "skipLibCheck": true,
     "resolveJsonModule": true,
     "lib": ["ES2020", "DOM", "DOM.Iterable"],
-    "allowImportingTsExtensions": false
+    "allowImportingTsExtensions": false,
+    "jsx": "react-jsx",
+    "jsxImportSource": "preact"
   },
-  "include": ["web/**/*.ts"]
+  "include": ["web/**/*.ts", "web/**/*.tsx"]
 }

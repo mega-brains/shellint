@@ -12,34 +12,25 @@ import {
   type LineHighlight,
 } from "./line-highlight";
 import { showDiffTint, unifiedDiff } from "./diff";
-import { openDiffModal } from "./diff-modal";
 import { suspendDirty } from "./dirty-gutter";
 import type { Finding } from "./check-panel";
+import type { DiffOption } from "./diff-modal";
 
 export type ArtifactInfo = { name: string; bytes: number; mtime: string };
+export type ArtifactOption = { value: string; label: string };
 
 type ApiFn = <T>(
   path: string,
   init?: RequestInit,
 ) => Promise<T & { ok: boolean; error?: string }>;
 
-/** Editor value that means "the editable source buffer", not an artifact. */
 const SOURCE = "source";
-
-/**
- * What `meta.env` gating actually removed, as a diff in the same selector. The
- * readable artifacts are the only pair worth diffing — the minified ones are a
- * single line each, so their diff says nothing a byte count does not.
- */
 const DIFF = "diff:debug↔prod";
-/** Same pair, but two columns in a modal instead of one buffer in the editor. */
 const DIFF_SIDE = "diff:side-by-side";
-/** What the compiler did to the code in the editor, TypeScript against ES5. */
 const DIFF_SRC = "diff:source-vs-prod";
 const DIFF_LEFT = "debug.raw.js";
 const DIFF_RIGHT = "prod.raw.js";
 
-/** Swapped between editable and read-only; main.ts seeds it empty. */
 export const readOnlyCompartment = new Compartment();
 
 const READ_ONLY = [
@@ -47,35 +38,41 @@ const READ_ONLY = [
   EditorView.editable.of(false),
 ];
 
+export type ArtifactController = {
+  refresh: () => Promise<void>;
+  previewing: () => boolean;
+  select: (name: string) => void;
+  loadDiff: (id: string) => Promise<string>;
+  dispose: () => void;
+};
+
 /**
- * Previews the built dist artifacts in the editor, read-only. Owns its element
- * lookups so main.ts stays inside the 500-line source cap.
+ * Previews built dist artifacts in the editor (read-only). UI chrome is owned
+ * by Preact; this controller only mutates the CodeMirror doc and reports state.
  */
-export function createArtifactView(opts: {
+export function createArtifactController(opts: {
   view: EditorView;
   api: ApiFn;
   onStatus: (msg: string, isError?: boolean) => void;
-  /** Fires after entering or leaving preview, so the host can sync buttons. */
   onPreview: () => void;
-}) {
-  const select = document.getElementById("artifactSel") as HTMLSelectElement;
-  const meta = document.getElementById("artifactMeta")!;
-
-  /** What the editor currently shows: SOURCE, or an artifact name. */
+  onMeta: (text: string, previewing: boolean) => void;
+  onOptions: (options: ArtifactOption[], current: string) => void;
+  onDiff: (spec: {
+    options: DiffOption[];
+    left: string;
+    right: string;
+  }) => void;
+}): ArtifactController {
   let current = SOURCE;
-  /** Last check run, kept so switching files re-marks the new buffer. */
   let findings: Finding[] = [];
-  /** The editable buffer — unsaved edits included — parked during a preview. */
   let sourceDoc: string | null = null;
-  /** Last artifact listing, so the diff modal can offer every built version. */
   let known: ArtifactInfo[] = [];
+  let disposed = false;
 
   function setMeta(text: string, previewing: boolean) {
-    meta.textContent = text;
-    meta.classList.toggle("preview", previewing);
+    opts.onMeta(text, previewing);
   }
 
-  /** A finding belongs to the buffer on screen, or it is not shown at all. */
   function markFindings() {
     const file = current === SOURCE ? "scripts/main.ts" : `dist/${current}`;
     showFindings(
@@ -91,39 +88,42 @@ export function createArtifactView(opts: {
     });
     opts.view.dom.classList.toggle("preview", readOnly);
     markFindings();
-    // Badge lines belong to the buffer they were counted in, not this one.
     highlightLines(opts.view, []);
     showDiffTint(opts.view, false);
     suspendDirty(opts.view, readOnly);
   }
 
   function restoreSource() {
-    // Fall back to what is on screen only if nothing was ever parked.
     const doc = sourceDoc ?? opts.view.state.doc.toString();
     sourceDoc = null;
     current = SOURCE;
     setDoc(doc, false);
-    select.value = SOURCE;
+    publishOptions();
     setMeta("", false);
     opts.onPreview();
     opts.onStatus("editing scripts/main.ts");
   }
 
-  function renderOptions(list: ArtifactInfo[]) {
-    known = list;
-    select.replaceChildren(new Option("source (editable)", SOURCE));
+  function buildOptions(list: ArtifactInfo[]): ArtifactOption[] {
+    const out: ArtifactOption[] = [
+      { value: SOURCE, label: "source (editable)" },
+    ];
     for (const a of list) {
-      select.append(new Option(`${a.name} · ${a.bytes} B`, a.name));
+      out.push({ value: a.name, label: `${a.name} · ${a.bytes} B` });
     }
     const has = (name: string) => list.some((a) => a.name === name);
     if (has(DIFF_LEFT) && has(DIFF_RIGHT)) {
-      select.append(new Option(`diff · debug ↔ prod (raw)`, DIFF));
-      select.append(new Option(`diff · side by side ⤢`, DIFF_SIDE));
+      out.push({ value: DIFF, label: "diff · debug ↔ prod (raw)" });
+      out.push({ value: DIFF_SIDE, label: "diff · side by side ⤢" });
     }
     if (has(DIFF_RIGHT)) {
-      select.append(new Option(`diff · source ↔ prod.raw ⤢`, DIFF_SRC));
+      out.push({ value: DIFF_SRC, label: "diff · source ↔ prod.raw ⤢" });
     }
-    select.value = current;
+    return out;
+  }
+
+  function publishOptions() {
+    opts.onOptions(buildOptions(known), current);
   }
 
   async function fetchArtifact(name: string) {
@@ -132,7 +132,6 @@ export function createArtifactView(opts: {
     );
   }
 
-  /** Both artifacts, diffed in the browser — the server has no diff endpoint. */
   async function showDiff() {
     const [left, right] = await Promise.all([
       fetchArtifact(DIFF_LEFT),
@@ -143,7 +142,7 @@ export function createArtifactView(opts: {
     current = DIFF;
     setDoc(diff.text, true);
     showDiffTint(opts.view, true);
-    select.value = DIFF;
+    publishOptions();
     const churn = `+${diff.added} −${diff.removed}`;
     setMeta(`${DIFF_LEFT} → ${DIFF_RIGHT} · ${churn}`, true);
     opts.onPreview();
@@ -152,39 +151,28 @@ export function createArtifactView(opts: {
     );
   }
 
-  /**
-   * The editable buffer, unsaved edits included, since that is the code the
-   * user is reasoning about rather than whatever was last written to disk.
-   */
   function sourceText(): string {
     return current === SOURCE
       ? opts.view.state.doc.toString()
       : (sourceDoc ?? "");
   }
 
-  /**
-   * A popup, not a buffer: what the editor shows is left exactly as it was.
-   * Both sides are pickable inside it, so this only chooses where to start.
-   */
   function openSideBySide(left: string, right: string) {
-    openDiffModal({
+    opts.onDiff({
       options: [
         { id: SOURCE, label: "scripts/main.ts (editor)" },
         ...known.map((a) => ({ id: a.name, label: `dist/${a.name}` })),
       ],
       left,
       right,
-      load: async (id) =>
-        id === SOURCE ? sourceText() : (await fetchArtifact(id)).code,
     });
-    select.value = current;
+    publishOptions();
     opts.onStatus(`side-by-side diff ${left} → ${right}`);
   }
 
   async function show(name: string, force = false) {
     if (name === current && !force) return;
     if (name === SOURCE) return restoreSource();
-    select.disabled = true;
     try {
       if (name === DIFF_SRC) return openSideBySide(SOURCE, DIFF_RIGHT);
       if (name === DIFF_SIDE) return openSideBySide(DIFF_LEFT, DIFF_RIGHT);
@@ -194,24 +182,19 @@ export function createArtifactView(opts: {
         bytes: number;
         code: string;
       }>(`/api/artifact?name=${encodeURIComponent(name)}`);
-      // Park the source only once the artifact is in hand, so a failed fetch
-      // can never cost the user unsaved edits.
       if (current === SOURCE) sourceDoc = opts.view.state.doc.toString();
       current = name;
       setDoc(data.code, true);
-      select.value = name;
+      publishOptions();
       setMeta(`dist/${data.name} · ${data.bytes} B · generated`, true);
       opts.onPreview();
       opts.onStatus(`preview dist/${data.name} — build output, read-only`);
     } catch (e) {
-      select.value = current;
+      publishOptions();
       opts.onStatus(e instanceof Error ? e.message : String(e), true);
-    } finally {
-      select.disabled = false;
     }
   }
 
-  /** Re-reads the artifact list, and the previewed artifact, after a build. */
   async function refresh() {
     let list: ArtifactInfo[];
     try {
@@ -223,7 +206,8 @@ export function createArtifactView(opts: {
       if (current === SOURCE) setMeta("artifact list unavailable", false);
       return;
     }
-    renderOptions(list);
+    known = list;
+    publishOptions();
     if (current === SOURCE) {
       setMeta(list.length ? "" : "no build artifacts yet", false);
       return;
@@ -237,11 +221,6 @@ export function createArtifactView(opts: {
     restoreSource();
   }
 
-  /**
-   * A finding points at a file the editor may not be showing: dialect findings
-   * live in a built artifact, lint findings in the source. Switch first, then
-   * jump, so the line number always refers to what is on screen.
-   */
   async function locate({ file, line }: FindingLocation) {
     const name = file.startsWith("dist/") ? file.slice("dist/".length) : SOURCE;
     try {
@@ -252,7 +231,6 @@ export function createArtifactView(opts: {
     revealLine(opts.view, line);
   }
 
-  /** A badge click: same switch-then-show dance as a finding, many lines. */
   async function locateLines({ file, lines, reveal = true }: LineHighlight) {
     if (!lines.length) {
       highlightLines(opts.view, []);
@@ -266,22 +244,39 @@ export function createArtifactView(opts: {
     }
     highlightLines(opts.view, lines);
     if (!reveal) return;
-    const first = Math.min(...lines);
-    revealLine(opts.view, first);
+    revealLine(opts.view, Math.min(...lines));
   }
 
-  select.addEventListener("change", () => void show(select.value));
-  document.addEventListener(SHOW_FILE_EVENT, (e) => {
+  const onShowFile = (e: Event) => {
     void locate((e as CustomEvent<FindingLocation>).detail);
-  });
-  document.addEventListener(HIGHLIGHT_LINES_EVENT, (e) => {
+  };
+  const onHighlight = (e: Event) => {
     void locateLines((e as CustomEvent<LineHighlight>).detail);
-  });
-  document.addEventListener(FINDINGS_EVENT, (e) => {
+  };
+  const onFindings = (e: Event) => {
     findings = (e as CustomEvent<Finding[]>).detail;
     markFindings();
-  });
+  };
+
+  document.addEventListener(SHOW_FILE_EVENT, onShowFile);
+  document.addEventListener(HIGHLIGHT_LINES_EVENT, onHighlight);
+  document.addEventListener(FINDINGS_EVENT, onFindings);
   void refresh();
 
-  return { refresh, previewing: () => current !== SOURCE };
+  return {
+    refresh,
+    previewing: () => current !== SOURCE,
+    select: (name: string) => {
+      void show(name);
+    },
+    loadDiff: async (id: string) =>
+      id === SOURCE ? sourceText() : (await fetchArtifact(id)).code,
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      document.removeEventListener(SHOW_FILE_EVENT, onShowFile);
+      document.removeEventListener(HIGHLIGHT_LINES_EVENT, onHighlight);
+      document.removeEventListener(FINDINGS_EVENT, onFindings);
+    },
+  };
 }

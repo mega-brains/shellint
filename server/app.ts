@@ -13,6 +13,7 @@ import { deploy, AuthNotSupportedError } from "./deploy.ts";
 import { runProbe, getProbeProgress } from "./probe.ts";
 import {
   fetchDeviceStatus,
+  rebootDevice,
   setEcoMode,
   setScriptRunning,
 } from "./device-status.ts";
@@ -340,6 +341,25 @@ export function createApp() {
     try {
       const result = await setEcoMode(body.eco_mode);
       return c.json({ ok: true, ...result });
+    } catch (e) {
+      if (e instanceof AuthNotSupportedError) {
+        return c.json({ ok: false, error: "auth not supported yet" }, 401);
+      }
+      if (e instanceof CompilerNotWiredError) {
+        return c.json({ ok: false, error: e.message }, 400);
+      }
+      return c.json(
+        { ok: false, error: e instanceof Error ? e.message : String(e) },
+        500,
+      );
+    }
+  });
+
+  /** Soft reboot — `Shelly.Reboot`, not factory reset. */
+  app.post("/api/device/reboot", async (c) => {
+    try {
+      await rebootDevice();
+      return c.json({ ok: true });
     } catch (e) {
       if (e instanceof AuthNotSupportedError) {
         return c.json({ ok: false, error: "auth not supported yet" }, 401);

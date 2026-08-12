@@ -102,18 +102,6 @@ if (same("dist/debug.raw.js", "dist/debug.js")) {
   }
 }
 
-// The UI wires itself by id, so a renamed element fails only at runtime.
-{
-  const html = readFileSync(join(ROOT, "web", "index.html"), "utf8");
-  const ids = new Set([...html.matchAll(/\bid="([^"]+)"/g)].map((m) => m[1]));
-  for (const file of readdirSync(join(ROOT, "web")).filter((f) => f.endsWith(".ts"))) {
-    const src = readFileSync(join(ROOT, "web", file), "utf8");
-    for (const m of src.matchAll(/getElementById\("([^"]+)"\)/g)) {
-      if (!ids.has(m[1])) fail(`web/${file} looks up #${m[1]}, absent from web/index.html`);
-    }
-  }
-}
-
 const smoke = spawnSync(
   "node",
   [

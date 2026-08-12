@@ -1,5 +1,6 @@
 import { RangeSet, StateEffect, StateField, type Extension } from "@codemirror/state";
 import { Decoration, EditorView, GutterMarker, gutter, type DecorationSet } from "@codemirror/view";
+import { cmHost } from "./cm-host";
 
 /** One `tsc` diagnostic, 1-indexed line/col as reported on the CLI. */
 export type BuildError = {
@@ -33,12 +34,12 @@ class BuildErrorMarker extends GutterMarker {
   }
 
   override toDOM(): Node {
-    const span = document.createElement("span");
-    span.className = "cm-build-error-marker";
-    span.textContent = "✕";
-    span.setAttribute("aria-label", this.detail);
-    span.title = this.detail;
-    return span;
+    return cmHost("span", {
+      class: "cm-build-error-marker",
+      "aria-label": this.detail,
+      title: this.detail,
+      children: "✕",
+    });
   }
 }
 

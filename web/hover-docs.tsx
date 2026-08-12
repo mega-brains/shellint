@@ -5,6 +5,7 @@
  */
 import { hoverTooltip, type Tooltip } from "@codemirror/view";
 import apiDocs from "../types/api-docs.json";
+import { cmHost } from "./cm-host";
 
 interface DocEntry {
   signature: string;
@@ -44,6 +45,26 @@ function lookup(lineText: string, word: { from: number; to: number; text: string
   return viaBare ? (docs.entries[viaBare] ?? null) : null;
 }
 
+function HoverBody(props: { entry: DocEntry }) {
+  const { entry } = props;
+  return (
+    <>
+      <code class="cm-shelly-hover-sig">{entry.signature}</code>
+      {entry.doc ? <div class="cm-shelly-hover-doc">{entry.doc}</div> : null}
+      {entry.doc_url ? (
+        <a
+          class="cm-shelly-hover-link"
+          href={entry.doc_url}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          docs ↗
+        </a>
+      ) : null}
+    </>
+  );
+}
+
 export const shellyHover = hoverTooltip((view, pos): Tooltip | null => {
   const line = view.state.doc.lineAt(pos);
   const word = wordAt(line.text, pos - line.from);
@@ -57,32 +78,12 @@ export const shellyHover = hoverTooltip((view, pos): Tooltip | null => {
     end: line.from + word.to,
     above: true,
     create() {
-      const dom = document.createElement("div");
-      dom.className = "cm-shelly-hover";
-
-      const sig = document.createElement("code");
-      sig.className = "cm-shelly-hover-sig";
-      sig.textContent = entry.signature;
-      dom.appendChild(sig);
-
-      if (entry.doc) {
-        const doc = document.createElement("div");
-        doc.className = "cm-shelly-hover-doc";
-        doc.textContent = entry.doc;
-        dom.appendChild(doc);
-      }
-
-      if (entry.doc_url) {
-        const link = document.createElement("a");
-        link.className = "cm-shelly-hover-link";
-        link.href = entry.doc_url;
-        link.target = "_blank";
-        link.rel = "noopener noreferrer";
-        link.textContent = "docs ↗";
-        dom.appendChild(link);
-      }
-
-      return { dom };
+      return {
+        dom: cmHost("div", {
+          class: "cm-shelly-hover",
+          children: <HoverBody entry={entry} />,
+        }),
+      };
     },
   };
 });

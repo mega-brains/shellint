@@ -1,4 +1,6 @@
+import { useState } from "preact/hooks";
 import { HIGHLIGHT_LINES_EVENT, type LineHighlight } from "./line-highlight";
+import type { StatSites } from "./stats-model";
 
 /** Uncapped script counters as a tile grid — no bar, because there is no cap. */
 export type BadgeStats = {
@@ -10,18 +12,8 @@ export type BadgeStats = {
   sites?: StatSites;
 };
 
-/** 1-based source lines behind each counter, as computed by the analyzer. */
-export type StatSites = {
-  apis: number[];
-  vars: number[];
-  functions: number[];
-  strings: number[];
-  consoleLog: number[];
-  print: number[];
-  shellyCall: number[];
-};
+export type { StatSites };
 
-/** The counters are always derived from the editable source, never a build. */
 const SOURCE_FILE = "scripts/main.ts";
 
 type Badge = {
@@ -98,60 +90,58 @@ function highlight(lines: number[]): void {
   );
 }
 
-export function renderStatBadges(
-  host: HTMLElement,
-  stats: BadgeStats | null | undefined,
-): void {
-  host.replaceChildren();
-  if (!stats) {
-    const empty = document.createElement("p");
-    empty.className = "stats-bars-empty";
-    empty.textContent = "no stats yet — Build to analyze";
-    host.appendChild(empty);
-    return;
+export function StatBadges(props: { stats: BadgeStats | null | undefined }) {
+  const [active, setActive] = useState<string | null>(null);
+
+  if (!props.stats) {
+    return (
+      <div id="statBadges" class="stat-badges" aria-label="Script counters">
+        <p class="stats-bars-empty">no stats yet — Build to analyze</p>
+      </div>
+    );
   }
 
-  /** At most one badge owns the editor highlight; clicking it again clears. */
-  let active: HTMLElement | null = null;
-
-  for (const badge of badgesFrom(stats)) {
-    const lines = badge.lines ?? [];
-    const tile = document.createElement(lines.length ? "button" : "div");
-    tile.className = "stat-badge";
-    tile.title = lines.length
-      ? `${badge.title}\nclick to highlight the ${lines.length} line${lines.length === 1 ? "" : "s"} in the editor`
-      : badge.title;
-    if (tile instanceof HTMLButtonElement) {
-      tile.type = "button";
-      tile.classList.add("clickable");
-      tile.setAttribute("aria-pressed", "false");
-      tile.addEventListener("click", () => {
-        const on = active !== tile;
-        active?.classList.remove("active");
-        active?.setAttribute("aria-pressed", "false");
-        tile.classList.toggle("active", on);
-        tile.setAttribute("aria-pressed", on ? "true" : "false");
-        active = on ? tile : null;
-        highlight(on ? lines : []);
-      });
-    }
-
-    const value = document.createElement("span");
-    value.className = "stat-badge-value";
-    value.textContent = badge.value;
-
-    const label = document.createElement("span");
-    label.className = "stat-badge-label";
-    label.textContent = badge.label;
-
-    tile.append(value, label);
-
-    if (badge.hint) {
-      const hint = document.createElement("span");
-      hint.className = "stat-badge-hint";
-      hint.textContent = badge.hint;
-      tile.appendChild(hint);
-    }
-    host.appendChild(tile);
-  }
+  return (
+    <div id="statBadges" class="stat-badges" aria-label="Script counters">
+      {badgesFrom(props.stats).map((badge) => {
+        const lines = badge.lines ?? [];
+        const key = badge.label;
+        const on = active === key;
+        const title = lines.length
+          ? `${badge.title}\nclick to highlight the ${lines.length} line${lines.length === 1 ? "" : "s"} in the editor`
+          : badge.title;
+        if (!lines.length) {
+          return (
+            <div key={key} class="stat-badge" title={title}>
+              <span class="stat-badge-value">{badge.value}</span>
+              <span class="stat-badge-label">{badge.label}</span>
+              {badge.hint ? (
+                <span class="stat-badge-hint">{badge.hint}</span>
+              ) : null}
+            </div>
+          );
+        }
+        return (
+          <button
+            key={key}
+            type="button"
+            class={`stat-badge clickable${on ? " active" : ""}`}
+            title={title}
+            aria-pressed={on ? "true" : "false"}
+            onClick={() => {
+              const next = on ? null : key;
+              setActive(next);
+              highlight(next ? lines : []);
+            }}
+          >
+            <span class="stat-badge-value">{badge.value}</span>
+            <span class="stat-badge-label">{badge.label}</span>
+            {badge.hint ? (
+              <span class="stat-badge-hint">{badge.hint}</span>
+            ) : null}
+          </button>
+        );
+      })}
+    </div>
+  );
 }

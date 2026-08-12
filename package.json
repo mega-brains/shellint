@@ -19,7 +19,8 @@
     "lint": "npm run typecheck",
     "check:lines": "node scripts/check-line-limit.mjs",
     "test": "node scripts/test.mjs",
-    "beforeCommit": "npm run check:lines && npm run typecheck && npm run build && npm run test"
+    "test:e2e": "playwright test -c e2e/playwright.config.ts",
+    "beforeCommit": "npm run check:lines && npm run typecheck && npm run build && npm run test && npm run test:e2e"
   },
   "engines": {
     "node": ">=20"
@@ -35,11 +36,14 @@
     "@codemirror/language": "^6.10.8",
     "@codemirror/state": "^6.5.2",
     "@codemirror/view": "^6.36.2",
+    "@playwright/test": "^1.62.1",
     "@types/node": "^22.13.0",
     "@types/ws": "^8.5.14",
     "codemirror": "^6.0.1",
     "esbuild": "^0.25.0",
     "espruino": "^0.1.67",
+    "playwright": "^1.62.1",
+    "preact": "^10.29.8",
     "terser": "^5.49.2",
     "tsx": "^4.19.0",
     "typescript": "^5.9.2"

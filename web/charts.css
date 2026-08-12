@@ -90,8 +90,25 @@
   width: 100%;
 }
 
-.mini-bar {
+/* Only live samples use accent — never paint missing slots teal. */
+.mini-bar:not(.missing) {
   fill: var(--accent);
+}
+
+/* Failed/missing poll slots: full-height muted fill + diagonal hatch strokes. */
+.mini-bar-missing {
+  opacity: 0.5;
+}
+
+.mini-bar.missing {
+  fill: #c4bfb3;
+  opacity: 0.1;
+}
+
+.mini-bar-hatch-line {
+  stroke: #6f6b62;
+  stroke-width: 1.25;
+  vector-effect: non-scaling-stroke;
 }
 
 /* Invisible per-sample hit area: the bars themselves are too thin to hover. */

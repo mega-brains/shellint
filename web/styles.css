@@ -41,6 +41,16 @@ body {
   overflow: hidden;
 }
 
+/* Preact mount — same flex column role body used to give header + main. */
+#app {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
 .top {
   font-family: var(--sans-narrow);
   position: sticky;

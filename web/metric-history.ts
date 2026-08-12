@@ -11,7 +11,8 @@ const PREFIX = "shelly-devroom.history.";
 
 export type MetricHistory = {
   read(now?: number): SparkPoint[];
-  push(value: number, now?: number): SparkPoint[];
+  /** `null` records a missing poll/sensor so the chart can hatch the gap. */
+  push(value: number | null, now?: number): SparkPoint[];
 };
 
 function prune(points: SparkPoint[], now: number): SparkPoint[] {

@@ -22,7 +22,7 @@ export type LogSnapshot = {
 
 const MAX_LINES = 500;
 const MAX_METRICS = 1000;
-const CONNECT_TIMEOUT_MS = 5_000;
+const CONNECT_TIMEOUT_MS = 9_000;
 
 /** `#m <series> <value>`, anywhere in the line — device log lines carry file/line noise. */
 const METRIC_RE = /(?:^|\s)#m\s+(\S+)\s+(\S+)/;

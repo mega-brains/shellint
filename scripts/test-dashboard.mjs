@@ -8,6 +8,10 @@ import { minFirmware } from "../server/min-firmware.ts";
 import { parseMetric, readLogs, startLogStream, stopLogStream } from "../server/debug-log.ts";
 import { sampleAt, sparkPaths } from "../web/spark.ts";
 import { createHistory, WINDOW_MS } from "../web/metric-history.ts";
+import {
+  isMissingSample,
+  layoutMiniBarSlots,
+} from "../web/mini-bars.tsx";
 
 function fail(msg) {
   console.error(`FAIL: ${msg}`);
@@ -183,6 +187,45 @@ const eq = (got, want, what) => {
   rssi.push(-58, t0);
   eq(rssi.read(t0).length, 1, "a second series keeps its own samples");
   eq(latency.read(t0 + 3 * WINDOW_MS).length, 0, "and does not leak into the first");
+
+  // Failed polls must leave a null slot so mini-bars can hatch the gap.
+  const gaps = createHistory("test-gaps");
+  gaps.push(10, t0);
+  const withMissing = gaps.push(null, t0 + 5_000);
+  eq(withMissing.length, 2, "a missing sample is recorded, not skipped");
+  eq(withMissing[1].y, null, "failed poll stores y: null");
+  gaps.push(12, t0 + 10_000);
+  const afterGap = gaps.read(t0 + 10_000);
+  eq(afterGap.length, 3, "null keeps its slot between live values");
+  eq(afterGap[0].y, 10, "live sample before gap");
+  eq(afterGap[1].y, null, "missing slot stays null");
+  eq(afterGap[2].y, 12, "live sample after gap");
+}
+
+// Mini-bar layout: nulls keep a full-height slot (hatch), never skip/collapse.
+{
+  eq(isMissingSample(null), true, "null is a missing sample");
+  eq(isMissingSample(21), false, "finite number is present");
+  eq(isMissingSample(Number.NaN), true, "NaN is missing");
+
+  const slots = layoutMiniBarSlots(
+    [
+      { x: 1, y: 50 },
+      { x: 2, y: null },
+      { x: 3, y: 25 },
+    ],
+    { domainMin: 0, domainMax: 100 },
+  );
+  eq(slots.length, 3, "layout keeps every history slot");
+  eq(slots[0].missing, false, "live slot is not missing");
+  eq(slots[1].missing, true, "null slot is missing");
+  eq(slots[1].height, 20, "missing slot is full chart height");
+  eq(slots[1].y0, 0, "missing slot starts at the top");
+  if (!(slots[0].height > 0 && slots[2].height > 0)) {
+    fail("live slots must have positive bar height");
+  }
+  // Missing sits between live clusters — widths stay aligned to equal slots.
+  eq(slots[0].width, slots[1].width, "missing width matches live slot width");
 }
 
 console.log("dashboard: memory estimate / min-firmware / debug-log / spark / latency ok");

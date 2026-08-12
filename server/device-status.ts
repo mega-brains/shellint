@@ -291,4 +291,21 @@ export async function setScriptRunning(
   }
 }
 
+/**
+ * Soft reboot via `Shelly.Reboot` (not factory wipe). Omitting `delay_ms`
+ * uses the device default (1000 ms; minimum allowed is 500).
+ */
+export async function rebootDevice(): Promise<void> {
+  const cfg = loadConfig();
+  assertDevroomCompiler(cfg);
+
+  const rpc = new ShellyRpc(cfg.deviceIp);
+  try {
+    await rpc.connect();
+    await rpc.call("Shelly.Reboot", {});
+  } finally {
+    rpc.close();
+  }
+}
+
 export { AuthNotSupportedError };

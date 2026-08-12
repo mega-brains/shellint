@@ -1,5 +1,5 @@
 /**
- * Bundle CodeMirror SPA into web/dist/app.js
+ * Bundle Preact + CodeMirror SPA into web/dist/app.js
  * Usage: node scripts/build-web.mjs
  */
 import * as esbuild from "esbuild";
@@ -13,13 +13,15 @@ const outfile = join(root, "web", "dist", "app.js");
 mkdirSync(dirname(outfile), { recursive: true });
 
 await esbuild.build({
-  entryPoints: [join(root, "web", "main.ts")],
+  entryPoints: [join(root, "web", "main.tsx")],
   bundle: true,
   outfile,
   format: "esm",
   platform: "browser",
   target: ["es2020"],
   sourcemap: true,
+  jsx: "automatic",
+  jsxImportSource: "preact",
   logLevel: "info",
 });
 
