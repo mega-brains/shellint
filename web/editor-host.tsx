@@ -1,3 +1,4 @@
+import type { ComponentChildren } from "preact";
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { EditorView } from "@codemirror/view";
 import { javascript } from "@codemirror/lang-javascript";
@@ -30,6 +31,8 @@ export type EditorHostProps = {
     refresh: () => Promise<void>;
     previewing: () => boolean;
   }) => void;
+  /** Notice strip above the artifact bar — currently the imported-code banner. */
+  banner?: ComponentChildren;
 };
 
 /**
@@ -126,6 +129,7 @@ export function EditorHost(props: EditorHostProps) {
 
   return (
     <div id="editor" class="editor">
+      {props.banner}
       <div class="artifact-bar">
         <span class="artifact-icon" aria-hidden="true">
           ◫

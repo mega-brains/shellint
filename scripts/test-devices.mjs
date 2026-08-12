@@ -5,7 +5,7 @@
  * user's real device IPs.
  * Usage: node --import tsx scripts/test-devices.mjs
  */
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { ROOT, DEVICE_PROFILE_PATH, PROBE_PATH, devicePaths } from "../server/paths.ts";
 import {
@@ -48,6 +48,10 @@ const originalGeneratedDts = existsSync(GENERATED_DTS_PATH)
   : null;
 const devicesSubdir = join(DEVICES_DIR, "devices");
 const originalDevicesSubdirExisted = existsSync(devicesSubdir);
+// Snapshot the real per-device dirs so the fake devices this test creates are
+// removed one by one — blanket-deleting the subdir would take the user's own
+// cached profiles with it.
+const originalDeviceDirs = originalDevicesSubdirExisted ? readdirSync(devicesSubdir) : [];
 
 function restore() {
   if (originalDevroom !== null) writeFileSync(DEVROOM_JSON, originalDevroom, "utf8");
@@ -72,7 +76,15 @@ function restore() {
   } else {
     rmSync(GENERATED_DTS_PATH, { force: true });
   }
-  if (!originalDevicesSubdirExisted) rmSync(devicesSubdir, { recursive: true, force: true });
+  if (!originalDevicesSubdirExisted) {
+    rmSync(devicesSubdir, { recursive: true, force: true });
+  } else {
+    for (const dir of readdirSync(devicesSubdir)) {
+      if (!originalDeviceDirs.includes(dir)) {
+        rmSync(join(devicesSubdir, dir), { recursive: true, force: true });
+      }
+    }
+  }
   _resetCache();
 }
 
@@ -122,7 +134,20 @@ try {
   }
 
   // --- migration from legacy devroom.json (deviceIp + deviceIp2 + scriptId) ---
+  // Seed both legacy top-level captures for the device about to be migrated:
+  // they must be adopted into its per-device dir, or the first setActive()
+  // mirror writes nothing over a real capture.
   setDevicesFile(null);
+  writeFileSync(
+    DEVICE_PROFILE_PATH,
+    JSON.stringify({ at: "t", deviceIp: "192.0.2.10", gen: 2, ver: "1.0.0", model: "M-LEGACY", app: null, methods: [], components: [] }),
+    "utf8",
+  );
+  writeFileSync(
+    PROBE_PATH,
+    JSON.stringify({ probed: true, at: "t", deviceIp: "192.0.2.10", scriptId: 1, results: [] }),
+    "utf8",
+  );
   setDevroom({
     deviceIp: "192.0.2.10",
     deviceIp2: "192.0.2.20",
@@ -141,6 +166,12 @@ try {
   if (!primary || !secondary) fail("migration should carry over both deviceIp and deviceIp2");
   if (!file.active || file.active.device !== primary.id || file.active.slot !== 3) {
     fail(`expected active to point at the primary device on slot 3, got ${JSON.stringify(file.active)}`);
+  }
+  const adopted = devicePaths(primary.id);
+  if (!existsSync(adopted.profile)) fail("migration should adopt types/device-profile.json into the device dir");
+  if (!existsSync(adopted.probe)) fail("migration should adopt types/generated-probe.json into the device dir");
+  if (existsSync(devicePaths(secondary.id).profile)) {
+    fail("a capture naming another device must not be adopted for the second device");
   }
   // Idempotent: devices.json now exists on disk, re-loading must not re-migrate.
   _resetCache();
@@ -264,15 +295,33 @@ try {
   let mirrored = JSON.parse(readFileSync(DEVICE_PROFILE_PATH, "utf8"));
   if (mirrored.model !== "M-A") fail(`expected mirror to reflect device A, got ${JSON.stringify(mirrored)}`);
 
-  // Device B has no cached profile yet -> switching to it must not leave A's mirror behind.
+  // Device B has no cache yet -> switching to it leaves A's mirror standing
+  // rather than blanking a real capture. The mirror names its own source
+  // device, so it stays self-identifying until B answers.
   setActive({ device: deviceB.id, slot: 1, script: "main" });
-  if (existsSync(DEVICE_PROFILE_PATH)) {
-    fail("switching to a device with no cached profile should remove the stale mirror");
+  if (!existsSync(DEVICE_PROFILE_PATH)) {
+    fail("switching to an uncached device should leave the previous mirror in place, not delete it");
   }
+  mirrored = JSON.parse(readFileSync(DEVICE_PROFILE_PATH, "utf8"));
+  if (mirrored.deviceIp !== deviceA.ip) fail("stale mirror should still name the device it came from");
 
   // Explicit mirrorActiveDevice() call (as fetchDeviceProfile/runProbe use internally) is idempotent.
   mirrorActiveDevice(deviceB.id);
-  if (existsSync(DEVICE_PROFILE_PATH)) fail("mirrorActiveDevice should stay a no-op mirror removal for an uncached device");
+  if (JSON.parse(readFileSync(DEVICE_PROFILE_PATH, "utf8")).model !== "M-A") {
+    fail("mirrorActiveDevice for an uncached device should be a no-op");
+  }
+
+  // Once B has its own cache, the next mirror swaps over.
+  mkdirSync(dirname(devicePaths(deviceB.id).profile), { recursive: true });
+  writeFileSync(
+    devicePaths(deviceB.id).profile,
+    JSON.stringify({ at: "t", deviceIp: deviceB.ip, gen: 2, ver: "1.0.0", model: "M-B", app: null, methods: [], components: [] }),
+    "utf8",
+  );
+  mirrorActiveDevice(deviceB.id);
+  if (JSON.parse(readFileSync(DEVICE_PROFILE_PATH, "utf8")).model !== "M-B") {
+    fail("mirror should swap to device B once B has a cached profile");
+  }
 
   // Log ring: resetForDeviceSwitch() bumps deviceGeneration so a poller sees the switch.
   const before = readLogs(0).deviceGeneration;

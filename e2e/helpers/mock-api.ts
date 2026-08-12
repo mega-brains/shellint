@@ -244,6 +244,15 @@ export async function mockDeviceApis(page: Page): Promise<void> {
           ];
     await json(route, { ok: true, slots });
   });
+
+  // Device-side source for `Import code from slot` — deliberately plain ES5
+  // JavaScript, which is what a real slot holds.
+  await page.route("**/api/device/script/code**", async (route) => {
+    const url = new URL(route.request().url());
+    const slot = Number(url.searchParams.get("slot") ?? 1);
+    const code = 'print("hello from the device slot");\n';
+    await json(route, { ok: true, slot, bytes: code.length, code });
+  });
 }
 
 /**

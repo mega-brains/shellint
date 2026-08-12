@@ -43,4 +43,23 @@ test.describe("device switch", () => {
     // old device are gone, and the stream shows disconnected until restarted.
     await expect(page.locator("#logsList li")).toHaveCount(0);
   });
+
+  test("importing a slot loads device code as an unsaved buffer", async ({ page }) => {
+    await openApp(page);
+    const editor = page.locator("#editor .cm-content");
+    await expect(editor).not.toContainText("hello from the device slot");
+
+    await page.locator("#slotSelect").selectOption("__import__");
+
+    // Device code lands in the editor, with a banner saying it is unsaved JS.
+    await expect(editor).toContainText("hello from the device slot", { timeout: 10_000 });
+    const banner = page.locator(".import-banner");
+    await expect(banner).toBeVisible();
+    await expect(banner).toContainText("not TypeScript");
+
+    // Discard restores what the editor held before the import.
+    await page.locator(".import-banner-discard").click();
+    await expect(banner).toHaveCount(0);
+    await expect(editor).not.toContainText("hello from the device slot");
+  });
 });

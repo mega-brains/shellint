@@ -17,10 +17,13 @@ export type SlotSelectProps = {
   /** Bumped on device switch, so the slot list refetches for the new device. */
   refreshKey: number;
   onStatus?: (msg: string, isError?: boolean) => void;
+  /** Loads a slot's device code into the editor as an unsaved buffer. */
+  onImport?: (slot: number) => void | Promise<void>;
 };
 
 const NEW_OPTION = "__new__";
 const DELETE_OPTION = "__delete__";
+const IMPORT_OPTION = "__import__";
 
 /** Header script-slot picker for the active device, plus create/delete. */
 export function SlotSelect(props: SlotSelectProps) {
@@ -98,6 +101,10 @@ export function SlotSelect(props: SlotSelectProps) {
         (e.target as HTMLSelectElement).value = String(props.activeSlot ?? "");
         if (value === NEW_OPTION) return void createSlot();
         if (value === DELETE_OPTION) return void deleteSlot();
+        if (value === IMPORT_OPTION) {
+          if (props.activeSlot != null) void props.onImport?.(props.activeSlot);
+          return;
+        }
         const n = Number(value);
         if (Number.isFinite(n)) void props.onSwitch(n);
       }}
@@ -110,6 +117,9 @@ export function SlotSelect(props: SlotSelectProps) {
         </option>
       ))}
       <option value={NEW_OPTION}>+ New slot…</option>
+      <option value={IMPORT_OPTION} disabled={props.activeSlot == null || !props.onImport}>
+        Import code from slot
+      </option>
       <option value={DELETE_OPTION} disabled={props.activeSlot == null}>
         Delete slot…
       </option>

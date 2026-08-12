@@ -12,6 +12,7 @@ import { LogsPanel } from "./logs-panel";
 import { api } from "./api";
 import { createDeployGate } from "./deploy-gate";
 import { setDirtyBaseline } from "./dirty-gutter";
+import { ImportBanner, useSlotImport } from "./use-slot-import";
 import {
   clearBuildErrors,
   reportBuildFailure,
@@ -127,6 +128,7 @@ export function App() {
     [checkScript],
   );
   const scriptHistory = useScriptHistory(viewRef, setStatus, checkScriptQuiet);
+  const slotImport = useSlotImport(viewRef, setStatus);
 
   const saveScript = useCallback(async () => {
     const view = viewRef.current;
@@ -138,8 +140,9 @@ export function App() {
     });
     setDirtyBaseline(view, source);
     scriptHistory.markSaved(source);
+    slotImport.clearImport();
     setStatus(`saved (${new TextEncoder().encode(source).length} B)`);
-  }, [setStatus, scriptHistory]);
+  }, [setStatus, scriptHistory, slotImport]);
 
   const buildScript = useCallback(async () => {
     const view = viewRef.current;
@@ -376,6 +379,7 @@ export function App() {
             devicesState={devicesState}
             withBusy={withBusy}
             setStatus={setStatus}
+            onImportSlot={slotImport.importSlot}
           />
         }
       >
@@ -419,6 +423,12 @@ export function App() {
         onResize={() => viewRef.current?.requestMeasure()}
         editor={
           <EditorHost
+            banner={
+              <ImportBanner
+                imported={slotImport.imported}
+                onDiscard={slotImport.discardImport}
+              />
+            }
             onView={onView}
             onDocChange={scheduleAuto}
             onStatus={setStatus}

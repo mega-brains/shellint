@@ -6,11 +6,16 @@ export type DevicePickerProps = {
   devicesState: ReturnType<typeof useDevices>;
   withBusy: (fn: () => Promise<void>) => Promise<void>;
   setStatus: (msg: string, isError?: boolean) => void;
+  /** Called with the slot and the label of the device it came from. */
+  onImportSlot?: (slot: number, deviceId: string, deviceLabel: string) => void | Promise<void>;
 };
 
 /** Header device + slot pickers — split out of app.tsx to stay under the 500-line cap. */
 export function DevicePicker(props: DevicePickerProps) {
   const { devicesState, withBusy, setStatus } = props;
+  const activeDeviceId = devicesState.active?.device ?? null;
+  const activeDeviceLabel =
+    devicesState.devices.find((d) => d.id === activeDeviceId)?.label ?? activeDeviceId ?? "device";
   return (
     <>
       <DeviceSelect
@@ -30,6 +35,14 @@ export function DevicePicker(props: DevicePickerProps) {
         activeSlot={devicesState.active?.slot ?? null}
         refreshKey={devicesState.sessionKey}
         onStatus={setStatus}
+        onImport={
+          props.onImportSlot && activeDeviceId
+            ? (slot) =>
+                withBusy(async () => {
+                  await props.onImportSlot!(slot, activeDeviceId, activeDeviceLabel);
+                })
+            : undefined
+        }
         onSwitch={(slot) =>
           withBusy(async () => {
             setStatus("switching slot…");

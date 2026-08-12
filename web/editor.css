@@ -180,3 +180,40 @@
 .cm-shelly-hover-link:hover {
   text-decoration: underline;
 }
+
+/* Imported device code: an unsaved buffer pulled off a device slot. Reserves
+   right padding for the absolutely-positioned artifact bar so the two never
+   collide. */
+.import-banner {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: baseline;
+  gap: 0.6rem;
+  padding: 0.45rem 3.4rem 0.45rem 0.7rem;
+  border-bottom: 1px solid var(--danger);
+  background: rgba(139, 46, 26, 0.08);
+  font-family: var(--sans-narrow);
+  font-size: 0.82rem;
+  line-height: 1.35;
+  color: var(--ink);
+}
+
+.import-banner-text { flex: 1 1 auto; }
+
+.import-banner code {
+  font-family: var(--mono, monospace);
+  font-size: 0.95em;
+}
+
+.import-banner-discard {
+  flex: 0 0 auto;
+  padding: 0.15rem 0.55rem;
+  border: 1px solid var(--danger);
+  border-radius: 3px;
+  background: transparent;
+  color: var(--danger);
+  font: inherit;
+  cursor: pointer;
+}
+
+.import-banner-discard:hover { background: rgba(139, 46, 26, 0.14); }

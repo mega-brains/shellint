@@ -5,7 +5,6 @@ import {
   writeFileSync,
   chmodSync,
   renameSync,
-  rmSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
 import { ROOT, DEVICE_PROFILE_PATH, PROBE_PATH, devicePaths } from "./paths.ts";
@@ -89,6 +88,23 @@ function writeRaw(file: DevicesFile): void {
 }
 
 /**
+ * Seeds a per-device cache file from a legacy top-level `types/` capture, but
+ * only when that capture names the device being migrated — an unrelated
+ * device's profile would poison Tier 4 lint.
+ */
+function adoptForDevice(src: string, dest: string, deviceIp: string): void {
+  if (!existsSync(src)) return;
+  try {
+    const parsed = JSON.parse(readFileSync(src, "utf8")) as { deviceIp?: string };
+    if (parsed.deviceIp !== deviceIp) return;
+    mkdirSync(dirname(dest), { recursive: true });
+    writeFileSync(dest, readFileSync(src, "utf8"), "utf8");
+  } catch {
+    /* best-effort — a corrupt capture just means a cold cache */
+  }
+}
+
+/**
  * One-way, automatic, idempotent migration from `devroom.json`'s legacy
  * single-device fields. Runs only when `devices.json` does not exist yet;
  * `devroom.json` itself is never rewritten, so it keeps working as the
@@ -119,26 +135,13 @@ function migrateFromLegacyConfig(): DevicesFile {
       slots: { [String(scriptId)]: { script: "main" } },
     };
 
-    // Carry over the cached capability profile, if it is for this device —
-    // keeps Tier 4 lint warm across the migration.
-    if (existsSync(DEVICE_PROFILE_PATH)) {
-      try {
-        const profile = JSON.parse(readFileSync(DEVICE_PROFILE_PATH, "utf8")) as {
-          deviceIp?: string;
-        };
-        if (profile.deviceIp === deviceIp) {
-          const dir = join(DEVICES_DIR, "devices", id);
-          mkdirSync(dir, { recursive: true });
-          writeFileSync(
-            join(dir, "profile.json"),
-            readFileSync(DEVICE_PROFILE_PATH, "utf8"),
-            "utf8",
-          );
-        }
-      } catch {
-        /* best-effort */
-      }
-    }
+    // Carry over the cached capability profile *and* probe report, if they are
+    // for this device — keeps Tier 4 lint and the advisory probe typings warm
+    // across the migration. Missing either one here is what would otherwise
+    // make the first `setActive()` mirror an empty file over real data.
+    const dest = devicePaths(id);
+    adoptForDevice(DEVICE_PROFILE_PATH, dest.profile, deviceIp);
+    adoptForDevice(PROBE_PATH, dest.probe, deviceIp);
 
     file.devices.push(record);
     file.active = { device: id, slot: scriptId, script: "main" };
@@ -321,20 +324,25 @@ function atomicCopy(src: string, dest: string): void {
  * point at rather than threading a device id through the whole pipeline.
  * Mirrors are written temp-then-rename; if that fails, the previous mirror
  * is left in place (never a half-written mix of two devices).
+ *
+ * A device with no cache of its own (never connected, never probed) leaves the
+ * previous mirror standing rather than deleting it: blanking it would destroy
+ * a real capture to say nothing, and both files name their source device
+ * (`deviceIp`, echoed into the `generated.d.ts` header), so a stale mirror is
+ * self-identifying. It refreshes as soon as that device answers.
  */
 export function mirrorActiveDevice(deviceId: string): void {
   const src = devicePaths(deviceId);
+  let changed = false;
   if (existsSync(src.profile)) {
     atomicCopy(src.profile, DEVICE_PROFILE_PATH);
-  } else {
-    rmSync(DEVICE_PROFILE_PATH, { force: true });
+    changed = true;
   }
   if (existsSync(src.probe)) {
     atomicCopy(src.probe, PROBE_PATH);
-  } else {
-    rmSync(PROBE_PATH, { force: true });
+    changed = true;
   }
-  writeGeneratedTypings();
+  if (changed) writeGeneratedTypings();
 }
 
 /** Records which local script key a device slot holds — `Deploy` with a new slot writes this back. */
