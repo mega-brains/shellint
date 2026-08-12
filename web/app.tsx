@@ -16,9 +16,11 @@ import {
   clearBuildErrors,
   reportBuildFailure,
 } from "./build-error-gutter";
-import { probeNote, type ProbeResult } from "./probe-logic";
 import { closeAllMenus } from "./split-button";
 import { isEmptySizes, type Sizes } from "./sizes";
+import { ScriptHistoryModal } from "./script-history-modal";
+import { useScriptHistory } from "./use-script-history";
+import { useProbe } from "./use-probe";
 
 const AUTO_KEY = "shelly-devroom.autoBuildCheck";
 
@@ -51,13 +53,6 @@ export function App() {
   const [dialectFindings, setDialectFindings] = useState<Finding[] | null>(
     null,
   );
-  const [probeResults, setProbeResults] = useState<ProbeResult[] | null>(null);
-  const [probeNoteText, setProbeNoteText] = useState("not run yet");
-  const [probeProgress, setProbeProgress] = useState<{
-    done: number;
-    total: number;
-  } | null>(null);
-
   const viewRef = useRef<EditorView | null>(null);
   const artifactsRef = useRef<{
     refresh: () => Promise<void>;
@@ -94,18 +89,6 @@ export function App() {
     [setStatus, syncDeployReady],
   );
 
-  const saveScript = useCallback(async () => {
-    const view = viewRef.current;
-    if (!view) return;
-    const source = view.state.doc.toString();
-    await api("/api/script", {
-      method: "PUT",
-      body: JSON.stringify({ source }),
-    });
-    setDirtyBaseline(view, source);
-    setStatus(`saved (${new TextEncoder().encode(source).length} B)`);
-  }, [setStatus]);
-
   const checkScript = useCallback(
     async ({ quiet = false } = {}) => {
       if (!quiet) {
@@ -136,6 +119,25 @@ export function App() {
     },
     [deviceOnline, deployGate, setStatus, syncDeployReady],
   );
+
+  const checkScriptQuiet = useCallback(
+    () => checkScript({ quiet: true }),
+    [checkScript],
+  );
+  const scriptHistory = useScriptHistory(viewRef, setStatus, checkScriptQuiet);
+
+  const saveScript = useCallback(async () => {
+    const view = viewRef.current;
+    if (!view) return;
+    const source = view.state.doc.toString();
+    await api("/api/script", {
+      method: "PUT",
+      body: JSON.stringify({ source }),
+    });
+    setDirtyBaseline(view, source);
+    scriptHistory.markSaved(source);
+    setStatus(`saved (${new TextEncoder().encode(source).length} B)`);
+  }, [setStatus, scriptHistory]);
 
   const buildScript = useCallback(async () => {
     const view = viewRef.current;
@@ -241,56 +243,8 @@ export function App() {
     [deployChoice, setStatus],
   );
 
-  const probeDevice = useCallback(async () => {
-    setProbeProgress({ done: 0, total: 0 });
-    setStatus("probing…");
-    const poll = setInterval(() => {
-      void api<{ done: number; total: number }>("/api/probe/progress")
-        .then((p) => {
-          setProbeProgress({ done: p.done, total: p.total });
-          const pct =
-            p.total > 0
-              ? Math.min(100, Math.round((p.done / p.total) * 100))
-              : 0;
-          setStatus(
-            p.total > 0
-              ? `probing… ${p.done}/${p.total} (${pct}%)`
-              : "probing…",
-          );
-        })
-        .catch(() => {});
-    }, 300);
-    try {
-      const data = await api<{
-        report: {
-          scriptId: number;
-          strategy: string;
-          notes?: string[];
-          results: ProbeResult[];
-        };
-      }>("/api/probe", { method: "POST", body: "{}" });
-      const report = data.report;
-      setProbeResults(report.results);
-      setProbeNoteText(
-        probeNote(report.scriptId, report.strategy, report.results),
-      );
-      const lines = report.results.map((r) =>
-        r.ok
-          ? `${r.id}: ${JSON.stringify(r.result)}`
-          : `${r.id}: FAIL ${r.error}`,
-      );
-      setStatus(
-        [
-          `probe written to types/generated-probe.json · slot ${report.scriptId} (${report.strategy})`,
-          ...(report.notes ?? []),
-          ...lines,
-        ].join("\n"),
-      );
-    } finally {
-      clearInterval(poll);
-      setProbeProgress(null);
-    }
-  }, [setStatus]);
+  const { probeResults, probeNoteText, probeProgress, probeDevice } =
+    useProbe(setStatus);
 
   const scheduleAuto = useCallback(() => {
     if (!autoOn.current) return;
@@ -362,6 +316,7 @@ export function App() {
           },
         });
         setDirtyBaseline(view, data.source);
+        scriptHistory.markSaved(data.source);
         setStatus("loaded scripts/main.ts");
       }).then(() => {
         void checkScript({ quiet: true }).catch(() => {
@@ -369,7 +324,7 @@ export function App() {
         });
       });
     },
-    [withBusy, setStatus, checkScript],
+    [withBusy, setStatus, checkScript, scriptHistory],
   );
 
   return (
@@ -424,6 +379,7 @@ export function App() {
             }
           }}
           onSave={() => void withBusy(saveScript)}
+          onHistory={() => void withBusy(scriptHistory.openHistory)}
           onBuild={() => void withBusy(() => runBuildAction())}
           onBuildPick={(action) => {
             setBuildAction(action);
@@ -489,6 +445,17 @@ export function App() {
             <LogsPanel api={api} onStatus={setStatus} />
           </>
         }
+      />
+
+      <ScriptHistoryModal
+        open={scriptHistory.historyOpen}
+        rows={scriptHistory.historyRows}
+        busy={busy}
+        currentSource={scriptHistory.currentSnapshot}
+        savedSource={scriptHistory.savedSource}
+        loadVersion={scriptHistory.loadHistoryVersion}
+        onRestore={(id) => withBusy(() => scriptHistory.restoreVersion(id))}
+        onClose={scriptHistory.closeHistory}
       />
     </>
   );

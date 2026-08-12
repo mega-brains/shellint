@@ -229,6 +229,8 @@ export type DiffModalProps = {
   right: string;
   load: DiffLoader;
   onClose: () => void;
+  /** Extra controls next to close, e.g. a restore-this-version button. */
+  actions?: ComponentChildren;
 };
 
 export function DiffModal(props: DiffModalProps) {
@@ -326,6 +328,7 @@ export function DiffModal(props: DiffModalProps) {
         >
           {unified ? "side by side" : "unified"}
         </button>
+        {props.actions}
         <button type="button" class="diff-close">
           close
         </button>

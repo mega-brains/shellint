@@ -34,6 +34,7 @@ export type ToolbarProps = {
   autoBuildCheck: boolean;
   onAutoChange: (on: boolean) => void;
   onSave: () => void;
+  onHistory: () => void;
   onBuild: () => void;
   onBuildPick: (action: BuildAction) => void;
   onDeploy: () => void;
@@ -99,6 +100,16 @@ export function Toolbar(props: ToolbarProps) {
         onClick={props.onSave}
       >
         Save
+      </button>
+
+      <button
+        type="button"
+        id="btnHistory"
+        title="Browse and restore previous saved versions of scripts/main.ts"
+        disabled={props.busy}
+        onClick={props.onHistory}
+      >
+        History
       </button>
 
       <SplitButton
