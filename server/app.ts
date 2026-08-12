@@ -5,7 +5,9 @@ import { serveStatic } from "@hono/node-server/serve-static";
 import {
   loadConfig,
   sanitizeConfig,
+  patchMinifyConfig,
   CompilerNotWiredError,
+  type MinifyConfig,
 } from "./config.ts";
 import { SCRIPT_PATH, WEB_DIR, ROOT } from "./paths.ts";
 import { runBuild } from "./build.ts";
@@ -17,7 +19,7 @@ import {
   setEcoMode,
   setScriptRunning,
 } from "./device-status.ts";
-import { analyzeScriptFile } from "./script-stats.ts";
+import { analyzeScriptFile, analyzeVariants } from "./script-stats.ts";
 import { appendBuildHistory, readBuildHistory } from "./build-history.ts";
 import { checkBuildArtifacts } from "./dialect-check.ts";
 import { runCheck } from "./check.ts";
@@ -34,6 +36,53 @@ export function createApp() {
 
   app.get("/api/config", (c) => {
     return c.json({ ok: true, config: sanitizeConfig(loadConfig()) });
+  });
+
+  app.patch("/api/config", async (c) => {
+    let body: { minify?: Partial<MinifyConfig> };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json(
+        { ok: false, error: 'expected JSON body { minify: { … } }' },
+        400,
+      );
+    }
+    if (!body.minify || typeof body.minify !== "object" || Array.isArray(body.minify)) {
+      return c.json(
+        { ok: false, error: "body.minify must be an object of boolean knobs" },
+        400,
+      );
+    }
+    const keys = [
+      "compress",
+      "mangle",
+      "toplevel",
+      "keepFnames",
+      "logMap",
+      "debugLogMap",
+      "advanced",
+    ] as const;
+    const patch: Partial<MinifyConfig> = {};
+    for (const key of keys) {
+      if (key in body.minify) {
+        if (typeof body.minify[key] !== "boolean") {
+          return c.json(
+            { ok: false, error: `minify.${key} must be a boolean` },
+            400,
+          );
+        }
+        patch[key] = body.minify[key];
+      }
+    }
+    if (Object.keys(patch).length === 0) {
+      return c.json(
+        { ok: false, error: "body.minify must include at least one known key" },
+        400,
+      );
+    }
+    const cfg = patchMinifyConfig(patch);
+    return c.json({ ok: true, config: sanitizeConfig(cfg) });
   });
 
   app.get("/api/script", (c) => {
@@ -62,8 +111,10 @@ export function createApp() {
     try {
       const { sizes, stdout, stderr } = await runBuild();
       let stats = null;
+      let variants = null;
       try {
         stats = analyzeScriptFile();
+        variants = analyzeVariants(stats);
       } catch {
         /* stats are best-effort */
       }
@@ -74,6 +125,7 @@ export function createApp() {
         ok: true,
         sizes,
         stats,
+        variants,
         estimate,
         minFirmware: stats ? minFirmware(stats.apis) : null,
         historyRow,
@@ -130,6 +182,7 @@ export function createApp() {
       return c.json({
         ok: true,
         stats,
+        variants: analyzeVariants(stats),
         estimate: estimateMemoryFile(),
         minFirmware: minFirmware(stats.apis),
       });

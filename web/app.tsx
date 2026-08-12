@@ -6,6 +6,7 @@ import { Layout } from "./layout";
 import { EditorHost } from "./editor-host";
 import { BuildPanel, loadStats, type DashboardPatch } from "./dashboard";
 import { CheckPanel, summarize, type CheckCatalog, type CheckReport, type Finding } from "./check-panel";
+import { OptionsPanel } from "./options-panel";
 import { DevicePanel, type DeviceIdentity } from "./device-panel";
 import { LogsPanel } from "./logs-panel";
 import { api } from "./api";
@@ -17,7 +18,7 @@ import {
 } from "./build-error-gutter";
 import { probeNote, type ProbeResult } from "./probe-logic";
 import { closeAllMenus } from "./split-button";
-import { formatSizes, type Sizes } from "./sizes";
+import { isEmptySizes, type Sizes } from "./sizes";
 
 const AUTO_KEY = "shelly-devroom.autoBuildCheck";
 
@@ -42,8 +43,8 @@ export function App() {
   const [identity, setIdentity] = useState<DeviceIdentity | null>(null);
   const [deviceMeta, setDeviceMeta] = useState("—");
   const [deviceOnline, setDeviceOnline] = useState(false);
-  const [sizeDebug, setSizeDebug] = useState("—");
-  const [sizeProd, setSizeProd] = useState("—");
+  const [sizeDebug, setSizeDebug] = useState<Sizes>({});
+  const [sizeProd, setSizeProd] = useState<Sizes>({});
   const [dash, setDash] = useState<DashboardPatch>({ history: [] });
   const [catalog, setCatalog] = useState<CheckCatalog | null>(null);
   const [report, setReport] = useState<CheckReport | null>(null);
@@ -146,41 +147,38 @@ export function App() {
     const data = await api<{
       sizes: { debug: Sizes; prod: Sizes };
       stats?: DashboardPatch["stats"];
+      variants?: DashboardPatch["variants"];
       estimate?: DashboardPatch["estimate"];
       minFirmware?: DashboardPatch["minFirmware"];
       dialect?: { file: string; findings: Finding[] }[];
     }>("/api/build", { method: "POST", body: "{}" }).catch((e) =>
       reportBuildFailure(view, e),
     );
-    setSizeDebug(formatSizes(data.sizes.debug));
-    setSizeProd(formatSizes(data.sizes.prod));
-    setDash((prev) => ({
-      ...prev,
-      estimate: data.estimate ?? null,
-      minFirmware: data.minFirmware ?? null,
-      stats: data.stats ?? prev.stats,
-    }));
+    setSizeDebug(data.sizes.debug ?? {});
+    setSizeProd(data.sizes.prod ?? {});
+    let history: DashboardPatch["history"] | undefined;
     try {
       const hist = await api<{ history: DashboardPatch["history"] }>(
         "/api/history?limit=40",
       );
-      setDash((prev) => ({
-        ...prev,
-        history: hist.history,
-        stats: data.stats ?? prev.stats,
-      }));
+      history = hist.history;
       const latest = hist.history?.[0];
       if (latest) {
         setSizeDebug((cur) =>
-          cur === "—" ? formatSizes(latest.sizes.debug) : cur,
+          isEmptySizes(cur) ? (latest.sizes.debug ?? {}) : cur,
         );
         setSizeProd((cur) =>
-          cur === "—" ? formatSizes(latest.sizes.prod) : cur,
+          isEmptySizes(cur) ? (latest.sizes.prod ?? {}) : cur,
         );
       }
     } catch {
-      setDash((prev) => ({ ...prev, history: [] }));
+      history = [];
     }
+    setDash((prev) => ({
+      ...prev, estimate: data.estimate ?? null, minFirmware: data.minFirmware ?? null,
+      stats: data.stats ?? prev.stats, variants: data.variants ?? prev.variants,
+      ...(history !== undefined ? { history } : {}),
+    }));
     await artifactsRef.current?.refresh();
     const dialect =
       data.dialect?.flatMap((r) =>
@@ -325,27 +323,28 @@ export function App() {
         /* check panel shows unavailable via note when catalog null */
       }
       const stats = await loadStats();
-      setDash((prev) => ({
-        ...prev,
-        estimate: stats.estimate,
-        minFirmware: stats.minFirmware,
-      }));
       try {
         const hist = await api<{ history: NonNullable<DashboardPatch["history"]> }>(
           "/api/history?limit=40",
         );
         setDash((prev) => ({
           ...prev,
+          estimate: stats.estimate,
+          minFirmware: stats.minFirmware,
           history: hist.history,
           stats: stats.stats,
+          variants: stats.variants,
         }));
         const latest = hist.history[0];
         if (latest) {
-          setSizeDebug(formatSizes(latest.sizes.debug));
-          setSizeProd(formatSizes(latest.sizes.prod));
+          setSizeDebug(latest.sizes.debug ?? {});
+          setSizeProd(latest.sizes.prod ?? {});
         }
       } catch {
-        setDash((prev) => ({ ...prev, history: [], stats: stats.stats }));
+        setDash((prev) => ({
+          ...prev, estimate: stats.estimate, minFirmware: stats.minFirmware,
+          history: [], stats: stats.stats, variants: stats.variants,
+        }));
       }
     })();
   }, []);
@@ -469,6 +468,7 @@ export function App() {
               report={report}
               dialectFindings={dialectFindings}
             />
+            <OptionsPanel onStatus={setStatus} />
           </>
         }
         footer={

@@ -9,6 +9,58 @@ export type StatSites = {
   shellyCall: number[];
 };
 
+/** Flat badge metrics from /api/stats variants (source + dist artifacts). */
+export type StatCounters = {
+  apiKinds: number;
+  apiCalls: number;
+  vars: number;
+  functions: number;
+  strings: number;
+  stringBytes: number;
+  consoleLog: number;
+  print: number;
+  shellyCall: number;
+};
+
+/**
+ * Dist keys omitted when the artifact is missing. Compare UI only when any
+ * debug/prod key is present.
+ */
+export type StatVariants = {
+  source: StatCounters;
+  debugRaw?: StatCounters;
+  debugMin?: StatCounters;
+  prodRaw?: StatCounters;
+  prodMin?: StatCounters;
+};
+
+export function hasDistVariants(v: StatVariants | null | undefined): boolean {
+  if (!v) return false;
+  return !!(v.debugRaw || v.debugMin || v.prodRaw || v.prodMin);
+}
+
+/** Build source counters from live BadgeStats / ScriptStats when variants absent. */
+export function countersFromBadgeStats(stats: {
+  apis: Record<string, number>;
+  declarations: { vars: number; functions: number };
+  literals: { strings: { count: number; totalBytes: number } };
+  logging: { consoleLog: number; print: number };
+  network: { shellyCall: number };
+}): StatCounters {
+  const apiCalls = Object.values(stats.apis).reduce((a, b) => a + b, 0);
+  return {
+    apiKinds: Object.keys(stats.apis).length,
+    apiCalls,
+    vars: stats.declarations.vars,
+    functions: stats.declarations.functions,
+    strings: stats.literals.strings.count,
+    stringBytes: stats.literals.strings.totalBytes,
+    consoleLog: stats.logging.consoleLog,
+    print: stats.logging.print,
+    shellyCall: stats.network.shellyCall,
+  };
+}
+
 export type ScriptStats = {
   apis: Record<string, number>;
   registrations: {

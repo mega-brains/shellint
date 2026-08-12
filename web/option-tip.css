@@ -1,0 +1,72 @@
+/* Immediate hover/focus tip for minify options (not native title=). */
+/* Portaled to document.body under [data-tip-portal] (z-index 10000 host). */
+
+.opt-tip {
+  /* Absolute inside [data-tip-portal] (position:fixed; inset:0) — same
+     viewport coords as fixed, but stacking is owned by the portal host. */
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  padding: 0.55rem 0.65rem 0.6rem;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  /* Opaque — never let sidebar text show through. */
+  background-color: #fffcf7;
+  background-color: var(--panel);
+  color: var(--ink);
+  box-shadow: 0 4px 18px rgba(28, 27, 25, 0.12);
+  pointer-events: none;
+  text-align: left;
+  font-family: var(--sans-narrow, var(--sans));
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.opt-tip-name {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  color: var(--accent);
+}
+
+.opt-tip-blurb {
+  margin: 0.3rem 0 0.45rem;
+  font-size: 0.9rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.opt-tip-diff {
+  margin: 0;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+  font-family: var(--mono);
+  font-size: 0.9rem;
+  line-height: 1.4;
+}
+
+.opt-tip-line {
+  display: flex;
+  gap: 0.35rem;
+  padding: 0.12rem 0.4rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.opt-tip-line .diff-sign {
+  flex: 0 0 0.9rem;
+  text-align: center;
+  user-select: none;
+}
+
+.opt-tip-line code {
+  font-family: inherit;
+  font-size: inherit;
+  color: var(--ink);
+}
+
+.opt-tip-line.diff-del .diff-sign { color: #6d2414; }
+.opt-tip-line.diff-add .diff-sign { color: #0b4f44; }

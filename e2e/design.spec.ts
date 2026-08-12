@@ -15,6 +15,8 @@ const VOLATILE = [
   "#memSpark",
   "#logsSpark",
   "#probeProgress",
+  // Live /api/config minify flags (smoke can toggle; peek text drifts).
+  "#optionsPeek",
 ];
 
 async function openSettled(page: Page) {
@@ -36,6 +38,11 @@ async function openSettled(page: Page) {
   // do not race catalog-pending vs report-complete paint.
   await expect(page.locator("#checkPeek")).not.toContainText("not run yet", {
     timeout: 30_000,
+  });
+  // Options peek loads async from /api/config; wait so layout is settled
+  // even though the text itself is masked.
+  await expect(page.locator("#optionsPeek")).not.toHaveText("…", {
+    timeout: 10_000,
   });
 }
 
@@ -59,6 +66,10 @@ test.describe("design baselines", () => {
     await page.locator("#checkHead").click();
     await expect(page.locator("#checkPanel")).not.toHaveClass(/collapsed/);
     await expect(page.locator("#checkRules")).not.toBeEmpty();
+    // Expanding check scrolls #side; pin bottom so the shot is stable.
+    await page.locator("#side").evaluate((el) => {
+      el.scrollTop = el.scrollHeight;
+    });
     await expect(page.locator("#side")).toHaveScreenshot("check-panel.png", {
       mask: masks(page),
     });

@@ -7,6 +7,8 @@
   --accent: #0f6b5c;
   --accent-ink: #ffffff;
   --danger: #8b2e1a;
+  --size-low-bg: rgba(47, 143, 91, 0.5);
+  --size-high-bg: rgba(214, 158, 46, 0.5);
   /* OS-bundled faces only (macOS / Windows / Linux) — nothing is downloaded. */
   --mono: ui-monospace, "SF Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
   --sans: system-ui, "Segoe UI", "Helvetica Neue", "DejaVu Sans", sans-serif;
@@ -150,6 +152,23 @@ button.run-state {
 button.run-state:hover,
 button.run-state:focus-visible { border-color: currentColor; }
 button.run-state:disabled { cursor: default; opacity: 0.5; }
+
+/* Hover/focus previews the click action: stop→▶, run→■. */
+button.run-state .run-glyph-action { display: none; }
+button.run-state:hover .run-glyph-current,
+button.run-state:focus-visible .run-glyph-current { display: none; }
+button.run-state:hover .run-glyph-action,
+button.run-state:focus-visible .run-glyph-action { display: inline; }
+
+button.run-state.run-running:hover,
+button.run-state.run-running:focus-visible {
+  color: #8a6d1f;
+  animation: none;
+}
+button.run-state.run-stopped:hover,
+button.run-state.run-stopped:focus-visible {
+  color: #2f8f5b;
+}
 
 .run-running {
   color: #2f8f5b;

@@ -4,8 +4,9 @@
  * Emits:
  *   dist/debug.raw.js  dist/debug.js  dist/debug.adv.js
  *   dist/prod.raw.js   dist/prod.js   dist/prod.adv.js  dist/prod.logmap.json
- * No IIFE wrapper. The tier-3 (`.adv.js`) artifact and the prod log map are both
- * best-effort: neither absence is a build failure.
+ * No IIFE wrapper. The tier-3 (`.adv.js`) artifact and the log map are both
+ * best-effort: neither absence is a build failure. Log shortening runs on prod
+ * when `minify.logMap` (default on) and on debug when `minify.debugLogMap`.
  */
 import { spawnSync } from "node:child_process";
 import {
@@ -31,11 +32,32 @@ const TSC_OUT_DIR = path.join(root, ".tsc-out");
 const TSC_OUT_JS = path.join(TSC_OUT_DIR, "main.js");
 const DIST_DIR = path.join(root, "dist");
 
+/** Defaults match today's pipeline when `minify` is absent from devroom.json. */
+const DEFAULT_MINIFY = {
+  compress: true,
+  mangle: true,
+  toplevel: false,
+  keepFnames: false,
+  logMap: true,
+  /** Opt-in: also shorten log strings on the debug artifact. */
+  debugLogMap: false,
+  advanced: true,
+};
+
 function loadConfig() {
   if (!existsSync(CONFIG_PATH)) {
-    return { compiler: "devroom" };
+    return { compiler: "devroom", minify: { ...DEFAULT_MINIFY } };
   }
-  return JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
+  const raw = JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
+  const src =
+    raw.minify && typeof raw.minify === "object" && !Array.isArray(raw.minify)
+      ? raw.minify
+      : {};
+  const minify = { ...DEFAULT_MINIFY };
+  for (const key of Object.keys(DEFAULT_MINIFY)) {
+    if (typeof src[key] === "boolean") minify[key] = src[key];
+  }
+  return { ...raw, minify };
 }
 
 function byteLen(s) {
@@ -71,11 +93,41 @@ async function envPass(code, { debug, prod }) {
   return result.code;
 }
 
-/** Size minify on already-env-substituted code. */
-async function minifyPass(code) {
+/**
+ * Size minify on already-env-substituted code.
+ * Options mirror `devroom.json` `minify.*` Terser knobs.
+ */
+async function minifyPass(code, opts) {
+  const compress = opts.compress !== false;
+  const mangle = opts.mangle !== false;
+  const toplevel = !!opts.toplevel;
+  const keepFnames = !!opts.keepFnames;
+
+  let compressOpt = false;
+  if (compress) {
+    if (toplevel || keepFnames) {
+      compressOpt = {};
+      if (toplevel) compressOpt.toplevel = true;
+      if (keepFnames) compressOpt.keep_fnames = true;
+    } else {
+      compressOpt = true;
+    }
+  }
+
+  let mangleOpt = false;
+  if (mangle) {
+    if (toplevel || keepFnames) {
+      mangleOpt = {};
+      if (toplevel) mangleOpt.toplevel = true;
+      if (keepFnames) mangleOpt.keep_fnames = true;
+    } else {
+      mangleOpt = true;
+    }
+  }
+
   const result = await minify(code, {
-    compress: true,
-    mangle: true,
+    compress: compressOpt,
+    mangle: mangleOpt,
     format: {
       comments: /@meta/,
     },
@@ -96,16 +148,22 @@ function writeLogMap(map) {
   writeFileSync(mapPath, `${JSON.stringify(map, null, 2)}\n`, "utf8");
 }
 
-async function buildVariant(tscJs, name, flags) {
+/**
+ * @param {string} tscJs
+ * @param {string} name
+ * @param {{ debug: boolean, prod: boolean }} flags
+ * @param {typeof DEFAULT_MINIFY} minifyOpts
+ * @param {{ sharedIds: Map<string, string>, shorten: boolean }} logMapState
+ */
+async function buildVariant(tscJs, name, flags, minifyOpts, logMapState) {
   let raw = await envPass(tscJs, flags);
-  // Prod only: log strings cost RAM on device, and the log panel re-expands the ids.
-  if (flags.prod) {
-    const shortened = shortenLogStrings(raw);
+  // Log strings cost RAM on device; the log panel re-expands the ids.
+  if (logMapState.shorten) {
+    const shortened = shortenLogStrings(raw, logMapState.sharedIds);
     raw = shortened.code;
-    writeLogMap(shortened.map);
   }
 
-  const min = await minifyPass(raw);
+  const min = await minifyPass(raw, minifyOpts);
   const rawPath = path.join(DIST_DIR, `${name}.raw.js`);
   const minPath = path.join(DIST_DIR, `${name}.js`);
   const advPath = path.join(DIST_DIR, `${name}.adv.js`);
@@ -114,9 +172,12 @@ async function buildVariant(tscJs, name, flags) {
 
   // Tier 3 runs on the Terser output rather than the raw source: on its own it
   // can come out larger than tier 2, chained it never does.
-  const adv = await minifyAdvanced(min);
   rmSync(advPath, { force: true });
-  if (adv.ok) writeFileSync(advPath, adv.code, "utf8");
+  let adv = { ok: false, reason: "disabled in config" };
+  if (minifyOpts.advanced !== false) {
+    adv = await minifyAdvanced(min);
+    if (adv.ok) writeFileSync(advPath, adv.code, "utf8");
+  }
 
   return {
     name,
@@ -169,15 +230,36 @@ async function main() {
 
   const tscJs = readFileSync(TSC_OUT_JS, "utf8");
   mkdirSync(DIST_DIR, { recursive: true });
+  const minifyOpts = config.minify ?? DEFAULT_MINIFY;
 
-  const debug = await buildVariant(tscJs, "debug", {
-    debug: true,
-    prod: false,
-  });
-  const prod = await buildVariant(tscJs, "prod", {
-    debug: false,
-    prod: true,
-  });
+  const shortenDebug = minifyOpts.debugLogMap === true;
+  const shortenProd = minifyOpts.logMap !== false;
+  /** Shared across variants so one dist/prod.logmap.json covers both. */
+  const sharedIds = new Map();
+
+  const debug = await buildVariant(
+    tscJs,
+    "debug",
+    { debug: true, prod: false },
+    minifyOpts,
+    { sharedIds, shorten: shortenDebug },
+  );
+  const prod = await buildVariant(
+    tscJs,
+    "prod",
+    { debug: false, prod: true },
+    minifyOpts,
+    { sharedIds, shorten: shortenProd },
+  );
+
+  if (shortenDebug || shortenProd) {
+    /** @type {Record<string, string>} */
+    const map = {};
+    for (const [text, id] of sharedIds) map[id] = text;
+    writeLogMap(map);
+  } else {
+    writeLogMap({});
+  }
 
   const sizes = (v) => {
     const out = { raw: v.rawBytes, min: v.minBytes };

@@ -63,13 +63,12 @@ const eq = (got, want, what) => {
     'var label = "a fairly long label string";',
     'Shelly.call("Switch.Set", {id: 0, on: true});',
     'var payload = "another long string literal here";',
-    'console.log("wrapped: " + label);',
     "console.log(label);",
     'notLogging("a long string that is not a log payload");',
     'console.debug("a long string on an uncounted console method");',
   ].join("\n");
   const { code, map } = shortenLogStrings(src);
-  eq(code, src, "only direct arguments of log calls are rewritten");
+  eq(code, src, "only arguments of log calls are rewritten");
   eq(Object.keys(map).length, 0, "no ids minted from non-log strings");
 }
 
@@ -104,4 +103,69 @@ const eq = (got, want, what) => {
   );
 }
 
-console.log("logmap: shorten / metric-safe / dedupe / expand ok");
+// L8 — strategy A: string-literal leaf in a `+` chain, with trailing pad.
+{
+  const { code, map } = shortenLogStrings(
+    'console.log(LOG_PREFIX + "found something long " + addr);',
+  );
+  eq(
+    code,
+    'console.log(LOG_PREFIX + "L1 " + addr);',
+    "concat leaf shortens and keeps trailing whitespace",
+  );
+  eq(map.L1, "found something long", "map stores core text without pad");
+  eq(
+    expandLogText("VC: L1 AA:BB", map),
+    "VC: found something long AA:BB",
+    "padded concat id re-expands as a standalone token",
+  );
+}
+
+// L9 — strategy B: fold adjacent static literals, then shorten.
+{
+  const { code, map } = shortenLogStrings(
+    'print("scan " + "failed unexpectedly " + err);',
+  );
+  eq(
+    code,
+    'print("L1 " + err);',
+    "adjacent static literals fold into one shortened piece",
+  );
+  eq(map.L1, "scan failed unexpectedly", "folded core is mapped");
+  eq(
+    expandLogText("L1 ECONN", map),
+    "scan failed unexpectedly ECONN",
+    "folded concat round-trips through expand",
+  );
+}
+
+// L10 — glued literal without edge whitespace must not shorten (token boundary).
+{
+  const src = 'console.log("x=" + v);';
+  const { code, map } = shortenLogStrings(src);
+  eq(code, src, "glued concat leaf without pad is left alone");
+  eq(Object.keys(map).length, 0, "no id for glued concat leaf");
+}
+
+// L11 — `#m` static left-prefix skips the whole chain.
+{
+  const src = 'print("#m " + "temp series " + tC);';
+  const { code, map } = shortenLogStrings(src);
+  eq(code, src, "metric concat chain is untouched");
+  eq(Object.keys(map).length, 0, "metric concat produces no ids");
+}
+
+// L12 — shared id map across calls (debug + prod build sharing).
+{
+  const shared = new Map();
+  const a = shortenLogStrings('print("shared long message here");', shared);
+  const b = shortenLogStrings(
+    'console.log(P + "shared long message here ");',
+    shared,
+  );
+  eq(a.map.L1, "shared long message here", "first call mints L1");
+  eq(b.code, 'console.log(P + "L1 ");', "second call reuses L1 for same core");
+  eq(Object.keys(b.map).length, 1, "shared map stays one entry");
+}
+
+console.log("logmap: shorten / concat / metric-safe / dedupe / expand ok");

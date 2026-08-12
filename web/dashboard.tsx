@@ -5,6 +5,14 @@ import { MemBreakdown, MemBullet, MemPeek } from "./mem-chart";
 import { Sparkline } from "./sparkline";
 import { api } from "./api";
 import {
+  formatSizeCell,
+  hasAdvColumn,
+  sizeExtent,
+  sizeTint,
+  type SizeTint,
+  type Sizes,
+} from "./sizes";
+import {
   formatEstimate,
   formatMemCompare,
   formatMinFirmware,
@@ -17,12 +25,14 @@ import {
   type MemoryEstimate,
   type MinFirmware,
   type ScriptStats,
+  type StatVariants,
 } from "./stats-model";
 
-export type { HistoryRow, MemoryEstimate, MinFirmware, ScriptStats };
+export type { HistoryRow, MemoryEstimate, MinFirmware, ScriptStats, StatVariants };
 
 export type DashboardPatch = {
   stats?: ScriptStats | null;
+  variants?: StatVariants | null;
   history?: HistoryRow[];
   estimate?: MemoryEstimate | null;
   minFirmware?: MinFirmware | null;
@@ -30,10 +40,37 @@ export type DashboardPatch = {
 };
 
 export type BuildPanelProps = {
-  sizeDebug: string;
-  sizeProd: string;
+  sizeDebug: Sizes;
+  sizeProd: Sizes;
   patch: DashboardPatch;
 };
+
+function SizeCell(props: { n: number | undefined; tint: SizeTint | null }) {
+  return (
+    <td class={props.tint ? `size-${props.tint}` : undefined}>
+      {formatSizeCell(props.n)}
+    </td>
+  );
+}
+
+function SizeRow(props: {
+  id: string;
+  label: string;
+  sizes: Sizes;
+  showAdv: boolean;
+  extent: { min: number; max: number } | null;
+}) {
+  return (
+    <tr id={props.id}>
+      <th scope="row">{props.label}</th>
+      <SizeCell n={props.sizes.raw} tint={sizeTint(props.sizes.raw, props.extent)} />
+      <SizeCell n={props.sizes.min} tint={sizeTint(props.sizes.min, props.extent)} />
+      {props.showAdv ? (
+        <SizeCell n={props.sizes.adv} tint={sizeTint(props.sizes.adv, props.extent)} />
+      ) : null}
+    </tr>
+  );
+}
 
 function HistoryList(props: { rows: HistoryRow[] }) {
   if (!props.rows.length) {
@@ -63,6 +100,8 @@ export function BuildPanel(props: BuildPanelProps) {
   const off = compare
     ? Math.abs(Number(compare.match(/\(([+-]?\d+)%\)/)?.[1] ?? 0))
     : 0;
+  const showAdv = hasAdvColumn(props.sizeDebug, props.sizeProd);
+  const extent = sizeExtent(props.sizeDebug, props.sizeProd, showAdv);
 
   return (
     <Collapsible
@@ -78,17 +117,37 @@ export function BuildPanel(props: BuildPanelProps) {
       headChildren={<h2>build</h2>}
     >
       <div class="sizes" id="buildBody">
-        <div class="size-block">
-          <h2>debug</h2>
-          <p id="sizeDebug">{props.sizeDebug}</p>
-        </div>
-        <div class="size-block">
-          <h2>prod</h2>
-          <p id="sizeProd">{props.sizeProd}</p>
+        <div class="size-block size-sizes">
+          <table class="size-table">
+            <thead>
+              <tr>
+                <th scope="col"></th>
+                <th scope="col">raw</th>
+                <th scope="col">min</th>
+                {showAdv ? <th scope="col">adv</th> : null}
+              </tr>
+            </thead>
+            <tbody>
+              <SizeRow
+                id="sizeDebug"
+                label="debug"
+                sizes={props.sizeDebug}
+                showAdv={showAdv}
+                extent={extent}
+              />
+              <SizeRow
+                id="sizeProd"
+                label="prod"
+                sizes={props.sizeProd}
+                showAdv={showAdv}
+                extent={extent}
+              />
+            </tbody>
+          </table>
         </div>
         <div class="size-block size-stats">
           <h2>stats</h2>
-          <StatBadges stats={stats} />
+          <StatBadges stats={stats} variants={props.patch.variants} />
           <StatsBars stats={stats} />
           <p
             id="minFirmware"
@@ -182,17 +241,20 @@ export function BuildPanel(props: BuildPanelProps) {
 
 export async function loadStats(): Promise<{
   stats: ScriptStats | null;
+  variants?: StatVariants;
   estimate?: MemoryEstimate;
   minFirmware?: MinFirmware;
 }> {
   try {
     const data = await api<{
       stats: ScriptStats;
+      variants: StatVariants;
       estimate: MemoryEstimate;
       minFirmware: MinFirmware;
     }>("/api/stats");
     return {
       stats: data.stats,
+      variants: data.variants,
       estimate: data.estimate,
       minFirmware: data.minFirmware,
     };

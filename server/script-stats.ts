@@ -1,6 +1,7 @@
 import { readFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
 import ts from "typescript";
-import { SCRIPT_PATH } from "./paths.ts";
+import { DIST_DIR, SCRIPT_PATH } from "./paths.ts";
 
 /**
  * 1-based source lines behind each dashboard badge, so a counter can be
@@ -101,16 +102,111 @@ function calleeName(expr: ts.Expression): string | null {
   return null;
 }
 
+/** Shelly/Espruino globals + print/console — shared by call and member sites. */
+function isKnownApi(name: string): boolean {
+  return (
+    name.startsWith("Shelly.") ||
+    name.startsWith("Timer.") ||
+    name.startsWith("MQTT.") ||
+    name.startsWith("HTTPServer.") ||
+    name.startsWith("Script.") ||
+    name.startsWith("Virtual.") ||
+    name.startsWith("AES.") ||
+    name.startsWith("BLE.") ||
+    name === "print" ||
+    name === "console.log" ||
+    name === "console.error" ||
+    name === "console.warn"
+  );
+}
+
 /**
- * Single TS AST walk — dashboard counters + future Tier-2 lint share this.
+ * Outermost property access in a chain that is not a call callee.
+ * Avoids triple-counting `BLE.Scanner.Start(...)` as BLE / BLE.Scanner / Start.
+ */
+function isApiMemberSite(node: ts.PropertyAccessExpression): boolean {
+  const parent = node.parent;
+  if (ts.isPropertyAccessExpression(parent) && parent.expression === node) {
+    return false;
+  }
+  if (ts.isCallExpression(parent) && parent.expression === node) {
+    return false;
+  }
+  return true;
+}
+
+/** Flat badge metrics — source + each dist variant share this shape. */
+export type StatCounters = {
+  apiKinds: number;
+  apiCalls: number;
+  vars: number;
+  functions: number;
+  strings: number;
+  stringBytes: number;
+  consoleLog: number;
+  print: number;
+  shellyCall: number;
+};
+
+/**
+ * Per-variant counters for badge tips. Dist keys omitted when the file is absent.
+ * Client shows the compare table only when at least one dist key is present.
+ */
+export type StatVariants = {
+  source: StatCounters;
+  debugRaw?: StatCounters;
+  debugMin?: StatCounters;
+  prodRaw?: StatCounters;
+  prodMin?: StatCounters;
+};
+
+const DIST_VARIANTS = {
+  debugRaw: "debug.raw.js",
+  debugMin: "debug.js",
+  prodRaw: "prod.raw.js",
+  prodMin: "prod.js",
+} as const;
+
+export function countersFromStats(stats: ScriptStats): StatCounters {
+  const apiCalls = Object.values(stats.apis).reduce((a, b) => a + b, 0);
+  return {
+    apiKinds: Object.keys(stats.apis).length,
+    apiCalls,
+    vars: stats.declarations.vars,
+    functions: stats.declarations.functions,
+    strings: stats.literals.strings.count,
+    stringBytes: stats.literals.strings.totalBytes,
+    consoleLog: stats.logging.consoleLog,
+    print: stats.logging.print,
+    shellyCall: stats.network.shellyCall,
+  };
+}
+
+/** Analyze source + existing debug/prod raw+min artifacts (no *.adv.js). */
+export function analyzeVariants(sourceStats: ScriptStats): StatVariants {
+  const out: StatVariants = { source: countersFromStats(sourceStats) };
+  for (const key of Object.keys(DIST_VARIANTS) as (keyof typeof DIST_VARIANTS)[]) {
+    const name = DIST_VARIANTS[key];
+    const path = join(DIST_DIR, name);
+    if (!existsSync(path)) continue;
+    out[key] = countersFromStats(analyzeSource(readFileSync(path, "utf8"), name));
+  }
+  return out;
+}
+
+/**
+ * Single TS/JS AST walk — dashboard counters + future Tier-2 lint share this.
  */
 export function analyzeSource(source: string, fileName = "main.ts"): ScriptStats {
+  const kind = fileName.endsWith(".ts") || fileName.endsWith(".tsx")
+    ? ts.ScriptKind.TS
+    : ts.ScriptKind.JS;
   const sf = ts.createSourceFile(
     fileName,
     source,
     ts.ScriptTarget.ES5,
     true,
-    ts.ScriptKind.TS,
+    kind,
   );
 
   const stats: ScriptStats = structuredClone(EMPTY);
@@ -170,22 +266,20 @@ export function analyzeSource(source: string, fileName = "main.ts"): ScriptStats
       stats.literals.numbers.count += 1;
     }
 
+    // Non-call member uses (e.g. BLE.Scanner.SCAN_RESULT). Call callees are
+    // handled below so `BLE.Scanner.Start(...)` stays a single site.
+    if (ts.isPropertyAccessExpression(node) && isApiMemberSite(node)) {
+      const name = calleeName(node);
+      if (name && isKnownApi(name)) {
+        bump(stats.apis, name);
+        mark("apis", node);
+      }
+    }
+
     if (ts.isCallExpression(node)) {
       const name = calleeName(node.expression);
       if (name) {
-        const known =
-          name.startsWith("Shelly.") ||
-          name.startsWith("Timer.") ||
-          name.startsWith("MQTT.") ||
-          name.startsWith("HTTPServer.") ||
-          name.startsWith("Script.") ||
-          name.startsWith("Virtual.") ||
-          name.startsWith("AES.") ||
-          name === "print" ||
-          name === "console.log" ||
-          name === "console.error" ||
-          name === "console.warn";
-        if (known) {
+        if (isKnownApi(name)) {
           bump(stats.apis, name);
           mark("apis", node);
         }

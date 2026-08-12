@@ -1,6 +1,10 @@
 import { useState } from "preact/hooks";
+import type { JSX } from "preact";
 import { HIGHLIGHT_LINES_EVENT, type LineHighlight } from "./line-highlight";
-import type { StatSites } from "./stats-model";
+import { tipStyleFor } from "./option-tip";
+import { StatTip, type StatTipContent } from "./stat-tip";
+import type { StatSites, StatVariants } from "./stats-model";
+import { countersFromBadgeStats } from "./stats-model";
 
 /** Uncapped script counters as a tile grid — no bar, because there is no cap. */
 export type BadgeStats = {
@@ -20,7 +24,7 @@ type Badge = {
   value: string;
   label: string;
   hint?: string;
-  title: string;
+  tip: StatTipContent;
   lines?: number[];
 };
 
@@ -33,50 +37,83 @@ function badgesFrom(stats: BadgeStats): Badge[] {
     {
       value: `${kinds}`,
       label: "api kinds",
-      title: `${kinds} distinct Shelly/Espruino APIs used`,
+      tip: {
+        name: "api kinds",
+        blurb: "Distinct Shelly/Espruino APIs used (member or call sites).",
+        metric: "apiKinds",
+      },
       lines: sites?.apis,
     },
     {
       value: `${calls}`,
       label: "api calls",
-      title: `${calls} call sites across those APIs`,
+      tip: {
+        name: "api calls",
+        blurb: "Total call/member sites across those APIs.",
+        metric: "apiCalls",
+      },
       lines: sites?.apis,
     },
     {
       value: `${stats.declarations.vars}`,
       label: "vars",
-      title: "top-level and local variable declarations",
+      tip: {
+        name: "vars",
+        blurb: "Top-level and local variable declarations (not for-loop binders).",
+        metric: "vars",
+      },
       lines: sites?.vars,
     },
     {
       value: `${stats.declarations.functions}`,
       label: "functions",
-      title: "function declarations and expressions",
+      tip: {
+        name: "functions",
+        blurb: "Named function declarations, methods, and named expressions.",
+        metric: "functions",
+      },
       lines: sites?.functions,
     },
     {
       value: `${str.count}`,
       label: "strings",
       hint: `${str.totalBytes} B`,
-      title: `${str.count} string literals totalling ${str.totalBytes} B`,
+      tip: {
+        name: "strings",
+        blurb: "String / template literals — count and UTF-8 bytes.",
+        metric: "strings",
+        showBytes: true,
+      },
       lines: sites?.strings,
     },
     {
       value: `${stats.logging.consoleLog}`,
       label: "console.log",
-      title: "console.log/warn/error call sites",
+      tip: {
+        name: "console.log",
+        blurb: "console.log / warn / error call sites (stripped in prod when gated).",
+        metric: "consoleLog",
+      },
       lines: sites?.consoleLog,
     },
     {
       value: `${stats.logging.print}`,
       label: "print",
-      title: "print() call sites — cheaper than console.log on device",
+      tip: {
+        name: "print",
+        blurb: "print() call sites — cheaper than console.log on device.",
+        metric: "print",
+      },
       lines: sites?.print,
     },
     {
       value: `${stats.network.shellyCall}`,
       label: "Shelly.call",
-      title: "asynchronous RPC calls — the device allows 5 concurrent",
+      tip: {
+        name: "Shelly.call",
+        blurb: "Async RPC calls — the device allows 5 concurrent.",
+        metric: "shellyCall",
+      },
       lines: sites?.shellyCall,
     },
   ];
@@ -90,8 +127,21 @@ function highlight(lines: number[]): void {
   );
 }
 
-export function StatBadges(props: { stats: BadgeStats | null | undefined }) {
+function resolveVariants(
+  variants: StatVariants | null | undefined,
+  stats: BadgeStats,
+): StatVariants {
+  if (variants?.source) return variants;
+  return { source: countersFromBadgeStats(stats) };
+}
+
+export function StatBadges(props: {
+  stats: BadgeStats | null | undefined;
+  variants?: StatVariants | null;
+}) {
   const [active, setActive] = useState<string | null>(null);
+  const [tipKey, setTipKey] = useState<string | null>(null);
+  const [tipStyle, setTipStyle] = useState<JSX.CSSProperties>({});
 
   if (!props.stats) {
     return (
@@ -101,18 +151,41 @@ export function StatBadges(props: { stats: BadgeStats | null | undefined }) {
     );
   }
 
+  const variants = resolveVariants(props.variants, props.stats);
+  const badges = badgesFrom(props.stats);
+  const tipBadge = tipKey ? badges.find((b) => b.label === tipKey) : null;
+
+  const openTip = (label: string, el: HTMLElement) => {
+    setTipKey(label);
+    setTipStyle(tipStyleFor(el.getBoundingClientRect(), 220));
+  };
+  const closeTip = () => setTipKey(null);
+
+  const tipHandlers = (label: string) => ({
+    onMouseEnter: (e: JSX.TargetedMouseEvent<HTMLElement>) =>
+      openTip(label, e.currentTarget),
+    onMouseLeave: closeTip,
+    onFocus: (e: JSX.TargetedFocusEvent<HTMLElement>) =>
+      openTip(label, e.currentTarget),
+    onBlur: closeTip,
+  });
+
   return (
     <div id="statBadges" class="stat-badges" aria-label="Script counters">
-      {badgesFrom(props.stats).map((badge) => {
+      {badges.map((badge) => {
         const lines = badge.lines ?? [];
         const key = badge.label;
         const on = active === key;
-        const title = lines.length
-          ? `${badge.title}\nclick to highlight the ${lines.length} line${lines.length === 1 ? "" : "s"} in the editor`
-          : badge.title;
+        const tipId = tipKey === key ? "statTipLive" : undefined;
         if (!lines.length) {
           return (
-            <div key={key} class="stat-badge" title={title}>
+            <div
+              key={key}
+              class="stat-badge"
+              tabIndex={0}
+              aria-describedby={tipId}
+              {...tipHandlers(key)}
+            >
               <span class="stat-badge-value">{badge.value}</span>
               <span class="stat-badge-label">{badge.label}</span>
               {badge.hint ? (
@@ -126,8 +199,9 @@ export function StatBadges(props: { stats: BadgeStats | null | undefined }) {
             key={key}
             type="button"
             class={`stat-badge clickable${on ? " active" : ""}`}
-            title={title}
             aria-pressed={on ? "true" : "false"}
+            aria-describedby={tipId}
+            {...tipHandlers(key)}
             onClick={() => {
               const next = on ? null : key;
               setActive(next);
@@ -142,6 +216,14 @@ export function StatBadges(props: { stats: BadgeStats | null | undefined }) {
           </button>
         );
       })}
+      {tipBadge ? (
+        <StatTip open content={tipBadge.tip} variants={variants} style={tipStyle} />
+      ) : null}
+      {tipBadge ? (
+        <span id="statTipLive" class="visually-hidden">
+          {tipBadge.tip.blurb}
+        </span>
+      ) : null}
     </div>
   );
 }

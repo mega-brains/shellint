@@ -122,9 +122,14 @@ function RunIcon(props: { state: RunState; onToggle?: () => void }) {
     "aria-label": `${props.state} — ${ACTION[props.state].toLowerCase()}`,
   };
   if (actionable) {
+    const preview: RunState =
+      props.state === "running" ? "stopped" : "running";
     return (
       <button type="button" {...common} onClick={props.onToggle}>
-        {STATE_GLYPH[props.state]}
+        <span class="run-glyph run-glyph-current">{STATE_GLYPH[props.state]}</span>
+        <span class="run-glyph run-glyph-action" aria-hidden="true">
+          {STATE_GLYPH[preview]}
+        </span>
       </button>
     );
   }

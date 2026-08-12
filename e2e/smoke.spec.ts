@@ -104,6 +104,33 @@ test.describe("vanilla UI smoke", () => {
     await expect(head).toHaveAttribute("aria-expanded", "true");
   });
 
+  test("options panel PATCHes minify config", async ({ page }) => {
+    await openApp(page);
+    const panel = page.locator("#optionsPanel");
+    await expect(panel).toBeVisible();
+    await expect(panel).toHaveClass(/collapsed/);
+    await page.locator("#optionsHead").click();
+    await expect(panel).not.toHaveClass(/collapsed/);
+    await expect(page.getByTestId("opt-compress")).toBeChecked();
+
+    const patch = page.waitForRequest(
+      (r) => r.url().includes("/api/config") && r.method() === "PATCH",
+    );
+    await page.getByTestId("opt-toplevel").click();
+    const req = await patch;
+    expect(req.postData() ?? "").toMatch(/toplevel/);
+    await expect(page.locator("#statusLine")).toContainText("minify options saved", {
+      timeout: 10_000,
+    });
+
+    // Restore so later runs / design snapshots keep default config.
+    const restore = page.waitForRequest(
+      (r) => r.url().includes("/api/config") && r.method() === "PATCH",
+    );
+    await page.getByTestId("opt-toplevel").click();
+    await restore;
+  });
+
   test("device panel shows mocked mem/cpu; logs show mocked lines", async ({
     page,
   }) => {
@@ -128,6 +155,39 @@ test.describe("vanilla UI smoke", () => {
     await expect(item).toBeVisible();
     await expect(item).toHaveText("Reboot device");
     await expect(item).toBeEnabled();
+  });
+
+  test("stat tip portals to body and stays left of #side", async ({ page }) => {
+    await openApp(page);
+    // Need badge stats — Build once if the panel is still empty.
+    const empty = page.locator("#statBadges .stats-bars-empty");
+    if (await empty.isVisible().catch(() => false)) {
+      await page.locator("#btnBuild").click();
+      await expect(page.locator("#statBadges .stat-badge").first()).toBeVisible({
+        timeout: 60_000,
+      });
+    }
+    const badge = page.locator("#statBadges .stat-badge", { hasText: "strings" });
+    await expect(badge).toBeVisible();
+    await badge.hover();
+    const tip = page.getByTestId("stat-tip");
+    await expect(tip).toBeVisible();
+    // Must live under body portal host — not under #statBadges / #side.
+    const portaled = await tip.evaluate((el) => {
+      const host = el.parentElement;
+      return !!(
+        host?.hasAttribute("data-tip-portal") &&
+        host.parentElement === document.body &&
+        !el.closest("#statBadges, #side")
+      );
+    });
+    expect(portaled).toBe(true);
+    const tipBox = await tip.boundingBox();
+    const sideBox = await page.locator("#side").boundingBox();
+    expect(tipBox).toBeTruthy();
+    expect(sideBox).toBeTruthy();
+    // Right edge of tip must stay in the editor column (gap left of #side).
+    expect(tipBox!.x + tipBox!.width).toBeLessThanOrEqual(sideBox!.x - 4);
   });
 
   test("Deploy split menu lists mode/minify choices", async ({ page }) => {

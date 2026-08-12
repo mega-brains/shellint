@@ -173,3 +173,67 @@ button.stat-badge:focus-visible {
 }
 
 .mem-compare.warn { color: var(--danger); }
+
+/* Instant compare tip for #statBadges (reuses .opt-tip chrome). */
+.stat-tip {
+  /* Width comes from tipStyleFor inline style (clamped left of #side). */
+  max-width: min(16rem, calc(100vw - 16px));
+}
+
+.stat-tip-solo {
+  margin: 0;
+}
+
+.stat-tip-solo-value {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.875rem;
+  color: var(--ink);
+}
+
+.stat-tip-solo-value strong {
+  font-weight: 600;
+}
+
+.stat-tip-hint {
+  margin: 0.35rem 0 0;
+  font-size: 0.8125rem;
+  line-height: 1.35;
+  color: var(--muted);
+}
+
+.stat-tip-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 0.8125rem;
+  line-height: 1.4;
+}
+
+.stat-tip-table th,
+.stat-tip-table td {
+  padding: 0.12rem 0.25rem;
+  border: none;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-tip-table th {
+  font-weight: 500;
+  color: var(--muted);
+  text-align: left;
+  padding-right: 0.75rem;
+}
+
+.stat-tip-table td {
+  text-align: right;
+  color: var(--ink);
+}
+
+.stat-tip-table td.stat-tip-cell.up {
+  color: #6d2414;
+}
+
+.stat-tip-table td.stat-tip-cell.down {
+  color: #0b4f44;
+}

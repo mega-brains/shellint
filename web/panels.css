@@ -33,6 +33,7 @@ main:has(#logsPanel:not(.collapsed)) #logsPanel {
 
 #buildPanel,
 #checkPanel,
+#optionsPanel,
 #devicePanel { font-family: var(--sans-narrow); }
 
 /* The editor's right-hand sidebar: build sizes on top, check indicator below. */
@@ -52,11 +53,12 @@ main:has(#logsPanel:not(.collapsed)) #logsPanel {
 /* Collapsible panel chrome, shared by the build and device sections. */
 .panel-head {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
+  flex-wrap: nowrap;
+  align-items: center;
   gap: 0.4rem 0.75rem;
   cursor: pointer;
   user-select: none;
+  min-width: 0;
 }
 
 .panel-head:focus-visible {
@@ -66,9 +68,15 @@ main:has(#logsPanel:not(.collapsed)) #logsPanel {
 
 .panel-toggle {
   font-family: var(--mono);
-  font-size: 0.8rem;
+  font-size: 1.15rem;
+  line-height: 1;
   color: var(--muted);
-  width: 0.9rem;
+  width: 1.35rem;
+  height: 1.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
 }
 
 .panel-head h2 {
@@ -78,6 +86,7 @@ main:has(#logsPanel:not(.collapsed)) #logsPanel {
   letter-spacing: 0.04em;
   color: var(--muted);
   font-weight: 600;
+  flex-shrink: 0;
 }
 
 .panel-peek {
@@ -90,6 +99,7 @@ main:has(#logsPanel:not(.collapsed)) #logsPanel {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  letter-spacing: -0.08em;
 }
 
 .panel-peek.error { color: var(--danger); }
@@ -109,6 +119,47 @@ main:has(#logsPanel:not(.collapsed)) #logsPanel {
 .build { flex: 0 0 auto; }
 
 .build.collapsed .sizes { display: none; }
+
+/* Minify knobs under build/check — collapsed by default. */
+.options {
+  flex: 0 0 auto;
+  border-top: 2px solid var(--line);
+  padding-top: 0.45rem;
+}
+
+.options.collapsed .options-body { display: none; }
+
+.options-body { margin-top: 0.35rem; }
+
+.options-note {
+  margin: 0 0 0.35rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.options-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.options-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--ink);
+  cursor: pointer;
+  user-select: none;
+}
+
+.options-item input { accent-color: var(--accent); }
+
+.options-item input:disabled { cursor: wait; }
 
 .sizes {
   display: grid;
@@ -146,6 +197,57 @@ main:has(#logsPanel:not(.collapsed)) #logsPanel {
   margin: 0.25rem 0 0;
   font-family: var(--mono);
   font-size: 0.95rem;
+  text-align: end; /* *************** */
+
+  &.mem-total {
+    margin-top: -1em;
+  }
+}
+
+.size-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+.size-table th,
+.size-table td {
+  padding: 0.15rem 0.55rem 0.15rem 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.size-table thead th {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.size-table tbody th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  padding-left: 0;
+}
+
+.size-table tbody td {
+  color: var(--ink);
+}
+
+.size-table td.size-low {
+  background: var(--size-low-bg);
+}
+
+.size-table td.size-high {
+  background: var(--size-high-bg);
+}
+
+.size-table th:last-child,
+.size-table td:last-child {
+  padding-right: 0;
 }
 
 .size-stats p.stats-summary {

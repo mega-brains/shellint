@@ -141,6 +141,18 @@ if (emitted("var d = arr[0];").has("no-destructuring")) {
 const stats = analyzeScriptFile();
 const timerSample = analyzeSource("Timer.set(1000, false, function () {});", "sample.ts");
 if (!timerSample.apis["Timer.set"]) throw new Error("expected Timer.set in sample stats");
+const bleSample = analyzeSource(
+  "if (ev !== BLE.Scanner.SCAN_RESULT) return;\\n" +
+    "BLE.Scanner.Start({ duration_ms: BLE.Scanner.INFINITE_SCAN }, function () {});",
+  "ble.ts",
+);
+for (const k of ["BLE.Scanner.SCAN_RESULT", "BLE.Scanner.INFINITE_SCAN", "BLE.Scanner.Start"]) {
+  if (!bleSample.apis[k]) throw new Error("expected " + k + " in sample stats");
+}
+if (bleSample.apis["BLE.Scanner.Start"] !== 1) throw new Error("BLE.Scanner.Start nested members");
+if (!bleSample.sites.apis.includes(1) || !bleSample.sites.apis.includes(2)) {
+  throw new Error("expected BLE sites on lines 1 and 2");
+}
 if (inferChip(2, "SNSW") !== "ESP32") throw new Error("inferChip gen2");
 if (inferChip(3, "S3SW") !== "ESP32-C3") throw new Error("inferChip gen3");
 
@@ -430,6 +442,12 @@ for (const name of ["../package.json", "devroom.json", "", "prod.js.map"]) {
   if (res.status !== 404) throw new Error("artifact route served off-allowlist name: " + name);
 }
 
+const statsPayload = await (await app.request("/api/stats")).json();
+const v = statsPayload.variants;
+if (!v?.source || v.source.apiKinds == null || !v.debugRaw || !v.prodMin) {
+  throw new Error("/api/stats must return variants.source + dist counters");
+}
+
 // Start/stop the device script: reject a malformed body before any RPC is made,
 // so a typo can never reach Script.Start/Stop. The happy path needs a device.
 for (const body of ["{}", '{"running":"yes"}', "not json"]) {
@@ -441,7 +459,28 @@ for (const body of ["{}", '{"running":"yes"}', "not json"]) {
   if (res.status !== 400) throw new Error("script route accepted bad body: " + body);
 }
 
-console.log("smoke: dialect/stats/inferChip/lint tier1-5/check/probe-slot-safety/artifacts ok");
+// Minify options live in devroom.json — GET exposes them; PATCH merges booleans.
+{
+  const patch = (body) =>
+    app.request("/api/config", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  const before = await (await app.request("/api/config")).json();
+  if (typeof before.config?.minify?.compress !== "boolean") {
+    throw new Error("GET /api/config should include minify knobs");
+  }
+  const was = before.config.minify.toplevel;
+  const flipped = await (await patch({ minify: { toplevel: !was } })).json();
+  if (flipped.config.minify.toplevel !== !was) throw new Error("PATCH minify.toplevel");
+  await patch({ minify: { toplevel: was } });
+  if ((await patch({ minify: { compress: "yes" } })).status !== 400) {
+    throw new Error("PATCH /api/config accepted non-boolean");
+  }
+}
+
+console.log("smoke: dialect/stats/inferChip/lint tier1-5/check/probe-slot-safety/artifacts/config ok");
 `,
   ],
   { cwd: ROOT, encoding: "utf8" },
