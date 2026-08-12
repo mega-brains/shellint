@@ -124,7 +124,7 @@ const smoke = spawnSync(
     `
 import { readFileSync } from "node:fs";
 import { checkBuildArtifacts, checkDialectSource } from "./server/dialect-check.ts";
-import { analyzeScriptFile } from "./server/script-stats.ts";
+import { analyzeScriptFile, analyzeSource } from "./server/script-stats.ts";
 import { inferChip } from "./server/device-status.ts";
 import { lintSource } from "./server/lint-source.ts";
 import { lintSemantics } from "./server/lint-semantics.ts";
@@ -151,7 +151,8 @@ if (emitted("var d = arr[0];").has("no-destructuring")) {
 }
 
 const stats = analyzeScriptFile();
-if (!stats.apis["Timer.set"]) throw new Error("expected Timer.set in sample stats");
+const timerSample = analyzeSource("Timer.set(1000, false, function () {});", "sample.ts");
+if (!timerSample.apis["Timer.set"]) throw new Error("expected Timer.set in sample stats");
 if (inferChip(2, "SNSW") !== "ESP32") throw new Error("inferChip gen2");
 if (inferChip(3, "S3SW") !== "ESP32-C3") throw new Error("inferChip gen3");
 

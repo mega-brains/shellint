@@ -1,6 +1,6 @@
 {
   "probed": true,
-  "at": "2026-08-11T23:00:01.817Z",
+  "at": "2026-08-11T23:06:58.539Z",
   "deviceIp": "192.168.3.106",
   "scriptId": 1,
   "configuredScriptId": 1,
@@ -639,9 +639,15 @@
     },
     {
       "id": "virtual.instance.methods",
-      "code": "(function () { try { var h = Virtual.getHandle(\"boolean:200\"); if (!h) return \"no-handle\"; return typeof h.setValue + \"/\" + typeof h.getValue + \"/\" + typeof h.getStatus + \"/\" + typeof h.getConfig + \"/\" + typeof h.setConfig + \"/\" + typeof h.on + \"/\" + typeof h.off; } catch (e) { return \"throws:\" + (e.message || e); } })()",
+      "code": "(function(){try{var h=Virtual.getHandle(\"boolean:200\");if(!h)return \"none\";return typeof h.setValue+\"/\"+typeof h.getValue+\"/\"+typeof h.getStatus+\"/\"+typeof h.getConfig+\"/\"+typeof h.setConfig;}catch(e){return \"throws:\"+(e.message||e);}})()",
       "ok": true,
-      "result": "no-handle"
+      "result": "none"
+    },
+    {
+      "id": "virtual.instance.events",
+      "code": "(function(){try{var h=Virtual.getHandle(\"boolean:200\");if(!h)return \"none\";return typeof h.on+\"/\"+typeof h.off;}catch(e){return \"throws:\"+(e.message||e);}})()",
+      "ok": true,
+      "result": "none"
     },
     {
       "id": "process",
