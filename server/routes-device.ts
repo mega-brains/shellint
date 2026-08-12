@@ -9,6 +9,7 @@ import {
   removeDevice,
   resolveTarget,
   sanitizeDevice,
+  setActive,
   updateDevice,
 } from "./devices.ts";
 import { ShellyRpc } from "./rpc.ts";
@@ -20,7 +21,12 @@ import {
   setEcoMode,
   setScriptRunning,
 } from "./device-status.ts";
-import { readLogs, startLogStream, stopLogStream } from "./debug-log.ts";
+import {
+  readLogs,
+  resetForDeviceSwitch,
+  startLogStream,
+  stopLogStream,
+} from "./debug-log.ts";
 import { expandLogText, loadLogMap } from "./log-map.ts";
 import { writeGeneratedTypings } from "./probe-typings.ts";
 
@@ -144,6 +150,26 @@ export function registerDeviceRoutes(app: Hono) {
       });
     } finally {
       rpc.close();
+    }
+  });
+
+  app.post("/api/session/active", async (c) => {
+    let body: { device?: string; slot?: number; script?: string };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json(
+        { ok: false, error: "expected JSON body { device?, slot?, script? }" },
+        400,
+      );
+    }
+    try {
+      const active = setActive(body);
+      // A new active device means the old one's log ring must not bleed into it.
+      resetForDeviceSwitch();
+      return c.json({ ok: true, active });
+    } catch (e) {
+      return deviceError(c, e);
     }
   });
 

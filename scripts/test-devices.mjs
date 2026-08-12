@@ -6,14 +6,15 @@
  * Usage: node --import tsx scripts/test-devices.mjs
  */
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { ROOT } from "../server/paths.ts";
+import { dirname, join } from "node:path";
+import { ROOT, DEVICE_PROFILE_PATH, PROBE_PATH, devicePaths } from "../server/paths.ts";
 import {
   _resetCache,
   addDevice,
   DuplicateDeviceError,
   loadDevices,
   NoDeviceError,
+  mirrorActiveDevice,
   removeDevice,
   requireActive,
   resolveTarget,
@@ -23,6 +24,8 @@ import {
   computeDigestResponse,
   NonceCounter,
 } from "../server/auth-digest.ts";
+import { resetForDeviceSwitch, readLogs } from "../server/debug-log.ts";
+import { GENERATED_DTS_PATH } from "../server/probe-typings.ts";
 import { createApp } from "../server/app.ts";
 
 const DEVROOM_JSON = join(ROOT, "devroom.json");
@@ -36,6 +39,15 @@ function fail(msg) {
 
 const originalDevroom = existsSync(DEVROOM_JSON) ? readFileSync(DEVROOM_JSON, "utf8") : null;
 const originalDevices = existsSync(DEVICES_FILE) ? readFileSync(DEVICES_FILE, "utf8") : null;
+const originalProfileMirror = existsSync(DEVICE_PROFILE_PATH)
+  ? readFileSync(DEVICE_PROFILE_PATH, "utf8")
+  : null;
+const originalProbeMirror = existsSync(PROBE_PATH) ? readFileSync(PROBE_PATH, "utf8") : null;
+const originalGeneratedDts = existsSync(GENERATED_DTS_PATH)
+  ? readFileSync(GENERATED_DTS_PATH, "utf8")
+  : null;
+const devicesSubdir = join(DEVICES_DIR, "devices");
+const originalDevicesSubdirExisted = existsSync(devicesSubdir);
 
 function restore() {
   if (originalDevroom !== null) writeFileSync(DEVROOM_JSON, originalDevroom, "utf8");
@@ -45,6 +57,22 @@ function restore() {
   } else {
     rmSync(DEVICES_FILE, { force: true });
   }
+  if (originalProfileMirror !== null) {
+    writeFileSync(DEVICE_PROFILE_PATH, originalProfileMirror, "utf8");
+  } else {
+    rmSync(DEVICE_PROFILE_PATH, { force: true });
+  }
+  if (originalProbeMirror !== null) {
+    writeFileSync(PROBE_PATH, originalProbeMirror, "utf8");
+  } else {
+    rmSync(PROBE_PATH, { force: true });
+  }
+  if (originalGeneratedDts !== null) {
+    writeFileSync(GENERATED_DTS_PATH, originalGeneratedDts, "utf8");
+  } else {
+    rmSync(GENERATED_DTS_PATH, { force: true });
+  }
+  if (!originalDevicesSubdirExisted) rmSync(devicesSubdir, { recursive: true, force: true });
   _resetCache();
 }
 
@@ -215,6 +243,43 @@ try {
   if (listAfterDelete.devices.some((d) => d.id === addedId)) {
     fail("device should be gone after DELETE");
   }
+
+  // --- switch cases: setActive() mirrors the newly active device's cached
+  // profile/probe into types/, and resets the log ring generation ---
+  setDevicesFile({ version: 1, active: null, devices: [] });
+  _resetCache();
+  const deviceA = await addDevice({ ip: "10.0.1.1", label: "Device A" }, fakeRpcFactory({ failConnect: true }));
+  const deviceB = await addDevice({ ip: "10.0.1.2", label: "Device B" }, fakeRpcFactory({ failConnect: true }));
+
+  // Seed device A's per-device cache directly (as if a prior profile fetch/probe ran).
+  mkdirSync(dirname(devicePaths(deviceA.id).profile), { recursive: true });
+  writeFileSync(
+    devicePaths(deviceA.id).profile,
+    JSON.stringify({ at: "t", deviceIp: deviceA.ip, gen: 2, ver: "1.0.0", model: "M-A", app: null, methods: [], components: [] }),
+    "utf8",
+  );
+
+  setActive({ device: deviceA.id, slot: 1, script: "main" });
+  if (!existsSync(DEVICE_PROFILE_PATH)) fail("mirrorActiveDevice should copy device A's cached profile to the mirror");
+  let mirrored = JSON.parse(readFileSync(DEVICE_PROFILE_PATH, "utf8"));
+  if (mirrored.model !== "M-A") fail(`expected mirror to reflect device A, got ${JSON.stringify(mirrored)}`);
+
+  // Device B has no cached profile yet -> switching to it must not leave A's mirror behind.
+  setActive({ device: deviceB.id, slot: 1, script: "main" });
+  if (existsSync(DEVICE_PROFILE_PATH)) {
+    fail("switching to a device with no cached profile should remove the stale mirror");
+  }
+
+  // Explicit mirrorActiveDevice() call (as fetchDeviceProfile/runProbe use internally) is idempotent.
+  mirrorActiveDevice(deviceB.id);
+  if (existsSync(DEVICE_PROFILE_PATH)) fail("mirrorActiveDevice should stay a no-op mirror removal for an uncached device");
+
+  // Log ring: resetForDeviceSwitch() bumps deviceGeneration so a poller sees the switch.
+  const before = readLogs(0).deviceGeneration;
+  resetForDeviceSwitch();
+  const after = readLogs(0).deviceGeneration;
+  if (after <= before) fail(`expected deviceGeneration to increase after a switch, got ${before} -> ${after}`);
+  if (readLogs(0).lines.length !== 0) fail("resetForDeviceSwitch should wipe buffered lines");
 
   // --- digest auth: known vector locks the formula against a refactor ---
   const realm = "shellyplus1pm-441793a1b2c3";

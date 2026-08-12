@@ -1,7 +1,16 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync, chmodSync } from "node:fs";
-import { join } from "node:path";
-import { ROOT, DEVICE_PROFILE_PATH } from "./paths.ts";
+import {
+  existsSync,
+  mkdirSync,
+  readFileSync,
+  writeFileSync,
+  chmodSync,
+  renameSync,
+  rmSync,
+} from "node:fs";
+import { dirname, join } from "node:path";
+import { ROOT, DEVICE_PROFILE_PATH, PROBE_PATH, devicePaths } from "./paths.ts";
 import { AuthFailedError, ShellyRpc } from "./rpc.ts";
+import { writeGeneratedTypings } from "./probe-typings.ts";
 
 export type DeviceAuth = { username: string; password: string };
 export type DeviceInfo = { model?: string; gen?: number; ver?: string; app?: string };
@@ -291,7 +300,41 @@ export function setActive(input: SetActiveInput): ActiveTarget {
   const script = input.script ?? file.active?.script ?? "main";
   const active: ActiveSelection = { device: deviceId, slot, script };
   persist({ ...file, active });
+  mirrorActiveDevice(deviceId);
   return { device, slot, script };
+}
+
+/** Copies `src` to `dest` via a temp file + rename, so a crash mid-write never
+ * leaves `dest` half-written. */
+function atomicCopy(src: string, dest: string): void {
+  mkdirSync(dirname(dest), { recursive: true });
+  const tmp = `${dest}.tmp`;
+  writeFileSync(tmp, readFileSync(src));
+  renameSync(tmp, dest);
+}
+
+/**
+ * Rewrites `types/device-profile.json` / `types/generated-probe.json` /
+ * `types/generated.d.ts` to mirror `deviceId`'s cached capability data —
+ * the compile path (`tsconfig.shelly.json`, `build-shelly.mjs`) reads those
+ * fixed paths unparameterized, so switching devices means swapping what they
+ * point at rather than threading a device id through the whole pipeline.
+ * Mirrors are written temp-then-rename; if that fails, the previous mirror
+ * is left in place (never a half-written mix of two devices).
+ */
+export function mirrorActiveDevice(deviceId: string): void {
+  const src = devicePaths(deviceId);
+  if (existsSync(src.profile)) {
+    atomicCopy(src.profile, DEVICE_PROFILE_PATH);
+  } else {
+    rmSync(DEVICE_PROFILE_PATH, { force: true });
+  }
+  if (existsSync(src.probe)) {
+    atomicCopy(src.probe, PROBE_PATH);
+  } else {
+    rmSync(PROBE_PATH, { force: true });
+  }
+  writeGeneratedTypings();
 }
 
 export function requireActive(): ActiveTarget {

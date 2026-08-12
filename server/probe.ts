@@ -1,8 +1,8 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { PROBE_PATH } from "./paths.ts";
+import { devicePaths } from "./paths.ts";
 import { loadConfig, assertDevroomCompiler } from "./config.ts";
-import { requireActive } from "./devices.ts";
+import { requireActive, mirrorActiveDevice } from "./devices.ts";
 import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
 // Script.Eval expressions, and they must stay side-effect-free: they may be
 // evaluated inside a script the user owns.
@@ -268,8 +268,10 @@ export async function runProbe(): Promise<ProbeReport> {
       results,
     };
 
-    mkdirSync(dirname(PROBE_PATH), { recursive: true });
-    writeFileSync(PROBE_PATH, JSON.stringify(report, null, 2) + "\n", "utf8");
+    const path = devicePaths(target.device.id).probe;
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify(report, null, 2) + "\n", "utf8");
+    mirrorActiveDevice(target.device.id);
     return report;
   } finally {
     rpc.close();

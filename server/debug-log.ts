@@ -19,6 +19,8 @@ export type LogSnapshot = {
   lines: LogLine[];
   metrics: MetricPoint[];
   dropped: number;
+  /** Bumped on every device switch — a poller sees this change and wipes its view. */
+  deviceGeneration: number;
 };
 
 const MAX_LINES = 500;
@@ -236,6 +238,21 @@ export function stopLogStream(): void {
 }
 
 /**
+ * Called on `/api/session/active` — the ring is per-device by construction
+ * (one socket), so a switch stops the stream, wipes the buffered lines/
+ * metrics, and bumps `generation` so the next `readLogs()` reports
+ * `deviceGeneration` changed and the panel wipes instead of interleaving two
+ * devices' output.
+ */
+export function resetForDeviceSwitch(): void {
+  stopLogStream();
+  lines.length = 0;
+  metrics.length = 0;
+  headSeq = 0;
+  evictedSeq = 0;
+}
+
+/**
  * Entries above `sinceSeq`, plus the head seq to poll from next.
  * The device buffer is circular and lossy — oldest lines may never be streamed —
  * so `dropped` is only what *this* ring evicted, and marks a gap the UI must not bridge.
@@ -250,6 +267,7 @@ export function readLogs(sinceSeq: number): LogSnapshot {
       .filter((m) => m.seq > from)
       .map((m) => ({ ts: m.ts, series: m.series, value: m.value })),
     dropped: Math.max(0, evictedSeq - from),
+    deviceGeneration: generation,
   };
 }
 

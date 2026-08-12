@@ -16,11 +16,18 @@ import { estimateMemoryFile } from "./memory-estimate.ts";
 import { minFirmware } from "./min-firmware.ts";
 import { listArtifacts, readArtifact } from "./artifacts.ts";
 import { registerScriptRoutes } from "./script-routes.ts";
+import { listDevices, loadDevices, sanitizeDevice } from "./devices.ts";
 
 /** Config, build, check, stats, history, artifacts — plus script source CRUD (script-routes.ts). Split out of app.ts to stay under the 500-line cap. */
 export function registerScriptBuildRoutes(app: Hono) {
   app.get("/api/config", (c) => {
-    return c.json({ ok: true, config: sanitizeConfig(loadConfig()) });
+    const devicesFile = loadDevices();
+    return c.json({
+      ok: true,
+      config: sanitizeConfig(loadConfig()),
+      devices: listDevices().map(sanitizeDevice),
+      active: devicesFile.active,
+    });
   });
 
   app.patch("/api/config", async (c) => {
