@@ -24,6 +24,10 @@ const VOLATILE = [
   // (mocked device status + real, unmocked /api/config), only the
   // rasterization isn't.
   "#deviceIp",
+  // Native <select> controls (M15 device/slot pickers) — same subpixel
+  // antialiasing instability as #deviceIp, deterministic content aside.
+  "#deviceSelect",
+  "#slotSelect",
 ];
 
 /**

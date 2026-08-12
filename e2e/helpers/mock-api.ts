@@ -166,6 +166,84 @@ export async function mockDeviceApis(page: Page): Promise<void> {
       typings: { path: "types/generated.d.ts", bytes: 0 },
     });
   });
+
+  const mockDevice = {
+    id: mockDeviceStatus.device.id,
+    label: "e2e-device",
+    ip: mockDeviceStatus.deviceIp,
+    hasPassword: false,
+    info: {
+      model: mockDeviceStatus.device.model,
+      gen: mockDeviceStatus.device.gen,
+      ver: mockDeviceStatus.device.ver,
+    },
+    slots: { "1": { script: "main" } },
+  };
+  // A second device, only for the device-switch spec — harmless to always
+  // list, since nothing selects it unless a test explicitly switches to it.
+  const mockDevice2 = {
+    id: "shellyplus1pm-second00000",
+    label: "Second device",
+    ip: "192.168.4.50",
+    hasPassword: false,
+    info: { model: "SNSW-001P16EU", gen: 2, ver: "1.0.0" },
+    slots: { "1": { script: "main" } },
+  };
+  let mockActive = { device: mockDevice.id, slot: 1, script: "main" };
+
+  await page.route("**/api/devices", async (route) => {
+    const method = route.request().method();
+    if (method === "GET") {
+      await json(route, {
+        ok: true,
+        devices: [mockDevice, mockDevice2],
+        active: mockActive,
+      });
+      return;
+    }
+    if (method === "POST") {
+      await json(route, { ok: true, device: mockDevice });
+      return;
+    }
+    await route.fallback();
+  });
+
+  await page.route("**/api/session/active", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    const body = (route.request().postDataJSON() ?? {}) as {
+      device?: string;
+      slot?: number;
+    };
+    mockActive = {
+      device: body.device ?? mockActive.device,
+      slot: body.slot ?? mockActive.slot,
+      script: "main",
+    };
+    // A device switch stops the log stream server-side (debug-log.ts:resetForDeviceSwitch) —
+    // mirror that so the next GET/POST /api/device/logs sees a fresh, disconnected stream.
+    logConnected = false;
+    logSeq = 0;
+    await json(route, { ok: true, active: mockActive });
+  });
+
+  await page.route("**/api/device/scripts**", async (route) => {
+    const url = new URL(route.request().url());
+    const forDevice = url.searchParams.get("device") ?? mockActive.device;
+    const slots =
+      forDevice === mockDevice2.id
+        ? [{ id: 1, name: "main", running: false, enable: true, boundScript: "main" }]
+        : [
+            {
+              id: 1,
+              name: "main",
+              running: mockDeviceStatus.script.running,
+              enable: true,
+              mem_used: mockDeviceStatus.script.mem_used,
+              boundScript: "main",
+            },
+          ];
+    await json(route, { ok: true, slots });
+  });
 }
 
 /**

@@ -1,0 +1,92 @@
+/* Header device/slot pickers + the add-device manager modal. */
+
+.device-picker-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-top: 0.15rem;
+}
+
+.device-select,
+.slot-select {
+  font: inherit;
+  font-size: 0.78rem;
+  padding: 0.1rem 0.35rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--panel);
+  color: var(--ink);
+  max-width: 220px;
+}
+
+.slot-select { max-width: 140px; }
+
+.device-manager-modal {
+  width: min(380px, 92vw);
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--panel);
+  color: var(--ink);
+}
+
+.device-manager-modal::backdrop { background: rgba(28, 27, 25, 0.45); }
+
+.device-manager-modal[open] {
+  display: flex;
+  flex-direction: column;
+}
+
+.device-manager-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.6rem 0.9rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.device-manager-head p { margin: 0; font-weight: 600; }
+
+.device-manager-body {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.8rem 0.9rem;
+}
+
+.device-manager-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.8rem;
+  color: var(--muted);
+}
+
+.device-manager-field input {
+  font: inherit;
+  padding: 0.3rem 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--bg);
+  color: var(--ink);
+}
+
+.device-manager-hint {
+  margin: 0;
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.device-manager-error {
+  margin: 0;
+  font-size: 0.8rem;
+  color: var(--bad, #b23);
+}
+
+.device-manager-actions {
+  display: flex;
+  justify-content: flex-end;
+  padding: 0.6rem 0.9rem;
+  border-top: 1px solid var(--line);
+}

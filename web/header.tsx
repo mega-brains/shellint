@@ -24,6 +24,8 @@ export type HeaderProps = {
   statusError?: boolean;
   probeProgress?: { done: number; total: number } | null;
   deviceMeta: string;
+  /** Device + slot pickers (web/device-select.tsx, web/slot-select.tsx), rendered next to the title. */
+  deviceSelector?: ComponentChildren;
 };
 
 export function Header(props: HeaderProps) {
@@ -75,6 +77,9 @@ export function Header(props: HeaderProps) {
             ) : null}
           </p>
           <h1>Shelly DevRoom</h1>
+          {props.deviceSelector ? (
+            <div class="device-picker-row">{props.deviceSelector}</div>
+          ) : null}
         </div>
         <p class={`sub ${warn}`} id="configLine">
           {configText || "loading config…"}

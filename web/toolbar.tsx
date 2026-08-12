@@ -43,6 +43,8 @@ export type ToolbarProps = {
   onProbe: () => void;
   probeResults: ProbeResult[] | null;
   probeNote: string;
+  /** "Kitchen:1" — appended to the Deploy label so the target is never a guess. */
+  deployTarget?: string;
 };
 
 export function Toolbar(props: ToolbarProps) {
@@ -263,7 +265,7 @@ export function Toolbar(props: ToolbarProps) {
             disabled={deployDisabled}
             onClick={props.onDeploy}
           >
-            {`Deploy ${mode} · ${shortMinify(minify)}`}
+            {`Deploy ${mode} · ${shortMinify(minify)}${props.deployTarget ? ` → ${props.deployTarget}` : ""}`}
           </button>
         }
         menu={
