@@ -8,8 +8,6 @@ Small, simple development room (playground) for developing shelly scripts
 
 ```json
 {
-  "deviceIp": "192.168.1.100",
-  "scriptId": 1,
   "host": "0.0.0.0",
   "port": 8787,
   "compiler": "devroom"
@@ -18,10 +16,15 @@ Small, simple development room (playground) for developing shelly scripts
 
 | Field | Meaning |
 |---|---|
-| `deviceIp` | Shelly Gen2+ address on your LAN |
-| `scriptId` | Existing script slot to overwrite (no Create) |
 | `host` / `port` | DevRoom HTTP bind (default `0.0.0.0:8787`) |
 | `compiler` | Must be `"devroom"` for now (`shelly-forge` not wired) |
+
+Devices are no longer configured in `devroom.json` — add one from the UI's
+header device picker (`+ Add device…`), which stores it in `.devroom/devices.json`
+(gitignored, `0600`; the password field is plaintext — this is a LAN-only tool
+with no login of its own). A legacy `devroom.json` with `deviceIp`/`scriptId`
+still works: the first server start migrates it into `.devroom/devices.json`
+automatically, one-way, without touching `devroom.json` itself.
 
 2. Install and start (mise preferred):
 
@@ -32,6 +35,12 @@ mise run start
 ```
 
 Open `http://127.0.0.1:8787` — edit `scripts/main.ts`, **Save → Build → Deploy**.
+The header's device picker switches the active device; a second picker next to
+it switches the active script slot on that device (`+ New slot…` /
+`Delete slot…`, typed-name confirm before a delete). Switching device or slot
+is server-global — this is a single-operator LAN tool, not a multi-tab
+per-target setup — and resets the device panel and log stream so they never
+blend two devices' data.
 Deploy is a split button: main click reuses last choice; ▾ picks
 **debug|prod** × **minified|non-minified**. **Check** runs the Shelly/Espruino
 compliance pass — it works offline, and when the device is answering it also

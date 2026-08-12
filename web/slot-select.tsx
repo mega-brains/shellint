@@ -1,4 +1,4 @@
-import { useEffect, useState } from "preact/hooks";
+import { useCallback, useEffect, useState } from "preact/hooks";
 import { api } from "./api";
 
 export type SlotInfo = {
@@ -16,33 +16,76 @@ export type SlotSelectProps = {
   onSwitch: (slot: number) => void | Promise<void>;
   /** Bumped on device switch, so the slot list refetches for the new device. */
   refreshKey: number;
+  onStatus?: (msg: string, isError?: boolean) => void;
 };
 
-/** Header script-slot picker for the active device. */
+const NEW_OPTION = "__new__";
+const DELETE_OPTION = "__delete__";
+
+/** Header script-slot picker for the active device, plus create/delete. */
 export function SlotSelect(props: SlotSelectProps) {
   const [slots, setSlots] = useState<SlotInfo[]>([]);
+  const [reloadTick, setReloadTick] = useState(0);
+  const deviceId = props.deviceId;
 
-  useEffect(() => {
-    if (!props.deviceId) {
+  const load = useCallback(async () => {
+    if (!deviceId) {
       setSlots([]);
       return;
     }
-    let cancelled = false;
-    void api<{ slots: SlotInfo[] }>(
-      `/api/device/scripts?device=${encodeURIComponent(props.deviceId)}`,
-    )
-      .then((data) => {
-        if (!cancelled) setSlots(data.slots);
-      })
-      .catch(() => {
-        if (!cancelled) setSlots([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [props.deviceId, props.refreshKey]);
+    try {
+      const data = await api<{ slots: SlotInfo[] }>(
+        `/api/device/scripts?device=${encodeURIComponent(deviceId)}`,
+      );
+      setSlots(data.slots);
+    } catch {
+      setSlots([]);
+    }
+  }, [deviceId]);
 
-  if (!props.deviceId) return null;
+  useEffect(() => {
+    void load();
+  }, [load, props.refreshKey, reloadTick]);
+
+  if (!deviceId) return null;
+
+  const createSlot = async () => {
+    const name = window.prompt("Name for the new slot on this device:");
+    if (!name || !name.trim()) return;
+    try {
+      const data = await api<{ slot: number }>("/api/device/scripts", {
+        method: "POST",
+        body: JSON.stringify({ name: name.trim(), device: deviceId }),
+      });
+      props.onStatus?.(`created slot ${data.slot} ("${name.trim()}")`);
+      setReloadTick((t) => t + 1);
+      await props.onSwitch(data.slot);
+    } catch (e) {
+      props.onStatus?.(e instanceof Error ? e.message : String(e), true);
+    }
+  };
+
+  const deleteSlot = async () => {
+    if (props.activeSlot == null) return;
+    const current = slots.find((s) => s.id === props.activeSlot);
+    const label = current?.name ?? String(props.activeSlot);
+    const typed = window.prompt(
+      `This deletes slot ${props.activeSlot} ("${label}") on the device — type its name to confirm:`,
+    );
+    if (typed !== label) {
+      if (typed !== null) props.onStatus?.("delete cancelled — name did not match", true);
+      return;
+    }
+    try {
+      await api(`/api/device/scripts/${props.activeSlot}?device=${encodeURIComponent(deviceId)}`, {
+        method: "DELETE",
+      });
+      props.onStatus?.(`deleted slot ${props.activeSlot}`);
+      setReloadTick((t) => t + 1);
+    } catch (e) {
+      props.onStatus?.(e instanceof Error ? e.message : String(e), true);
+    }
+  };
 
   return (
     <select
@@ -51,8 +94,12 @@ export function SlotSelect(props: SlotSelectProps) {
       aria-label="Active script slot"
       value={props.activeSlot ?? ""}
       onChange={(e) => {
-        const value = Number((e.target as HTMLSelectElement).value);
-        if (Number.isFinite(value)) void props.onSwitch(value);
+        const value = (e.target as HTMLSelectElement).value;
+        (e.target as HTMLSelectElement).value = String(props.activeSlot ?? "");
+        if (value === NEW_OPTION) return void createSlot();
+        if (value === DELETE_OPTION) return void deleteSlot();
+        const n = Number(value);
+        if (Number.isFinite(n)) void props.onSwitch(n);
       }}
     >
       {slots.length === 0 ? <option value="">no slots</option> : null}
@@ -62,6 +109,10 @@ export function SlotSelect(props: SlotSelectProps) {
           {s.running ? " ▶" : ""}
         </option>
       ))}
+      <option value={NEW_OPTION}>+ New slot…</option>
+      <option value={DELETE_OPTION} disabled={props.activeSlot == null}>
+        Delete slot…
+      </option>
     </select>
   );
 }

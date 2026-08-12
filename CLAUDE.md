@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - read [plans-in-project-dir](./.claude/memory/plans-in-project-dir.md)
 
 
-## Status: M0–M4 basic · M5–M10 done (lint Tier 1–5, incl. connected Tier 4) · M11 type-layer bans · M12 dashboard metrics · post-M12 UI (editor sidebar, permanent check indicator) · M13 tier-3 minify, prod log map, 104-probe capability run, artifact preview · M14 web bundle size (minify, CSS bundle, precompressed assets)
+## Status: M0–M4 basic · M5–M10 done (lint Tier 1–5, incl. connected Tier 4) · M11 type-layer bans · M12 dashboard metrics · post-M12 UI (editor sidebar, permanent check indicator) · M13 tier-3 minify, prod log map, 104-probe capability run, artifact preview · M14 web bundle size (minify, CSS bundle, precompressed assets) · M15 multi-device + multi-script slot selection (device CRUD, digest auth, header device/slot pickers, per-device profile/probe mirroring)
 
 Prefer **mise** tasks ([`mise.toml`](./mise.toml)). Verify with `ls` / `mise tasks`
 before assuming entrypoints exist.
@@ -27,7 +27,8 @@ build, test).
 | Env gating | `meta.env` DCE → `*.raw.js`; then Terser minify → `*.js`; prod also shortens log strings into `dist/prod.logmap.json`, which the logs panel re-expands (M13) |
 | Emit | Flat (no IIFE) → `dist/{debug,prod}.{raw.js,js,adv.js}` — `*.adv.js` is tier 3 (`espruino --minify`, chained after Terser) and is simply absent when that binary is not installed (M13) |
 | Types | `types/shelly.d.ts`, `types/espruino-lib.d.ts`, `types/meta.d.ts` — the whole stdlib for device code, since `noLib` drops `lib.es*` (M11) |
-| Config | `devroom.json` (`deviceIp`, `scriptId`, `host`, `port`, `compiler`) |
+| Config | `devroom.json` (`host`, `port`, `compiler`, `minify`); legacy `deviceIp`/`scriptId` are read only as a one-time migration fallback (M15) |
+| Multi-device | `.devroom/devices.json` (gitignored, `0600`) holds the device list + active `{device, slot, script}` selection — `server/devices.ts`. Digest auth (`server/auth-digest.ts`) retries a 401 challenge once. Header device/slot pickers (`web/device-select.tsx`, `web/slot-select.tsx`) switch via `POST /api/session/active`, which re-mirrors the switched-to device's cached profile/probe into the fixed `types/*` paths below and resets the log stream. Per-script workspaces (`scriptKey`, always `"main"` today) are designed for but not built yet — see the M15 plan's §9 (M16) (M15) |
 | Server / UI | Hono + CodeMirror 6 |
 | Web bundle | esbuild → `web/dist/{app.js,styles.css,api-docs.json}`, all minified and precompressed to `.br`/`.gz`; `server/static-assets.ts` negotiates on `Accept-Encoding`. Sourcemap is dev-only (`build:web:dev`); `npm run build:web` passes `--prod`. `web/cm-setup.ts` replaces CodeMirror's `basicSetup` to keep `@codemirror/lint` out. Budgets enforced by `scripts/test-web-assets.mjs` (M14) |
 | Deploy | WS PutCode; mode debug/prod + artifact min/raw |
@@ -37,10 +38,10 @@ build, test).
 | Charts | Hand-rolled inline SVG (`web/spark.ts`). **No uPlot** — deliberately dependency-free |
 | Compliance | `POST /api/check` — source lint Tier 1–5 + post-compile dialect guard (M8–M10). `server/check-catalog.ts` names all 59 checks; each run reports pass/warn/fail/**skipped** per rule, and `GET /api/checks` serves the catalog alone |
 | UI layout | Editor + resizable sidebar (`build`, `check`); footer keeps device telemetry, logs, status. Toolbar: Save · Build split (build / check / build + check) · Deploy split · Probe, both splits driven by `web/split-button.ts` |
-| Device profile | `types/device-profile.json` (`ListMethods` + components + gen/fw) drives Tier 4; refreshed when the device answers |
-| Capability probe | `mise run probe` → 104 `Script.Eval` expressions (`server/probe-catalog.ts`) → `types/generated-probe.json` → `types/generated.d.ts`. **Advisory**: excluded from the device compile, surfaced as the `probe-absent-api` warning (M13) |
+| Device profile | `types/device-profile.json` (`ListMethods` + components + gen/fw) drives Tier 4; refreshed when the device answers. Authoritative per-device copy lives at `.devroom/devices/<id>/profile.json`; `types/device-profile.json` is a mirror of whichever device is active, rewritten on switch (M15) |
+| Capability probe | `mise run probe` → 104 `Script.Eval` expressions (`server/probe-catalog.ts`) → `types/generated-probe.json` → `types/generated.d.ts`. **Advisory**: excluded from the device compile, surfaced as the `probe-absent-api` warning (M13). Same per-device-copy-plus-mirror scheme as the device profile (M15) |
 | Artifact preview | Selector above the editor swaps in any built `dist` artifact read-only; `GET /api/artifacts` + `/api/artifact` serve a six-name allowlist (M13). Last entry is `diff · debug ↔ prod (raw)` — unified diff computed in the browser (`web/diff.ts`, hand-rolled LCS), tinted per +/- line |
-| Auth | None for now |
+| Auth | None for the DevRoom UI itself. Digest auth (username `admin`, per-device password) is supported *to the Shelly device* — `.devroom/devices.json` stores the plaintext password, LAN-only tool, no login of its own (M15) |
 
 Default compiler is clean-room DevRoom (`compiler: "devroom"`). Setting
 `compiler` to anything else prints `shelly-forge path not wired yet`.

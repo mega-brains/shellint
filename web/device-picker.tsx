@@ -29,6 +29,7 @@ export function DevicePicker(props: DevicePickerProps) {
         deviceId={devicesState.active?.device ?? null}
         activeSlot={devicesState.active?.slot ?? null}
         refreshKey={devicesState.sessionKey}
+        onStatus={setStatus}
         onSwitch={(slot) =>
           withBusy(async () => {
             setStatus("switching slot…");
