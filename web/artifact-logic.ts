@@ -1,5 +1,5 @@
 import { Compartment, EditorState } from "@codemirror/state";
-import { EditorView } from "codemirror";
+import { EditorView } from "@codemirror/view";
 import {
   revealLine,
   SHOW_FILE_EVENT,

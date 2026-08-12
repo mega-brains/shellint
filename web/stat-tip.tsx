@@ -35,6 +35,7 @@ function cellText(c: StatCounters | undefined, metric: StatMetricKey, showBytes?
   if (!c) return "—";
   const n = c[metric];
   if (showBytes && metric === "strings") return `${n} · ${c.stringBytes} B`;
+  if (metric === "functions" && c.anonFunctions) return `${n} · ${c.anonFunctions} anon`;
   return String(n);
 }
 

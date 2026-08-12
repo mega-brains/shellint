@@ -1,0 +1,17 @@
+/*
+ * Bundle entry for the UI stylesheet — esbuild inlines these into
+ * web/dist/styles.css (scripts/build-web.mjs).
+ *
+ * ORDER IS THE CASCADE. It mirrors the <link> order web/index.html used
+ * before the bundle existed; do not sort or regroup these lines.
+ */
+@import "./styles.css";
+@import "./editor.css";
+@import "./panels.css";
+@import "./panels-extra.css";
+@import "./checks.css";
+@import "./charts.css";
+@import "./stats.css";
+@import "./diff.css";
+@import "./option-tip.css";
+@import "./build-error.css";

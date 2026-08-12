@@ -11,7 +11,7 @@
     "toplevel": true,
     "keepFnames": false,
     "logMap": true,
-    "debugLogMap": false,
+    "debugLogMap": true,
     "advanced": true
   }
 }

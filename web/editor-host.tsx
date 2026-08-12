@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import { EditorView, basicSetup } from "codemirror";
+import { EditorView } from "@codemirror/view";
 import { javascript } from "@codemirror/lang-javascript";
 import { EditorState } from "@codemirror/state";
+import { basicSetup } from "./cm-setup";
 import { findingGutter } from "./finding-gutter";
 import { dirtyGutter } from "./dirty-gutter";
 import { statLineHighlight } from "./line-highlight";

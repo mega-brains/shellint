@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - read [plans-in-project-dir](./.claude/memory/plans-in-project-dir.md)
 
 
-## Status: M0–M4 basic · M5–M10 done (lint Tier 1–5, incl. connected Tier 4) · M11 type-layer bans · M12 dashboard metrics · post-M12 UI (editor sidebar, permanent check indicator) · M13 tier-3 minify, prod log map, 104-probe capability run, artifact preview
+## Status: M0–M4 basic · M5–M10 done (lint Tier 1–5, incl. connected Tier 4) · M11 type-layer bans · M12 dashboard metrics · post-M12 UI (editor sidebar, permanent check indicator) · M13 tier-3 minify, prod log map, 104-probe capability run, artifact preview · M14 web bundle size (minify, CSS bundle, precompressed assets)
 
 Prefer **mise** tasks ([`mise.toml`](./mise.toml)). Verify with `ls` / `mise tasks`
 before assuming entrypoints exist.
@@ -29,6 +29,7 @@ build, test).
 | Types | `types/shelly.d.ts`, `types/espruino-lib.d.ts`, `types/meta.d.ts` — the whole stdlib for device code, since `noLib` drops `lib.es*` (M11) |
 | Config | `devroom.json` (`deviceIp`, `scriptId`, `host`, `port`, `compiler`) |
 | Server / UI | Hono + CodeMirror 6 |
+| Web bundle | esbuild → `web/dist/{app.js,styles.css,api-docs.json}`, all minified and precompressed to `.br`/`.gz`; `server/static-assets.ts` negotiates on `Accept-Encoding`. Sourcemap is dev-only (`build:web:dev`); `npm run build:web` passes `--prod`. `web/cm-setup.ts` replaces CodeMirror's `basicSetup` to keep `@codemirror/lint` out. Budgets enforced by `scripts/test-web-assets.mjs` (M14) |
 | Deploy | WS PutCode; mode debug/prod + artifact min/raw |
 | Live telemetry | `GET /api/device/status` + eco toggle (M5) |
 | Dashboard metrics | `/api/stats` → `estimate` (JsVar model) + `minFirmware`; size sparkline; estimate vs live `mem_peak` (M12). Counter badges carry `stats.sites` (source lines per counter) and toggle a line highlight in the editor when clicked |

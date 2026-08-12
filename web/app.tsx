@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "preact/hooks";
-import type { EditorView } from "codemirror";
+import type { EditorView } from "@codemirror/view";
 import { Header } from "./header";
 import { Toolbar, type BuildAction, type Minify, type Mode } from "./toolbar";
 import { Layout } from "./layout";

@@ -30,6 +30,7 @@ export type ScriptStats = {
   declarations: {
     vars: number;
     functions: number;
+    anonFunctions: number;
     params: number;
   };
   literals: {
@@ -62,7 +63,7 @@ const EMPTY: ScriptStats = {
     rpcHandlers: 0,
     mqttSubs: 0,
   },
-  declarations: { vars: 0, functions: 0, params: 0 },
+  declarations: { vars: 0, functions: 0, anonFunctions: 0, params: 0 },
   literals: {
     strings: { count: 0, totalBytes: 0 },
     numbers: { count: 0 },
@@ -141,6 +142,7 @@ export type StatCounters = {
   apiCalls: number;
   vars: number;
   functions: number;
+  anonFunctions: number;
   strings: number;
   stringBytes: number;
   consoleLog: number;
@@ -174,6 +176,7 @@ export function countersFromStats(stats: ScriptStats): StatCounters {
     apiCalls,
     vars: stats.declarations.vars,
     functions: stats.declarations.functions,
+    anonFunctions: stats.declarations.anonFunctions,
     strings: stats.literals.strings.count,
     stringBytes: stats.literals.strings.totalBytes,
     consoleLog: stats.logging.consoleLog,
@@ -248,6 +251,8 @@ export function analyzeSource(source: string, fileName = "main.ts"): ScriptStats
       if (node.name) {
         stats.declarations.functions += 1;
         mark("functions", node);
+      } else {
+        stats.declarations.anonFunctions += 1;
       }
       stats.declarations.params += node.parameters.length;
     }

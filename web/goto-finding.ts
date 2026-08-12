@@ -1,4 +1,4 @@
-import { EditorView } from "codemirror";
+import { EditorView } from "@codemirror/view";
 
 /**
  * Clicking a finding's location jumps the editor to that line. The check panel

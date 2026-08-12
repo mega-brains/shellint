@@ -4,7 +4,6 @@
  * scripts/gen-api-docs.mjs into types/api-docs.json).
  */
 import { hoverTooltip, type Tooltip } from "@codemirror/view";
-import apiDocs from "../types/api-docs.json";
 import { cmHost } from "./cm-host";
 
 interface DocEntry {
@@ -18,7 +17,21 @@ interface ApiDocs {
   byBareName: Record<string, string>;
 }
 
-const docs = apiDocs as ApiDocs;
+/**
+ * 27 KB of JSON that only ever renders on hover, so it is fetched alongside the
+ * bundle rather than inlined into it. `hoverTooltip` is synchronous — until the
+ * fetch lands, lookups simply miss and no tooltip appears.
+ */
+let docs: ApiDocs = { entries: {}, byBareName: {} };
+
+fetch("/api-docs.json")
+  .then((res) => (res.ok ? (res.json() as Promise<ApiDocs>) : null))
+  .then((loaded) => {
+    if (loaded) docs = loaded;
+  })
+  .catch(() => {
+    /* tooltips stay empty; the editor is unaffected */
+  });
 
 const WORD_CHAR = /[A-Za-z0-9_$]/;
 

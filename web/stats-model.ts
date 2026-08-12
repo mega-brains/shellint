@@ -15,6 +15,7 @@ export type StatCounters = {
   apiCalls: number;
   vars: number;
   functions: number;
+  anonFunctions: number;
   strings: number;
   stringBytes: number;
   consoleLog: number;
@@ -42,7 +43,7 @@ export function hasDistVariants(v: StatVariants | null | undefined): boolean {
 /** Build source counters from live BadgeStats / ScriptStats when variants absent. */
 export function countersFromBadgeStats(stats: {
   apis: Record<string, number>;
-  declarations: { vars: number; functions: number };
+  declarations: { vars: number; functions: number; anonFunctions?: number };
   literals: { strings: { count: number; totalBytes: number } };
   logging: { consoleLog: number; print: number };
   network: { shellyCall: number };
@@ -53,6 +54,7 @@ export function countersFromBadgeStats(stats: {
     apiCalls,
     vars: stats.declarations.vars,
     functions: stats.declarations.functions,
+    anonFunctions: stats.declarations.anonFunctions ?? 0,
     strings: stats.literals.strings.count,
     stringBytes: stats.literals.strings.totalBytes,
     consoleLog: stats.logging.consoleLog,
@@ -70,7 +72,7 @@ export type ScriptStats = {
     httpEndpoints: number;
     rpcHandlers: number;
   };
-  declarations: { vars: number; functions: number };
+  declarations: { vars: number; functions: number; anonFunctions: number };
   literals: { strings: { count: number; totalBytes: number } };
   logging: { consoleLog: number; print: number };
   network: { shellyCall: number };
@@ -152,7 +154,7 @@ export function resolveStats(
       httpEndpoints: 0,
       rpcHandlers: 0,
     },
-    declarations: { vars: 0, functions: 0 },
+    declarations: { vars: 0, functions: 0, anonFunctions: 0 },
     literals: { strings: { count: 0, totalBytes: 0 } },
     logging: { consoleLog: latest.stats.consoleLog, print: 0 },
     network: { shellyCall: 0 },

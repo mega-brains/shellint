@@ -30,6 +30,7 @@ import { readLogs, startLogStream, stopLogStream } from "./debug-log.ts";
 import { expandLogText, loadLogMap } from "./log-map.ts";
 import { listArtifacts, readArtifact } from "./artifacts.ts";
 import { writeGeneratedTypings } from "./probe-typings.ts";
+import { apiDocsJson, appJs, appJsMap, css } from "./static-assets.ts";
 
 export function createApp() {
   const app = new Hono();
@@ -435,31 +436,13 @@ export function createApp() {
     return c.html(readFileSync(index, "utf8"));
   });
 
-  app.get("/:name{[a-z0-9-]+\\.css}", (c) => {
-    const css = join(WEB_DIR, c.req.param("name"));
-    if (!existsSync(css)) return c.text("not found", 404);
-    c.header("Content-Type", "text/css; charset=utf-8");
-    return c.body(readFileSync(css, "utf8"));
-  });
+  app.get("/:name{[a-z0-9-]+\\.css}", (c) => css(c, c.req.param("name")));
 
-  app.get("/app.js", (c) => {
-    const js = join(WEB_DIR, "dist", "app.js");
-    if (!existsSync(js)) {
-      return c.text(
-        "console.error('web bundle missing — run: npm run build:web');",
-        503,
-      );
-    }
-    c.header("Content-Type", "application/javascript; charset=utf-8");
-    return c.body(readFileSync(js));
-  });
+  app.get("/api-docs.json", apiDocsJson);
 
-  app.get("/app.js.map", (c) => {
-    const map = join(WEB_DIR, "dist", "app.js.map");
-    if (!existsSync(map)) return c.text("not found", 404);
-    c.header("Content-Type", "application/json");
-    return c.body(readFileSync(map));
-  });
+  app.get("/app.js", appJs);
+
+  app.get("/app.js.map", appJsMap);
 
   // Sourcemap and any other web/dist assets
   const webRoot = relative(process.cwd(), ROOT) || ".";

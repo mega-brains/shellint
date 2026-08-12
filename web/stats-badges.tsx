@@ -9,7 +9,7 @@ import { countersFromBadgeStats } from "./stats-model";
 /** Uncapped script counters as a tile grid — no bar, because there is no cap. */
 export type BadgeStats = {
   apis: Record<string, number>;
-  declarations: { vars: number; functions: number };
+  declarations: { vars: number; functions: number; anonFunctions?: number };
   literals: { strings: { count: number; totalBytes: number } };
   logging: { consoleLog: number; print: number };
   network: { shellyCall: number };
@@ -69,7 +69,7 @@ function badgesFrom(stats: BadgeStats): Badge[] {
       label: "functions",
       tip: {
         name: "functions",
-        blurb: "Named function declarations, methods, and named expressions.",
+        blurb: "Named function declarations, methods, and named expressions. Anonymous function/arrow count shown alongside when nonzero.",
         metric: "functions",
       },
       lines: sites?.functions,

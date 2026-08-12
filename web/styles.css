@@ -15,7 +15,7 @@
   --sans-narrow:
     "Avenir Next Condensed", "Arial Narrow", "Liberation Sans Narrow",
     "DejaVu Sans Condensed", var(--sans);
-  --chrome-pad: 1rem 1.25rem;
+  --chrome-pad: .4rem 1.rem;
 }
 
 * { box-sizing: border-box; }
@@ -60,7 +60,6 @@ body {
   z-index: 30;
   flex: 0 0 auto;
   padding: var(--chrome-pad);
-  padding-bottom: 0.75rem;
   background: rgba(243, 241, 236, 0.92);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
@@ -94,7 +93,6 @@ body {
   font-family: var(--mono);
   font-size: 0.78rem;
   line-height: 1;
-  letter-spacing: 0.02em;
   color: var(--accent);
   /* Sits on the title's ascenders; the halo keeps both readable. */
   text-shadow:
@@ -111,7 +109,6 @@ body {
   pointer-events: auto;
   color: inherit;
   text-decoration: underline dotted;
-  text-underline-offset: 2px;
 }
 
 .device-link:hover,
@@ -200,7 +197,7 @@ main {
   flex-direction: column;
   min-height: 0;
   width: 100%;
-  padding: 0.75rem 1.25rem 1rem;
+  padding: 0.2rem .6rem .8rem;
   gap: 0.75rem;
 }
 
