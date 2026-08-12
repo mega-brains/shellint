@@ -3,15 +3,23 @@ import { CompilerNotWiredError } from "./config.ts";
 import {
   addDevice,
   DuplicateDeviceError,
+  getDevice,
   listDevices,
   loadDevices,
   NoDeviceError,
   removeDevice,
+  requireActive,
   resolveTarget,
   sanitizeDevice,
   setActive,
   updateDevice,
 } from "./devices.ts";
+import {
+  createSlot,
+  deleteSlot,
+  getSlotCode,
+  listSlots,
+} from "./device-scripts.ts";
 import { ShellyRpc } from "./rpc.ts";
 import { deploy, AuthNotSupportedError, AuthFailedError } from "./deploy.ts";
 import { runProbe, getProbeProgress } from "./probe.ts";
@@ -173,6 +181,109 @@ export function registerDeviceRoutes(app: Hono) {
     }
   });
 
+  app.get("/api/device/scripts", async (c) => {
+    const deviceId = c.req.query("device");
+    let target;
+    let device;
+    try {
+      target = resolveTarget(deviceId);
+      device = deviceId ? getDevice(deviceId) : requireActive().device;
+    } catch (e) {
+      return deviceError(c, e);
+    }
+    const rpc = new ShellyRpc(target);
+    try {
+      await rpc.connect();
+      const slots = await listSlots(rpc, device ?? undefined);
+      return c.json({ ok: true, slots });
+    } catch (e) {
+      return deviceError(c, e);
+    } finally {
+      rpc.close();
+    }
+  });
+
+  app.get("/api/device/script/code", async (c) => {
+    const deviceId = c.req.query("device");
+    const slotRaw = Number(c.req.query("slot"));
+    if (!Number.isFinite(slotRaw)) {
+      return c.json({ ok: false, error: "?slot= must be a number" }, 400);
+    }
+    let target;
+    try {
+      target = resolveTarget(deviceId);
+    } catch (e) {
+      return deviceError(c, e);
+    }
+    const rpc = new ShellyRpc(target);
+    try {
+      await rpc.connect();
+      const code = await getSlotCode(rpc, slotRaw);
+      return c.json({
+        ok: true,
+        slot: slotRaw,
+        bytes: Buffer.byteLength(code, "utf8"),
+        code,
+      });
+    } catch (e) {
+      return deviceError(c, e);
+    } finally {
+      rpc.close();
+    }
+  });
+
+  app.post("/api/device/scripts", async (c) => {
+    let body: { name?: string; device?: string };
+    try {
+      body = await c.req.json();
+    } catch {
+      return c.json({ ok: false, error: "expected JSON body { name }" }, 400);
+    }
+    if (typeof body.name !== "string" || body.name.length === 0) {
+      return c.json({ ok: false, error: "body.name must be a non-empty string" }, 400);
+    }
+    let target;
+    try {
+      target = resolveTarget(body.device);
+    } catch (e) {
+      return deviceError(c, e);
+    }
+    const rpc = new ShellyRpc(target);
+    try {
+      await rpc.connect();
+      const slot = await createSlot(rpc, body.name);
+      return c.json({ ok: true, slot });
+    } catch (e) {
+      return deviceError(c, e);
+    } finally {
+      rpc.close();
+    }
+  });
+
+  app.delete("/api/device/scripts/:slot", async (c) => {
+    const slotRaw = Number(c.req.param("slot"));
+    if (!Number.isFinite(slotRaw)) {
+      return c.json({ ok: false, error: "slot must be a number" }, 400);
+    }
+    const deviceId = c.req.query("device");
+    let target;
+    try {
+      target = resolveTarget(deviceId);
+    } catch (e) {
+      return deviceError(c, e);
+    }
+    const rpc = new ShellyRpc(target);
+    try {
+      await rpc.connect();
+      await deleteSlot(rpc, slotRaw);
+      return c.json({ ok: true });
+    } catch (e) {
+      return deviceError(c, e);
+    } finally {
+      rpc.close();
+    }
+  });
+
   app.get("/api/device/logs", (c) => {
     const sinceRaw = Number(c.req.query("since"));
     const since = Number.isFinite(sinceRaw) ? Math.max(0, sinceRaw) : 0;
@@ -207,7 +318,14 @@ export function registerDeviceRoutes(app: Hono) {
   });
 
   app.post("/api/deploy", async (c) => {
-    let body: { mode?: string; minify?: string };
+    let body: {
+      mode?: string;
+      minify?: string;
+      device?: string;
+      slot?: number;
+      script?: string;
+      createName?: string;
+    };
     try {
       body = await c.req.json();
     } catch {
@@ -239,6 +357,12 @@ export function registerDeviceRoutes(app: Hono) {
           lastStatus = msg;
         },
         minify,
+        {
+          deviceId: body.device,
+          slot: body.slot,
+          scriptKey: body.script,
+          createName: body.createName,
+        },
       );
       return c.json({
         ok: true,

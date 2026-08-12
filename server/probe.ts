@@ -3,6 +3,7 @@ import { dirname } from "node:path";
 import { devicePaths } from "./paths.ts";
 import { loadConfig, assertDevroomCompiler } from "./config.ts";
 import { requireActive, mirrorActiveDevice } from "./devices.ts";
+import { createSlot, deleteSlot } from "./device-scripts.ts";
 import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
 // Script.Eval expressions, and they must stay side-effect-free: they may be
 // evaluated inside a script the user owns.
@@ -96,18 +97,15 @@ async function isRunning(rpc: ProbeRpc, id: number): Promise<boolean> {
 }
 
 /**
- * Script.Create a fresh slot, upload the keep-alive stub, start it.
- * Refuses to write to any id that already existed; cleans up on partial failure.
+ * Script.Create (via device-scripts.ts, the same helper the slot routes use)
+ * a fresh slot, upload the keep-alive stub, start it. Refuses to write to any
+ * id that already existed; cleans up on partial failure.
  */
 async function createScratchHost(
   rpc: ProbeRpc,
   existingIds: Set<number>,
 ): Promise<number> {
-  const created = (await rpc.call("Script.Create", { name: SCRATCH_NAME })) as {
-    id?: unknown;
-  } | null;
-  const id = typeof created?.id === "number" ? created.id : null;
-  if (id == null) throw new Error("Script.Create returned no id");
+  const id = await createSlot(rpc, SCRATCH_NAME);
   if (existingIds.has(id)) {
     throw new Error(
       `Script.Create returned pre-existing slot ${id} — refusing to overwrite a stored script`,
@@ -125,12 +123,7 @@ async function createScratchHost(
 }
 
 export async function removeScratch(rpc: ProbeRpc, id: number): Promise<void> {
-  try {
-    await rpc.call("Script.Stop", { id });
-  } catch {
-    // Not running is fine — Delete is what matters.
-  }
-  await rpc.call("Script.Delete", { id });
+  await deleteSlot(rpc, id);
 }
 
 /**

@@ -337,6 +337,18 @@ export function mirrorActiveDevice(deviceId: string): void {
   writeGeneratedTypings();
 }
 
+/** Records which local script key a device slot holds — `Deploy` with a new slot writes this back. */
+export function bindSlot(deviceId: string, slot: number, script: string, name?: string): void {
+  const file = loadDevices();
+  const idx = file.devices.findIndex((d) => d.id === deviceId);
+  if (idx === -1) throw new Error(`unknown device "${deviceId}"`);
+  const current = file.devices[idx]!;
+  const slots = { ...current.slots, [String(slot)]: { script, ...(name ? { name } : {}) } };
+  const devices = [...file.devices];
+  devices[idx] = { ...current, slots };
+  persist({ ...file, devices });
+}
+
 export function requireActive(): ActiveTarget {
   const file = loadDevices();
   if (!file.active) throw new NoDeviceError();
