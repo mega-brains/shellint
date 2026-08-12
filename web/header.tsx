@@ -1,4 +1,5 @@
 import type { ComponentChildren } from "preact";
+import { useEffect, useState } from "preact/hooks";
 import type { DeviceIdentity } from "./device-panel";
 
 const MAX_SCRIPT_NAME = 28;
@@ -26,6 +27,9 @@ export type HeaderProps = {
 };
 
 export function Header(props: HeaderProps) {
+  const [statusHidden, setStatusHidden] = useState(false);
+  useEffect(() => setStatusHidden(false), [props.status]);
+
   const id = props.identity;
   const name =
     id?.scriptName && id.scriptName.length > MAX_SCRIPT_NAME
@@ -107,8 +111,18 @@ export function Header(props: HeaderProps) {
         class={`status${props.statusError ? " error" : ""}`}
         id="statusLine"
         role="status"
+        hidden={statusHidden}
       >
         {props.status}
+        <button
+          type="button"
+          class="status-close"
+          onClick={() => setStatusHidden(true)}
+          aria-label="Dismiss status"
+          title="Dismiss status"
+        >
+          ×
+        </button>
       </p>
     </header>
   );

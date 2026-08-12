@@ -111,6 +111,23 @@
   color: var(--danger);
 }
 
+.status-close {
+  float: right;
+  margin-left: 0.5rem;
+  border: none;
+  background: none;
+  color: inherit;
+  font-family: var(--mono);
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.status-close:hover {
+  opacity: 1;
+}
+
 /* Artifact preview: swaps the editor between the source and a dist artifact.
    Parks in the editor's top-right corner as an icon, and opens on hover or
    keyboard focus so it costs no editing width when unused. */
