@@ -1,13 +1,48 @@
 /**
  * Project tests: dual Shelly build + web bundle + dialect/stats smoke.
- * Usage: node scripts/test.mjs
+ * Usage: node --import tsx scripts/test.mjs [name…] [--isolated]
+ *
+ * Every test module is a top-level script that throws (or `process.exit(1)`s)
+ * on failure, so running one is just importing it. They are imported into
+ * *this* process rather than spawned: `node --import tsx` costs ~750 ms of
+ * transpile before a single line of test code runs, and paying that 14 times
+ * was ~7.5 s of the suite's ~9.9 s. Same process, same order, same on-disk
+ * effects — the modules that mutate repo files (devroom.json, scripts/main.ts,
+ * .devroom/) already restore in a `finally`, which they had to do under
+ * spawning too.
+ *
+ * `--isolated` restores the old process-per-test behaviour. Reach for it when
+ * a failure looks like cross-test interference: if a test passes isolated and
+ * fails in-process, the two runs differ only in shared module state.
  */
-import { spawnSync } from "node:child_process";
-import { existsSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { spawn, spawnSync } from "node:child_process";
+import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+const argv = process.argv.slice(2);
+const isolated = argv.includes("--isolated");
+const filters = argv.filter((a) => !a.startsWith("--"));
+
+/** Order is load-bearing: artifact readers run after the builds that write dist/. */
+const TESTS = [
+  "test-dialect-artifacts",
+  "test-dashboard",
+  "test-tier3",
+  "test-logmap",
+  "test-typings",
+  "test-probe-catalog",
+  "test-minify-options",
+  "test-device-minify-options",
+  "test-intern-strings",
+  "test-web-assets",
+  "test-script-history",
+  "test-devices",
+  "test-device-scripts",
+  "test-smoke",
+];
 
 function fail(msg) {
   console.error(`FAIL: ${msg}`);
@@ -26,21 +61,49 @@ function run(cmd, args) {
   return r;
 }
 
-run("npm", ["run", "build:shelly"]);
-run("npm", ["run", "build:web"]);
-run("node", ["scripts/test-dialect-artifacts.mjs"]);
-run("node", ["--import", "tsx", "scripts/test-dashboard.mjs"]);
-run("node", ["scripts/test-tier3.mjs"]);
-run("node", ["--import", "tsx", "scripts/test-logmap.mjs"]);
-run("node", ["--import", "tsx", "scripts/test-typings.mjs"]);
-run("node", ["--import", "tsx", "scripts/test-probe-catalog.mjs"]);
-run("node", ["--import", "tsx", "scripts/test-minify-options.mjs"]);
-run("node", ["scripts/test-device-minify-options.mjs"]);
-run("node", ["--import", "tsx", "scripts/test-intern-strings.mjs"]);
-run("node", ["scripts/test-web-assets.mjs"]);
-run("node", ["--import", "tsx", "scripts/test-script-history.mjs"]);
-run("node", ["--import", "tsx", "scripts/test-devices.mjs"]);
-run("node", ["--import", "tsx", "scripts/test-device-scripts.mjs"]);
+/** The two builds share no inputs and no outputs, so they overlap for free. */
+function runParallel(jobs) {
+  return Promise.all(
+    jobs.map(
+      ([cmd, args]) =>
+        new Promise((resolve) => {
+          const child = spawn(cmd, args, {
+            cwd: ROOT,
+            encoding: "utf8",
+            shell: process.platform === "win32",
+          });
+          let out = "";
+          child.stdout.on("data", (d) => (out += d));
+          child.stderr.on("data", (d) => (out += d));
+          child.on("close", (status) => {
+            if (status !== 0) fail(`${cmd} ${args.join(" ")}\n${out}`);
+            resolve();
+          });
+        }),
+    ),
+  );
+}
+
+await runParallel([
+  ["npm", ["run", "build:shelly"]],
+  ["npm", ["run", "build:web"]],
+]);
+
+const selected = TESTS.filter((t) => !filters.length || filters.some((f) => t.includes(f)));
+if (!selected.length) fail(`no test matched ${filters.join(", ")}`);
+
+for (const name of selected) {
+  if (isolated) {
+    run("node", ["--import", "tsx", `scripts/${name}.mjs`]);
+  } else {
+    await import(`./${name}.mjs`);
+  }
+}
+
+if (filters.length) {
+  console.log(`OK: ${selected.length} test module(s) matching ${filters.join(", ")}`);
+  process.exit(0);
+}
 
 for (const f of [
   "dist/debug.js",
@@ -108,8 +171,5 @@ if (same("dist/debug.raw.js", "dist/debug.js")) {
     rmSync(config, { force: true });
   }
 }
-
-const smoke = run("node", ["--import", "tsx", "scripts/test-smoke.mjs"]);
-process.stdout.write(smoke.stdout);
 
 console.log("OK: shelly artifacts; web bundle; debug≠prod; raw≠min; server smoke");

@@ -56,6 +56,11 @@ depends = ["typecheck:shelly", "typecheck:server", "typecheck:web"]
 description = "Fail if any .ts/.tsx/.js/.mjs/.mts/.css source exceeds 500 lines"
 run = "npm run check:lines"
 
+[tasks.bench]
+description = "Minify option benchmark over bench/*.ts (+ main.ts as reference)"
+# Usage: mise run bench   OR   mise run bench -- log-heavy   OR   mise run bench -- --json
+run = "npm run bench -- \"$@\""
+
 [tasks.test]
 description = "Shelly DCE/minify asserts + web bundle + server smoke"
 run = "npm run test"

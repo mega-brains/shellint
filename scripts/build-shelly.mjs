@@ -241,6 +241,11 @@ function writeLogMap(map) {
 }
 
 /**
+ * Source → `{ raw, min }` for one variant, with no disk IO: envPass →
+ * log-shorten → intern → minifyPass. `buildVariant` adds the writes and the
+ * tier-3 step on top; `scripts/bench-minify.mjs` calls this one directly, so
+ * the benchmark measures the pipeline that actually ships rather than a
+ * reimplementation of it.
  * @param {string} tscJs
  * @param {string} name
  * @param {{ debug: boolean, prod: boolean }} flags
@@ -248,7 +253,14 @@ function writeLogMap(map) {
  * @param {{ sharedIds: Map<string, string>, shorten: boolean }} logMapState
  * @param {Record<string, unknown>} deviceDefs meta.device.* global_defs (possibly {})
  */
-async function buildVariant(tscJs, name, flags, minifyOpts, logMapState, deviceDefs) {
+export async function transformVariant(
+  tscJs,
+  name,
+  flags,
+  minifyOpts,
+  logMapState,
+  deviceDefs,
+) {
   const variantOpts = resolveVariantOptions(minifyOpts, name);
   let raw = await envPass(tscJs, flags, deviceDefs, {
     dropConsole: variantOpts.dropConsole === true,
@@ -269,6 +281,26 @@ async function buildVariant(tscJs, name, flags, minifyOpts, logMapState, deviceD
   }
 
   const min = await minifyPass(raw, variantOpts);
+  return { variantOpts, raw, min, interned };
+}
+
+/**
+ * @param {string} tscJs
+ * @param {string} name
+ * @param {{ debug: boolean, prod: boolean }} flags
+ * @param {typeof DEFAULT_MINIFY} minifyOpts raw config, not yet scope-resolved
+ * @param {{ sharedIds: Map<string, string>, shorten: boolean }} logMapState
+ * @param {Record<string, unknown>} deviceDefs meta.device.* global_defs (possibly {})
+ */
+async function buildVariant(tscJs, name, flags, minifyOpts, logMapState, deviceDefs) {
+  const { variantOpts, raw, min, interned } = await transformVariant(
+    tscJs,
+    name,
+    flags,
+    minifyOpts,
+    logMapState,
+    deviceDefs,
+  );
   const rawPath = path.join(DIST_DIR, `${name}.raw.js`);
   const minPath = path.join(DIST_DIR, `${name}.js`);
   const advPath = path.join(DIST_DIR, `${name}.adv.js`);

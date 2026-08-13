@@ -18,6 +18,9 @@ const SKIP_DIRS = new Set([
   ".devroom",
   ".git",
   ".idea",
+  // Minify benchmark inputs, not app source: they need bulk to be
+  // representative, and nothing imports them. See bench/README.md.
+  "bench",
 ]);
 // Device script authored by the user in the editor — not app source, can't
 // use imports (compiles module:none/noLib) so it can't be split like the rest.

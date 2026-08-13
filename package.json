@@ -18,8 +18,9 @@
     "typecheck:web": "tsc -p tsconfig.web.json",
     "typecheck": "npm run typecheck:shelly && npm run typecheck:server && npm run typecheck:web",
     "lint": "npm run typecheck",
+    "bench": "node scripts/bench-minify.mjs",
     "check:lines": "node scripts/check-line-limit.mjs",
-    "test": "node scripts/test.mjs",
+    "test": "node --import tsx scripts/test.mjs",
     "test:e2e": "playwright test -c e2e/playwright.config.ts",
     "beforeCommit": "npm run check:lines && npm run typecheck && npm run build && npm run test && npm run test:e2e"
   },

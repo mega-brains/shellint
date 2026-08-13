@@ -16,7 +16,7 @@
     "dropConsole": false,
     "passes": true,
     "hoistProps": true,
-    "deviceDCE": true,
-    "internStrings": true
+    "deviceDCE": false,
+    "internStrings": false
   }
 }

@@ -9,13 +9,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - read [plans-in-project-dir](./.claude/memory/plans-in-project-dir.md)
 
 
-## Status: M0–M4 basic · M5–M10 done (lint Tier 1–5, incl. connected Tier 4) · M11 type-layer bans · M12 dashboard metrics · post-M12 UI (editor sidebar, permanent check indicator) · M13 tier-3 minify, prod log map, 104-probe capability run, artifact preview · M14 web bundle size (minify, CSS bundle, precompressed assets) · M15 multi-device + multi-script slot selection (device CRUD, digest auth, header device/slot pickers, per-device profile/probe mirroring)
+## Status: M0–M4 basic · M5–M10 done (lint Tier 1–5, incl. connected Tier 4) · M11 type-layer bans · M12 dashboard metrics · post-M12 UI (editor sidebar, permanent check indicator) · M13 tier-3 minify, prod log map, 104-probe capability run, artifact preview · M14 web bundle size (minify, CSS bundle, precompressed assets) · M14b device-pipeline minify knobs + `bench/` corpus · M15 multi-device + multi-script slot selection (device CRUD, digest auth, header device/slot pickers, per-device profile/probe mirroring)
 
 Prefer **mise** tasks ([`mise.toml`](./mise.toml)). Verify with `ls` / `mise tasks`
 before assuming entrypoints exist.
 
 Pre-commit gate: `mise run beforeCommit` (line limit ≤500, typecheck shelly/server/web,
-build, test).
+build, test, e2e).
+
+`scripts/test.mjs` runs the two builds in parallel, then **imports** each test
+module into its own process instead of spawning one `node --import tsx` per
+file — that startup is ~750 ms each and was most of the suite's runtime.
+`mise run test -- <name>` filters; `mise run test -- --isolated` restores
+process-per-test, for when a failure smells like cross-test module state.
 
 ## Stack (committed)
 
@@ -56,6 +62,8 @@ mise run lint             # typecheck shelly + server + web
 mise run typecheck        # same as lint
 mise run check:lines      # source files ≤ 500 lines
 mise run test             # DCE/minify asserts + web + server smoke
+                          # accepts a name filter and `--isolated` (see below)
+mise run bench            # minify-option benchmark over bench/*.ts
 mise run beforeCommit     # check:lines → typecheck → build → test
 mise run start            # DevRoom server (alias: mise run dev)
 mise run deploy -- debug min   # MODE + MINIFY=min|raw
