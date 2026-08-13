@@ -13,9 +13,9 @@ import {
   readProbeReport,
   readProbeVerdicts,
   writeGeneratedTypings,
-} from "../server/probe-typings.ts";
-import { lintProbe } from "../server/lint-probe.ts";
-import { PROBE_PATH } from "../server/paths.ts";
+} from "../server/probe/probe-typings.ts";
+import { lintProbe } from "../server/lint/lint-probe.ts";
+import { PROBE_PATH } from "../server/core/paths.ts";
 
 // Severity depends on which device (and firmware) the probe came from, so
 // every lint call here says so explicitly instead of inheriting whatever

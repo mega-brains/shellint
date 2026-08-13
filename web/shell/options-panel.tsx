@@ -1,0 +1,187 @@
+import { useEffect, useRef, useState } from "preact/hooks";
+import type { JSX } from "preact";
+import { Collapsible } from "../ui/collapsible";
+import { api } from "../lib/api";
+import { OPT_TIPS, OptTip, tipStyleFor } from "../ui/option-tip";
+import {
+  DEFAULT_MINIFY,
+  MINIFY_OPTIONS,
+  type MinifyConfig,
+} from "../../shared/minify-options.mjs";
+
+export type MinifyOptions = MinifyConfig;
+
+const DEFAULTS: MinifyOptions = { ...DEFAULT_MINIFY };
+
+type OptDef = {
+  key: keyof MinifyOptions;
+  id: string;
+  label: string;
+};
+
+/** `optCompress`, `optKeepFnames`, … — derived so the DOM id can't drift from the schema. */
+const idFor = (key: keyof MinifyOptions) =>
+  `opt${key.charAt(0).toUpperCase()}${key.slice(1)}`;
+
+const OPTS: OptDef[] = MINIFY_OPTIONS.map((o) => ({
+  key: o.key,
+  id: idFor(o.key),
+  label: o.label,
+}));
+
+const SAVE_MS = 350;
+
+function peekText(opts: MinifyOptions): string {
+  const on = OPTS.filter((o) => opts[o.key]).map((o) => o.label);
+  return on.length ? on.join(" · ") : "all off";
+}
+
+export type OptionsPanelProps = {
+  onStatus?: (msg: string, isError?: boolean) => void;
+};
+
+/** Collapsible minify knobs → PATCH /api/config. Applies on next build. */
+export function OptionsPanel(props: OptionsPanelProps) {
+  const [opts, setOpts] = useState<MinifyOptions>(DEFAULTS);
+  const [loaded, setLoaded] = useState(false);
+  const [tipKey, setTipKey] = useState<keyof MinifyOptions | null>(null);
+  const [tipStyle, setTipStyle] = useState<JSX.CSSProperties>({});
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pending = useRef<Partial<MinifyOptions> | null>(null);
+  const onStatus = useRef(props.onStatus);
+  onStatus.current = props.onStatus;
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const data = await api<{ config: { minify?: MinifyOptions } }>(
+          "/api/config",
+        );
+        setOpts({ ...DEFAULTS, ...(data.config.minify ?? {}) });
+      } catch {
+        onStatus.current?.("minify options unavailable", true);
+      } finally {
+        setLoaded(true);
+      }
+    })();
+    return () => {
+      if (saveTimer.current) clearTimeout(saveTimer.current);
+    };
+  }, []);
+
+  const flush = () => {
+    const patch = pending.current;
+    pending.current = null;
+    if (!patch) return;
+    void (async () => {
+      try {
+        const data = await api<{ config: { minify: MinifyOptions } }>(
+          "/api/config",
+          {
+            method: "PATCH",
+            body: JSON.stringify({ minify: patch }),
+          },
+        );
+        setOpts({ ...DEFAULTS, ...data.config.minify });
+        onStatus.current?.("minify options saved — apply on next build");
+      } catch (err) {
+        onStatus.current?.(
+          err instanceof Error ? err.message : String(err),
+          true,
+        );
+      }
+    })();
+  };
+
+  const onToggle = (key: keyof MinifyOptions, value: boolean) => {
+    setOpts((prev) => ({ ...prev, [key]: value }));
+    pending.current = { ...(pending.current ?? {}), [key]: value };
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => {
+      saveTimer.current = null;
+      flush();
+    }, SAVE_MS);
+  };
+
+  const openTip = (key: keyof MinifyOptions, el: HTMLElement) => {
+    setTipKey(key);
+    setTipStyle(tipStyleFor(el.getBoundingClientRect()));
+  };
+
+  const closeTip = () => setTipKey(null);
+
+  const tip = tipKey ? OPT_TIPS[tipKey] : null;
+
+  return (
+    <Collapsible
+      storageKey="shelly-devroom.optionsPanel.collapsed"
+      defaultCollapsed={true}
+      panelId="optionsPanel"
+      panelClass="options"
+      bodyId="optionsBody"
+      headId="optionsHead"
+      toggleId="optionsToggle"
+      title="Show or hide minify options (Terser, prod log map, tier-3)"
+      ariaLabel="Build options"
+      headChildren={
+        <>
+          <h2>options</h2>
+          <p class="panel-peek" id="optionsPeek" data-testid="options-peek">
+            {loaded ? peekText(opts) : "…"}
+          </p>
+        </>
+      }
+    >
+      <div class="options-body" id="optionsBody" data-testid="options-body">
+        <p class="options-note" id="optionsNote">
+          applies on next build
+        </p>
+        <ul class="options-list" data-testid="options-list">
+          {OPTS.map((o) => (
+            <li key={o.key}>
+              <label
+                class="options-item"
+                for={o.id}
+                onMouseEnter={(e) =>
+                  openTip(o.key, e.currentTarget as HTMLElement)
+                }
+                onMouseLeave={closeTip}
+                onFocusCapture={(e) =>
+                  openTip(o.key, e.currentTarget as HTMLElement)
+                }
+                onBlurCapture={(e) => {
+                  const next = e.relatedTarget as Node | null;
+                  if (!next || !(e.currentTarget as HTMLElement).contains(next)) {
+                    closeTip();
+                  }
+                }}
+              >
+                <input
+                  type="checkbox"
+                  id={o.id}
+                  data-testid={`opt-${o.key}`}
+                  checked={opts[o.key]}
+                  disabled={!loaded}
+                  aria-describedby={tipKey === o.key ? "optTipLive" : undefined}
+                  onChange={(e) =>
+                    onToggle(o.key, (e.target as HTMLInputElement).checked)
+                  }
+                />
+                <span>{o.label}</span>
+              </label>
+            </li>
+          ))}
+        </ul>
+        {tip ? (
+          <OptTip
+            open
+            content={tip}
+            style={tipStyle}
+          />
+        ) : null}
+        {/* Stable id for aria-describedby while a tip is open. */}
+        {tip ? <span id="optTipLive" class="visually-hidden">{tip.blurb}</span> : null}
+      </div>
+    </Collapsible>
+  );
+}

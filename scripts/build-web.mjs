@@ -2,7 +2,7 @@
  * Bundle the Preact + CodeMirror SPA into web/dist/.
  *
  *   app.js      minified ESM bundle (+ .br/.gz siblings)
- *   styles.css  the ten web/*.css files, bundled and minified (+ .br/.gz)
+ *   styles.css  feature CSS, bundled and minified (+ .br/.gz)
  *   app.js.map  dev builds only — 2.4 MB, omitted from --prod
  *
  * Usage: node scripts/build-web.mjs [--prod]
@@ -39,7 +39,7 @@ function precompress(file) {
 
 const jsOut = join(distDir, "app.js");
 await esbuild.build({
-  entryPoints: [join(root, "web", "main.tsx")],
+  entryPoints: [join(root, "web", "shell", "main.tsx")],
   bundle: true,
   outfile: jsOut,
   format: "esm",

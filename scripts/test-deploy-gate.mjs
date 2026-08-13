@@ -9,9 +9,9 @@
  */
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { ROOT } from "../server/paths.ts";
-import { _resetCache, addDevice, setActive } from "../server/devices.ts";
-import { deploy, ProbeRequiredError } from "../server/deploy.ts";
+import { ROOT } from "../server/core/paths.ts";
+import { _resetCache, addDevice, setActive } from "../server/device/devices.ts";
+import { deploy, ProbeRequiredError } from "../server/device/deploy.ts";
 import { createApp } from "../server/app.ts";
 
 const DEVICES_DIR = join(ROOT, ".devroom");

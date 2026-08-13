@@ -1,7 +1,7 @@
 /**
  * Hand-written types for minify-options.mjs. TypeScript can't infer a precise
  * per-key object shape from the `Object.fromEntries` construction of
- * DEFAULT_MINIFY, and `server/config.ts`'s `MinifyConfig` must stay a
+ * DEFAULT_MINIFY, and `server/core/config.ts`'s `MinifyConfig` must stay a
  * concretely-typed object (not `Record<string, boolean>`) so a typo'd key
  * anywhere in the server/build pipeline is still a compile error.
  */

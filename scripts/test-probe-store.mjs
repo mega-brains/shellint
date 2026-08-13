@@ -15,7 +15,7 @@ import {
   writeFileSync,
 } from "node:fs";
 import { dirname, join } from "node:path";
-import { ROOT, DEVICE_PROFILE_PATH, PROBE_PATH, devicePaths } from "../server/paths.ts";
+import { ROOT, DEVICE_PROFILE_PATH, PROBE_PATH, devicePaths } from "../server/core/paths.ts";
 import {
   _resetCache,
   addDevice,
@@ -23,8 +23,8 @@ import {
   mirrorActiveDevice,
   setActive,
   setProbeSkip,
-} from "../server/devices.ts";
-import { GENERATED_DTS_PATH } from "../server/probe-typings.ts";
+} from "../server/device/devices.ts";
+import { GENERATED_DTS_PATH } from "../server/probe/probe-typings.ts";
 import {
   deleteCapture,
   listCaptures,
@@ -33,7 +33,7 @@ import {
   resolveCapture,
   verKeyOf,
   writeCapture,
-} from "../server/probe-store.ts";
+} from "../server/probe/probe-store.ts";
 
 const DEVICES_DIR = join(ROOT, ".devroom");
 const DEVICES_FILE = join(DEVICES_DIR, "devices.json");

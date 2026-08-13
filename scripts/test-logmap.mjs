@@ -5,7 +5,7 @@
 import { existsSync } from "node:fs";
 import { minify } from "terser";
 import { shortenLogStrings } from "./log-shorten.mjs";
-import { expandLogText, loadLogMap, LOG_MAP_PATH } from "../server/log-map.ts";
+import { expandLogText, loadLogMap, LOG_MAP_PATH } from "../server/script/log-map.ts";
 
 function fail(msg) {
   console.error(`FAIL: ${msg}`);

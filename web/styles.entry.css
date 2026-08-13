@@ -5,15 +5,15 @@
  * ORDER IS THE CASCADE. It mirrors the <link> order web/index.html used
  * before the bundle existed; do not sort or regroup these lines.
  */
-@import "./styles.css";
-@import "./editor.css";
-@import "./panels.css";
-@import "./panels-extra.css";
-@import "./checks.css";
-@import "./charts.css";
-@import "./stats.css";
-@import "./diff.css";
-@import "./script-history.css";
-@import "./device-select.css";
-@import "./option-tip.css";
-@import "./build-error.css";
+@import "./shell/styles.css";
+@import "./editor/editor.css";
+@import "./shell/panels.css";
+@import "./shell/panels-extra.css";
+@import "./check/checks.css";
+@import "./charts/charts.css";
+@import "./stats/stats.css";
+@import "./diff/diff.css";
+@import "./history/script-history.css";
+@import "./device/device-select.css";
+@import "./ui/option-tip.css";
+@import "./editor/build-error.css";

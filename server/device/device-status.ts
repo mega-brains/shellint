@@ -1,0 +1,364 @@
+import { loadConfig, assertDevroomCompiler } from "../core/config.ts";
+import { readDeviceProfile } from "./device-profile.ts";
+import { requireActive, toDeviceInfo, touchDeviceInfo } from "./devices.ts";
+import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
+
+export type DeviceStatus = {
+  deviceIp: string;
+  deviceId: string;
+  scriptId: number;
+  latencyMs: number;
+  device: {
+    id?: string;
+    name?: string;
+    model?: string;
+    gen?: number | string;
+    ver?: string;
+    app?: string;
+    chip: string;
+    chipInferred: true;
+  };
+  script: {
+    id: number;
+    name: string | null;
+    running: boolean | null;
+    mem_used: number | null;
+    mem_peak: number | null;
+    mem_free: number | null;
+    cpu: number | null;
+    errors: unknown[];
+  };
+  sys: {
+    ram_size: number | null;
+    ram_free: number | null;
+    ram_min_free: number | null;
+    fs_size: number | null;
+    fs_free: number | null;
+    uptime: number | null;
+    restart_required: boolean | null;
+    unixtime: number | null;
+  };
+  eco_mode: boolean | null;
+  temperatureC: number | null;
+  /** Which component answered — a relay's own temperature is not a room sensor. */
+  temperatureFrom: string | null;
+  wifi: {
+    rssi: number | null;
+    ssid: string | null;
+    sta_ip: string | null;
+  };
+};
+
+function num(v: unknown): number | null {
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
+}
+
+/**
+ * Component types from the cached profile, so a poll does not spend a failing
+ * round trip every five seconds on a component this device does not have.
+ * `null` means "no profile yet" — then everything is worth a try.
+ */
+function knownComponentTypes(): Set<string> | null {
+  const profile = readDeviceProfile();
+  if (!profile?.components?.length) return null;
+  return new Set(profile.components.map((c) => c.split(":")[0]!.toLowerCase()));
+}
+
+function bool(v: unknown): boolean | null {
+  return typeof v === "boolean" ? v : null;
+}
+
+function str(v: unknown): string | null {
+  return typeof v === "string" ? v : null;
+}
+
+/** Community/teardown mapping — not returned by the device. */
+export function inferChip(
+  gen: unknown,
+  model: unknown,
+): string {
+  const m = typeof model === "string" ? model.toUpperCase() : "";
+  // Known exceptions first
+  if (/X4|S3SW|S3SN/i.test(m)) return "ESP32-C3";
+  const g = typeof gen === "number" ? gen : Number(gen);
+  if (g === 4) return "ESP32-C6";
+  if (g === 3) return "ESP32-C3";
+  if (g === 2) return "ESP32";
+  return "unknown";
+}
+
+async function timedCall(
+  rpc: ShellyRpc,
+  method: string,
+  params: Record<string, unknown> = {},
+): Promise<{ result: unknown; ms: number }> {
+  const t0 = performance.now();
+  const result = await rpc.call(method, params);
+  return { result, ms: Math.round(performance.now() - t0) };
+}
+
+async function softCall(
+  rpc: ShellyRpc,
+  method: string,
+  params: Record<string, unknown> = {},
+): Promise<{ result: unknown; ms: number } | null> {
+  try {
+    return await timedCall(rpc, method, params);
+  } catch (e) {
+    if (e instanceof AuthNotSupportedError) throw e;
+    return null;
+  }
+}
+
+export async function fetchDeviceStatus(): Promise<DeviceStatus> {
+  const cfg = loadConfig();
+  assertDevroomCompiler(cfg);
+  const target = requireActive();
+  const scriptId = target.slot;
+
+  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
+  const rtts: number[] = [];
+
+  try {
+    await rpc.connect();
+
+    const infoCall = await softCall(rpc, "Shelly.GetDeviceInfo", {});
+    if (infoCall) rtts.push(infoCall.ms);
+    const info = (infoCall?.result ?? {}) as Record<string, unknown>;
+    // Only on a successful answer — a failed poll must not blank out good info.
+    if (infoCall) touchDeviceInfo(target.device.id, toDeviceInfo(info));
+
+    const scriptCall = await timedCall(rpc, "Script.GetStatus", {
+      id: scriptId,
+    });
+    rtts.push(scriptCall.ms);
+    const script = (scriptCall.result ?? {}) as Record<string, unknown>;
+
+    const sysCall = await timedCall(rpc, "Sys.GetStatus", {});
+    rtts.push(sysCall.ms);
+    const sys = (sysCall.result ?? {}) as Record<string, unknown>;
+
+    const cfgCall = await softCall(rpc, "Sys.GetConfig", {});
+    if (cfgCall) rtts.push(cfgCall.ms);
+    const sysCfg = (cfgCall?.result ?? {}) as Record<string, unknown>;
+    const deviceCfg = (sysCfg.device ?? {}) as Record<string, unknown>;
+
+    const wifiCall = await softCall(rpc, "WiFi.GetStatus", {});
+    if (wifiCall) rtts.push(wifiCall.ms);
+    const wifi = (wifiCall?.result ?? {}) as Record<string, unknown>;
+    const sta = (wifi.sta_ip != null ? wifi : (wifi.sta ?? wifi)) as Record<
+      string,
+      unknown
+    >;
+
+    // Script.GetStatus carries no name; the slot listing is the only source.
+    const listCall = await softCall(rpc, "Script.List", {});
+    if (listCall) rtts.push(listCall.ms);
+    const list = (listCall?.result ?? {}) as { scripts?: unknown };
+    const slot = (Array.isArray(list.scripts) ? list.scripts : []).find(
+      (s): s is Record<string, unknown> =>
+        !!s && typeof s === "object" && (s as { id?: unknown }).id === scriptId,
+    );
+
+    // A dedicated sensor is the real reading; a relay's own die temperature is
+    // the fallback, because most Gen2 boxes report only that.
+    const present = knownComponentTypes();
+    let temperatureC: number | null = null;
+    let temperatureFrom: string | null = null;
+
+    if (present === null || present.has("temperature")) {
+      const tempCall = await softCall(rpc, "Temperature.GetStatus", { id: 0 });
+      if (tempCall) {
+        rtts.push(tempCall.ms);
+        const t = (tempCall.result ?? {}) as Record<string, unknown>;
+        temperatureC = num(t.tC);
+        if (temperatureC != null) temperatureFrom = "temperature:0";
+      }
+    }
+
+    if (temperatureC == null && (present === null || present.has("switch"))) {
+      const swCall = await softCall(rpc, "Switch.GetStatus", { id: 0 });
+      if (swCall) {
+        rtts.push(swCall.ms);
+        const sw = (swCall.result ?? {}) as Record<string, unknown>;
+        const t = (sw.temperature ?? {}) as Record<string, unknown>;
+        temperatureC = num(t.tC);
+        if (temperatureC != null) temperatureFrom = "switch:0";
+      }
+    }
+
+    const latencyMs =
+      rtts.length > 0
+        ? Math.round(rtts.reduce((a, b) => a + b, 0) / rtts.length)
+        : 0;
+
+    return {
+      deviceIp: target.device.ip,
+      deviceId: target.device.id,
+      scriptId,
+      latencyMs,
+      device: {
+        id: str(info.id) ?? undefined,
+        name: str(info.name) ?? str(deviceCfg.name) ?? undefined,
+        model: str(info.model) ?? undefined,
+        gen: (info.gen as number | string | undefined) ?? undefined,
+        ver: str(info.ver) ?? undefined,
+        app: str(info.app) ?? undefined,
+        chip: inferChip(info.gen, info.model),
+        chipInferred: true,
+      },
+      script: {
+        id: scriptId,
+        name: slot ? str(slot.name) : null,
+        running: bool(script.running),
+        mem_used: num(script.mem_used),
+        mem_peak: num(script.mem_peak),
+        mem_free: num(script.mem_free),
+        cpu: num(script.cpu),
+        errors: Array.isArray(script.errors) ? script.errors : [],
+      },
+      sys: {
+        ram_size: num(sys.ram_size),
+        ram_free: num(sys.ram_free),
+        ram_min_free: num(sys.ram_min_free),
+        fs_size: num(sys.fs_size),
+        fs_free: num(sys.fs_free),
+        uptime: num(sys.uptime),
+        restart_required: bool(sys.restart_required),
+        unixtime: num(sys.unixtime),
+      },
+      eco_mode: bool(deviceCfg.eco_mode),
+      temperatureC,
+      temperatureFrom,
+      wifi: {
+        rssi: num(wifi.rssi) ?? num(sta.rssi),
+        ssid: str(wifi.ssid) ?? str(sta.ssid),
+        sta_ip: str(wifi.sta_ip) ?? str(sta.ip) ?? str(sta.sta_ip),
+      },
+    };
+  } finally {
+    rpc.close();
+  }
+}
+
+export type EcoResult = {
+  eco_mode: boolean;
+  restart_required: boolean | null;
+};
+
+/** Minimal RPC surface the eco helpers need, so `runProbe` can drive them on
+ * the connection it already holds instead of opening a second one. */
+export type EcoRpc = {
+  call(method: string, params?: Record<string, unknown>): Promise<unknown>;
+};
+
+/** Current `device.eco_mode`, or `null` when the device does not answer. */
+export async function readEcoConfig(rpc: EcoRpc): Promise<boolean | null> {
+  try {
+    const sysCfg = ((await rpc.call("Sys.GetConfig", {})) ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const deviceCfg = (sysCfg.device ?? {}) as Record<string, unknown>;
+    return bool(deviceCfg.eco_mode);
+  } catch (e) {
+    if (e instanceof AuthNotSupportedError) throw e;
+    return null;
+  }
+}
+
+/** Writes `device.eco_mode` and reads it straight back — the device is the
+ * authority on what actually took, and it also reports whether a restart is
+ * needed before the change has any effect. */
+export async function applyEcoMode(
+  rpc: EcoRpc,
+  eco_mode: boolean,
+): Promise<EcoResult> {
+  const result = (await rpc.call("Sys.SetConfig", {
+    config: { device: { eco_mode } },
+  })) as Record<string, unknown>;
+  const confirmed = await readEcoConfig(rpc);
+  return {
+    eco_mode: confirmed ?? eco_mode,
+    restart_required: bool(result.restart_required),
+  };
+}
+
+/** One `Sys.GetConfig` round trip — the probe-eco prompt asks this before it
+ * decides whether to warn, and must not pay for a full status poll. */
+export async function fetchEcoMode(): Promise<{ eco_mode: boolean | null }> {
+  const cfg = loadConfig();
+  assertDevroomCompiler(cfg);
+  const target = requireActive();
+
+  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
+  try {
+    await rpc.connect();
+    return { eco_mode: await readEcoConfig(rpc) };
+  } finally {
+    rpc.close();
+  }
+}
+
+export async function setEcoMode(eco_mode: boolean): Promise<EcoResult> {
+  const cfg = loadConfig();
+  assertDevroomCompiler(cfg);
+  const target = requireActive();
+
+  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
+  try {
+    await rpc.connect();
+    return await applyEcoMode(rpc, eco_mode);
+  } finally {
+    rpc.close();
+  }
+}
+
+export type ScriptRunResult = { running: boolean | null; scriptId: number };
+
+/**
+ * Start or stop the configured script slot. The device answers `Script.Start`
+ * with `{was_running}`, so the new state is read back rather than assumed —
+ * starting a script that immediately throws leaves it stopped.
+ */
+export async function setScriptRunning(
+  running: boolean,
+): Promise<ScriptRunResult> {
+  const cfg = loadConfig();
+  assertDevroomCompiler(cfg);
+  const target = requireActive();
+  const scriptId = target.slot;
+
+  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
+  try {
+    await rpc.connect();
+    await rpc.call(running ? "Script.Start" : "Script.Stop", {
+      id: scriptId,
+    });
+    const status = await softCall(rpc, "Script.GetStatus", { id: scriptId });
+    const result = (status?.result ?? {}) as Record<string, unknown>;
+    return { running: bool(result.running), scriptId };
+  } finally {
+    rpc.close();
+  }
+}
+
+/**
+ * Soft reboot via `Shelly.Reboot` (not factory wipe). Omitting `delay_ms`
+ * uses the device default (1000 ms; minimum allowed is 500).
+ */
+export async function rebootDevice(): Promise<void> {
+  const cfg = loadConfig();
+  assertDevroomCompiler(cfg);
+  const target = requireActive();
+
+  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
+  try {
+    await rpc.connect();
+    await rpc.call("Shelly.Reboot", {});
+  } finally {
+    rpc.close();
+  }
+}
+
+export { AuthNotSupportedError };

@@ -5,7 +5,7 @@
  * `disableEcoForProbe` is the whole decision, `runProbe` only sequences it.
  * Usage: node --import tsx scripts/test-probe-eco.mjs
  */
-import { disableEcoForProbe } from "../server/probe.ts";
+import { disableEcoForProbe } from "../server/probe/probe.ts";
 
 function fail(msg) {
   console.error(`FAIL: ${msg}`);

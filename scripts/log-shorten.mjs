@@ -12,7 +12,7 @@
  */
 import ts from "typescript";
 
-/** Log call shapes — same surface server/script-stats.ts counts as logging. */
+/** Log call shapes — same surface server/script/script-stats.ts counts as logging. */
 const LOG_CALLEES = new Set([
   "print",
   "console.log",
@@ -20,7 +20,7 @@ const LOG_CALLEES = new Set([
   "console.warn",
 ]);
 
-/** `#m <series> <value>` metric lines are parsed by server/debug-log.ts. */
+/** `#m <series> <value>` metric lines are parsed by server/device/debug-log.ts. */
 const METRIC_PREFIX = "#m";
 
 function calleeName(expr) {

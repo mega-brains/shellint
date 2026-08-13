@@ -1,0 +1,421 @@
+:root {
+  --bg: #f3f1ec;
+  --ink: #1c1b19;
+  --muted: #5c584f;
+  --line: #d4cfc4;
+  --panel: #fffcf7;
+  --accent: #0f6b5c;
+  --accent-ink: #ffffff;
+  --danger: #8b2e1a;
+  --size-low-bg: rgba(47, 143, 91, 0.2);
+  --size-high-bg: rgba(214, 158, 46, 0.2);
+  /* OS-bundled faces only (macOS / Windows / Linux) — nothing is downloaded. */
+  --mono: ui-monospace, "SF Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
+  --sans: system-ui, "Segoe UI", "Helvetica Neue", "DejaVu Sans", sans-serif;
+  --sans-narrow:
+    "Avenir Next Condensed", "Arial Narrow", "Liberation Sans Narrow",
+    "DejaVu Sans Condensed", var(--sans);
+  --chrome-pad: .4rem 1.rem;
+}
+
+* { box-sizing: border-box; }
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+}
+
+html {
+  background:
+    radial-gradient(1200px 500px at 10% -10%, #e7efe9 0%, transparent 55%),
+    linear-gradient(180deg, #efebe3 0%, var(--bg) 40%, #e8e4db 100%);
+  color: var(--ink);
+  font-family: var(--sans);
+}
+
+body {
+  display: flex;
+  flex-direction: column;
+  min-height: 100dvh;
+  padding: 0;
+  overflow: hidden;
+}
+
+/* Preact mount — same flex column role body used to give header + main. */
+#app {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+  overflow: hidden;
+}
+
+.top {
+  font-family: var(--sans-narrow);
+  position: sticky;
+  top: 0;
+  z-index: 30;
+  flex: 0 0 auto;
+  padding: var(--chrome-pad);
+  background: rgba(243, 241, 236, 0.92);
+  backdrop-filter: blur(8px);
+  border-bottom: 1px solid var(--line);
+  overflow-x: auto;
+}
+
+.top-row {
+  display: flex;
+  flex-wrap: nowrap;
+  /* Align controls with title baseline. */
+  align-items: flex-end;
+  gap: 0.5rem 1.25rem;
+}
+
+/* The device address rides above the title and dips into it, so the header
+   reads as one block rather than two stacked lines. */
+.title-stack {
+  position: relative;
+  /* Less than the address's own height, which is what makes them overlap. */
+  padding-top: 0.45rem;
+}
+
+.device-ip {
+  position: absolute;
+  top: 0;
+  left: 0.15rem;
+  z-index: 1;
+  margin: 0;
+  /* The stack is only as wide as the title, so the address must be free to
+     run past its right edge instead of wrapping under itself. */
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1;
+  color: var(--accent);
+  /* Sits on the title's ascenders; the halo keeps both readable. */
+  text-shadow:
+    0 1px 0 var(--bg),
+    0 -1px 0 var(--bg),
+    1px 0 0 var(--bg),
+    -1px 0 0 var(--bg);
+  pointer-events: none;
+}
+
+/* Only the address itself is clickable; the rest of the line stays inert so it
+   cannot swallow clicks meant for the title beneath it. */
+.device-link {
+  pointer-events: auto;
+  color: inherit;
+  text-decoration: underline dotted;
+}
+
+.device-link:hover,
+.device-link:focus-visible { text-decoration-style: solid; }
+
+.top h1 {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 650;
+  letter-spacing: -0.02em;
+}
+
+.sub {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-family: var(--mono);
+}
+
+.sub.warn { color: var(--danger); }
+
+/* Script state as a glyph. Only "running" pulses — a steady glow on a stopped
+   script would read as activity that is not happening. */
+.run-state {
+  font-size: 1.4rem;
+  line-height: 1;
+}
+
+button.run-state {
+  padding: 0 0.25rem;
+  border: 1px solid transparent;
+  border-radius: 3px;
+  background: none;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+button.run-state:hover,
+button.run-state:focus-visible { border-color: currentColor; }
+button.run-state:disabled { cursor: default; opacity: 0.5; }
+
+/* Hover/focus previews the click action: stop→▶, run→■. */
+button.run-state .run-glyph-action { display: none; }
+button.run-state:hover .run-glyph-current,
+button.run-state:focus-visible .run-glyph-current { display: none; }
+button.run-state:hover .run-glyph-action,
+button.run-state:focus-visible .run-glyph-action { display: inline; }
+
+button.run-state.run-running:hover,
+button.run-state.run-running:focus-visible {
+  color: #8a6d1f;
+  animation: none;
+}
+button.run-state.run-stopped:hover,
+button.run-state.run-stopped:focus-visible {
+  color: #2f8f5b;
+}
+
+.run-running {
+  color: #2f8f5b;
+  animation: run-glow 2.4s ease-in-out infinite;
+}
+
+.run-stopped { color: #8a6d1f; }
+.run-offline { color: var(--danger); }
+
+@keyframes run-glow {
+  0%,
+  100% {
+    text-shadow: 0 0 0 rgba(47, 143, 91, 0);
+    opacity: 0.75;
+  }
+  50% {
+    text-shadow: 0 0 6px rgba(47, 143, 91, 0.85);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .run-running { animation: none; }
+}
+
+main {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  width: 100%;
+  padding: 0.2rem .6rem .8rem;
+  gap: 0.75rem;
+}
+
+/* Lives in the header, pushed to the right of the title and config line. */
+.toolbar {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 0.25rem;
+  align-items: center;
+  flex: 0 0 auto;
+  margin-left: auto;
+}
+
+button,
+select { font: inherit; }
+
+button {
+  background: var(--accent);
+  color: var(--accent-ink);
+  border: 1px solid #0b5649;
+  padding: 0.45rem 0.85rem;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+button:hover { filter: brightness(1.05); }
+button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+.split > button:first-child { position: relative; overflow: hidden; }
+
+.btn-progress {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  height: 3px;
+  width: 48%;
+  background: var(--accent);
+  box-shadow: 0 -1px 3px rgba(15, 107, 92, 0.4);
+  opacity: 0;
+  transform: translateX(-100%);
+}
+
+button.running .btn-progress {
+  opacity: 1;
+  animation: btn-progress-slide 1s ease-in-out infinite;
+}
+
+@keyframes btn-progress-slide {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+
+.split {
+  position: relative;
+  display: inline-flex;
+  align-items: stretch;
+}
+
+.split > button:first-child {
+  border-radius: 4px 0 0 4px;
+  border-right: none;
+}
+
+.split-toggle {
+  border-radius: 0 4px 4px 0;
+  padding: 0.45rem 0.55rem;
+  min-width: 2rem;
+}
+
+/* Header actions share the compact outlined treatment of the device and slot
+   selectors. The split seam keeps the primary action and its menu distinct. */
+.toolbar .split > button {
+  padding: 0.25rem 0.5rem;
+  border-color: var(--line);
+  border-radius: 2px;
+  background: var(--panel);
+  color: var(--ink);
+  font-size: 0.78rem;
+  line-height: 1.1;
+  box-shadow: inset 0 -2px 0 rgba(15, 107, 92, 0.18);
+}
+
+.toolbar .split > button:first-child {
+  border-radius: 2px 0 0 2px;
+  border-right: none;
+}
+
+.toolbar .split-toggle {
+  min-width: 1.75rem;
+  padding: 0.25rem 0.4rem;
+  border-radius: 0 2px 2px 0;
+}
+
+.toolbar .split > button:hover:not(:disabled),
+.toolbar .split > button[aria-expanded="true"] {
+  border-color: var(--accent);
+  box-shadow: inset 0 -2px 0 var(--accent);
+  filter: none;
+}
+
+.toolbar .split > button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* Match the room gained when the workspace switches back to its side-by-side
+   desktop layout without making the header controls crowd smaller screens. */
+@media (min-width: 1001px) {
+  .toolbar { gap: 0.35rem; }
+
+  .toolbar .split > button {
+    padding: 0.35rem 0.65rem;
+    font-size: 0.82rem;
+  }
+
+  .toolbar .split-toggle {
+    min-width: 1.9rem;
+    padding-inline: 0.5rem;
+  }
+}
+
+.menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 40;
+  margin: 0;
+  padding: 0.25rem;
+  list-style: none;
+  min-width: 12.5rem;
+  background: var(--panel);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  box-shadow: 0 6px 18px rgba(28, 27, 25, 0.12);
+}
+
+.menu[hidden] { display: none; }
+
+.menu button {
+  display: block;
+  text-align: left;
+  background: transparent;
+  color: var(--ink);
+  border: none;
+  border-radius: 3px;
+  padding: 0.45rem 0.6rem;
+  font-family: var(--sans-narrow);
+  font-size: 0.85rem;
+}
+
+.menu button:hover {
+  background: #e7efe9;
+  filter: none;
+}
+
+.menu-sep {
+  height: 1px;
+  margin: 0.25rem 0.4rem;
+  background: var(--line);
+}
+
+.menu .menu-check {
+  padding: 0.35rem 0.6rem;
+  font-family: var(--sans-narrow);
+  font-size: 0.85rem;
+}
+
+/* No gap: the splitter is its own spacing, drawn as a 2px line inside it. */
+.workspace {
+  flex: 1 1 auto;
+  display: flex;
+  align-items: stretch;
+  min-height: 0;
+  width: 100%;
+}
+
+.splitter {
+  flex: 0 0 0.5rem;
+  align-self: stretch;
+  cursor: col-resize;
+  border-radius: 3px;
+  background:
+    linear-gradient(var(--line), var(--line)) center / 2px 100% no-repeat;
+  touch-action: none;
+}
+
+.splitter:hover,
+.splitter.dragging,
+.splitter:focus-visible {
+  background:
+    linear-gradient(var(--accent), var(--accent)) center / 2px 100% no-repeat;
+}
+
+.splitter:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* Horizontal handle: trades height between the editor row and the footer. */
+.splitter-h {
+  flex: 0 0 0.5rem;
+  width: 100%;
+  /* Keeps the 8px grab area while cancelling most of main's row gap. */
+  margin: -0.75rem 0;
+  cursor: row-resize;
+  background:
+    linear-gradient(var(--line), var(--line)) center / 100% 2px no-repeat;
+}
+
+.splitter-h:hover,
+.splitter-h.dragging,
+.splitter-h:focus-visible {
+  background:
+    linear-gradient(var(--accent), var(--accent)) center / 100% 2px no-repeat;
+}
+
+/* Only once the user has dragged: until then the editor fills what is left. */
+main.rows-sized .workspace { flex: 0 0 var(--workspace-h); }
+main.rows-sized .footer { overflow: auto; }
+
+/* Keep the resize cursor while dragging past the handle. */
+body.col-resizing { cursor: col-resize; user-select: none; }
+body.row-resizing { cursor: row-resize; user-select: none; }

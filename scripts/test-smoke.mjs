@@ -3,16 +3,16 @@
  * safety, artifact/config/session routes. Usage: node --import tsx scripts/test-smoke.mjs
  */
 import { readFileSync } from "node:fs";
-import { checkBuildArtifacts, checkDialectSource } from "../server/dialect-check.ts";
-import { analyzeScriptFile, analyzeSource } from "../server/script-stats.ts";
-import { inferChip } from "../server/device-status.ts";
-import { lintSource } from "../server/lint-source.ts";
-import { lintSemantics } from "../server/lint-semantics.ts";
-import { lintAdvisories, parseMeta } from "../server/lint-advisories.ts";
-import { lintConnected } from "../server/lint-connected.ts";
-import { runCheck } from "../server/check.ts";
-import { CHECK_CATALOG } from "../server/check-catalog.ts";
-import { acquireHost, removeScratch } from "../server/probe.ts";
+import { checkBuildArtifacts, checkDialectSource } from "../server/lint/dialect-check.ts";
+import { analyzeScriptFile, analyzeSource } from "../server/script/script-stats.ts";
+import { inferChip } from "../server/device/device-status.ts";
+import { lintSource } from "../server/lint/lint-source.ts";
+import { lintSemantics } from "../server/lint/lint-semantics.ts";
+import { lintAdvisories, parseMeta } from "../server/lint/lint-advisories.ts";
+import { lintConnected } from "../server/lint/lint-connected.ts";
+import { runCheck } from "../server/lint/check.ts";
+import { CHECK_CATALOG } from "../server/lint/check-catalog.ts";
+import { acquireHost, removeScratch } from "../server/probe/probe.ts";
 import { MINIFY_KEYS } from "../shared/minify-options.mjs";
 import { createApp } from "../server/app.ts";
 

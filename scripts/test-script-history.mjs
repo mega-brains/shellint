@@ -21,8 +21,8 @@ import {
   listScriptHistory,
   readScriptHistoryRow,
   COALESCE_WINDOW_MS,
-} from "../server/script-history.ts";
-import { SCRIPT_PATH, ROOT } from "../server/paths.ts";
+} from "../server/script/script-history.ts";
+import { SCRIPT_PATH, ROOT } from "../server/core/paths.ts";
 import { createApp } from "../server/app.ts";
 
 const HISTORY_FILE = join(ROOT, ".devroom", "script-history.jsonl");

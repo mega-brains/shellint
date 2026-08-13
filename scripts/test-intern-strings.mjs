@@ -8,7 +8,7 @@
  */
 import { minify } from "terser";
 import { internStrings } from "./intern-strings.mjs";
-import { checkDialectSource } from "../server/dialect-check.ts";
+import { checkDialectSource } from "../server/lint/dialect-check.ts";
 
 function fail(msg) {
   console.error(`FAIL: ${msg}`);

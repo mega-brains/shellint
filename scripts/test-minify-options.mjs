@@ -1,6 +1,6 @@
 /**
  * Assert the minify option schema (shared/minify-options.mjs) and its UI tips
- * (web/option-tip.tsx) can't drift apart. OPT_TIPS stays hand-written
+ * (web/ui/option-tip.tsx) can't drift apart. OPT_TIPS stays hand-written
  * prose+JSX — deliberately not folded into the schema — so this is the seam
  * test that keeps every schema key covered by a tip and vice versa.
  * Usage: node --import tsx scripts/test-minify-options.mjs
@@ -10,7 +10,7 @@ import {
   MINIFY_KEYS,
   MINIFY_OPTIONS,
 } from "../shared/minify-options.mjs";
-import { OPT_TIPS } from "../web/option-tip.tsx";
+import { OPT_TIPS } from "../web/ui/option-tip.tsx";
 
 function fail(msg) {
   console.error(`FAIL: ${msg}`);

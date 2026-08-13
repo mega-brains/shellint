@@ -2,11 +2,11 @@ import { Hono } from "hono";
 import { readFileSync, existsSync } from "node:fs";
 import { join, relative } from "node:path";
 import { serveStatic } from "@hono/node-server/serve-static";
-import { WEB_DIR, ROOT } from "./paths.ts";
-import { registerDeviceRoutes } from "./routes-device.ts";
-import { registerProbeRoutes } from "./routes-probe.ts";
-import { registerScriptBuildRoutes } from "./routes-script.ts";
-import { apiDocsJson, appJs, appJsMap, css } from "./static-assets.ts";
+import { WEB_DIR, ROOT } from "./core/paths.ts";
+import { registerDeviceRoutes } from "./device/routes.ts";
+import { registerProbeRoutes } from "./probe/routes.ts";
+import { registerScriptBuildRoutes } from "./script/routes.ts";
+import { apiDocsJson, appJs, appJsMap, css } from "./core/static-assets.ts";
 
 export function createApp() {
   const app = new Hono();

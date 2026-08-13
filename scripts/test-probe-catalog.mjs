@@ -5,7 +5,7 @@
  * Usage: node --import tsx scripts/test-probe-catalog.mjs
  */
 import { readFileSync } from "node:fs";
-import { PROBES } from "../server/probe-catalog.ts";
+import { PROBES } from "../server/probe/probe-catalog.ts";
 
 function fail(msg) {
   console.error(`FAIL: ${msg}`);
@@ -147,14 +147,14 @@ const byId = new Map(PROBES.map((p) => [p.id, p]));
 // P5 — probe.ts iterates this catalog and nothing else. Source-level check, so
 // the test never reaches for the device.
 {
-  const src = readFileSync(new URL("../server/probe.ts", import.meta.url), "utf8");
+  const src = readFileSync(new URL("../server/probe/probe.ts", import.meta.url), "utf8");
   if (!/import \{ PROBES \} from "\.\/probe-catalog\.ts";/.test(src)) {
-    fail("server/probe.ts must import PROBES from the catalog");
+    fail("server/probe/probe.ts must import PROBES from catalog");
   }
   if (!/for \(const p of PROBES\)/.test(src)) {
     fail("runProbe must iterate PROBES");
   }
-  if (/const PROBES/.test(src)) fail("server/probe.ts still declares its own PROBES");
+  if (/const PROBES/.test(src)) fail("server/probe/probe.ts still declares its own PROBES");
 }
 
 const groups = {};

@@ -7,7 +7,7 @@
  */
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
-import { ROOT, DEVICE_PROFILE_PATH, PROBE_PATH, devicePaths } from "../server/paths.ts";
+import { ROOT, DEVICE_PROFILE_PATH, PROBE_PATH, devicePaths } from "../server/core/paths.ts";
 import {
   _resetCache,
   addDevice,
@@ -21,13 +21,13 @@ import {
   sanitizeDevice,
   setActive,
   touchDeviceInfo,
-} from "../server/devices.ts";
+} from "../server/device/devices.ts";
 import {
   computeDigestResponse,
   NonceCounter,
-} from "../server/auth-digest.ts";
-import { resetForDeviceSwitch, readLogs } from "../server/debug-log.ts";
-import { GENERATED_DTS_PATH } from "../server/probe-typings.ts";
+} from "../server/device/auth-digest.ts";
+import { resetForDeviceSwitch, readLogs } from "../server/device/debug-log.ts";
+import { GENERATED_DTS_PATH } from "../server/probe/probe-typings.ts";
 import { createApp } from "../server/app.ts";
 
 const DEVROOM_JSON = join(ROOT, "devroom.json");

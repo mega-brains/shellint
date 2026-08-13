@@ -3,15 +3,15 @@
  * parsing. Split out of test.mjs to keep both files inside the 500-line cap.
  * Usage: node --import tsx scripts/test-dashboard.mjs
  */
-import { estimateMemory, estimateMemoryFile } from "../server/memory-estimate.ts";
-import { minFirmware } from "../server/min-firmware.ts";
-import { parseMetric, readLogs, startLogStream, stopLogStream } from "../server/debug-log.ts";
-import { sampleAt, sparkPaths } from "../web/spark.ts";
-import { createHistory, WINDOW_MS } from "../web/metric-history.ts";
+import { estimateMemory, estimateMemoryFile } from "../server/script/memory-estimate.ts";
+import { minFirmware } from "../server/script/min-firmware.ts";
+import { parseMetric, readLogs, startLogStream, stopLogStream } from "../server/device/debug-log.ts";
+import { sampleAt, sparkPaths } from "../web/charts/spark.ts";
+import { createHistory, WINDOW_MS } from "../web/charts/metric-history.ts";
 import {
   isMissingSample,
   layoutMiniBarSlots,
-} from "../web/mini-bars.tsx";
+} from "../web/charts/mini-bars.tsx";
 
 function fail(msg) {
   console.error(`FAIL: ${msg}`);

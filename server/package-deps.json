@@ -20,7 +20,7 @@
   "scripts": {
     "dev": "npm run build:web && node --import tsx server/index.ts",
     "build:web": "node scripts/build-web.mjs",
-    "deploy": "node --import tsx server/cli-deploy.ts",
-    "probe": "node --import tsx server/cli-probe.ts"
+    "deploy": "node --import tsx server/cli/cli-deploy.ts",
+    "probe": "node --import tsx server/cli/cli-probe.ts"
   }
 }

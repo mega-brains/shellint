@@ -1,6 +1,6 @@
 /**
  * Assert the post-compile dialect guard (`checkBuildArtifacts`,
- * server/dialect-check.ts) actually covers every artifact that ships to the
+ * server/lint/dialect-check.ts) actually covers every artifact that ships to the
  * device — dist/{mode}.raw.js *and* dist/{mode}.js *and* dist/{mode}.adv.js —
  * not just the pre-Terser raw source. Tier 3 is best-effort, so its coverage
  * is only asserted when the artifact exists.
@@ -10,7 +10,7 @@
 import { existsSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { checkBuildArtifacts } from "../server/dialect-check.ts";
+import { checkBuildArtifacts } from "../server/lint/dialect-check.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 

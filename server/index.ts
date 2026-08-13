@@ -1,7 +1,7 @@
 import { serve } from "@hono/node-server";
 import { createApp } from "./app.ts";
-import { loadConfig } from "./config.ts";
-import { requireActive } from "./devices.ts";
+import { loadConfig } from "./core/config.ts";
+import { requireActive } from "./device/devices.ts";
 
 const cfg = loadConfig();
 const app = createApp();

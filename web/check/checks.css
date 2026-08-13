@@ -1,0 +1,332 @@
+/* Compliance indicator: the check catalog, its verdicts, and the findings. */
+
+/* The head always carries the verdict, collapsed or not. */
+.checks {
+  flex: 0 0 auto;
+  border-top: 2px solid var(--line);
+  padding-top: 0.45rem;
+  container-type: inline-size;
+}
+
+.checks .panel-peek { color: var(--accent); }
+.checks .panel-peek.error { color: var(--danger); }
+
+/* Counts read as badges: the colour carries the severity, not a word. */
+.badge {
+  display: inline-block;
+  padding: 0 0.3rem;
+  border-radius: 0.6rem;
+  font-family: var(--sans-narrow);
+  font-size: 0.78rem;
+  line-height: 1.35;
+  white-space: nowrap;
+}
+
+.badge-warn {
+  background: rgba(214, 158, 46, 0.22);
+  color: #7a5c14;
+}
+
+.badge-fail {
+  background: rgba(176, 58, 46, 0.18);
+  color: var(--danger);
+}
+
+.badge-pass,
+.badge-idle {
+  padding: 0;
+  color: var(--muted);
+  letter-spacing: 0;
+}
+
+.badge-pass { color: var(--accent); }
+
+.checks-body { margin-top: 0.35rem; }
+.checks.collapsed .checks-body { display: none; }
+
+.checks-note-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.checks-note {
+  margin: 0 0 0.35rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  color: var(--muted);
+}
+
+.copy-findings {
+  flex: 0 0 auto;
+  margin-bottom: 0.35rem;
+  padding: 0 0.4rem;
+  border: 1px solid var(--line);
+  border-radius: 0.35rem;
+  background: none;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+  cursor: pointer;
+}
+
+.copy-findings:hover,
+.copy-findings:focus-visible {
+  color: var(--ink);
+  border-color: var(--accent);
+}
+
+.copy-findings.copied {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.check-rules { margin-top: 0.35rem; margin-inline-start: 1em; }
+
+.check-group + .check-group { border-top: 1px solid var(--line); }
+
+.check-group-head {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+  padding: 0.28rem 0;
+  cursor: pointer;
+  font-size: 0.84rem;
+  letter-spacing: 0.03em;
+  color: var(--ink);
+  font-weight: 600;
+  list-style: none;
+}
+
+/* Own marker, so the twisty matches the other panels in the sidebar. */
+.check-group-head::-webkit-details-marker { display: none; }
+
+.check-group-head::before {
+  content: "▸";
+  flex: 0 0 auto;
+  width: 0.8rem;
+  font-size: 0.7rem;
+  color: var(--muted);
+}
+
+.check-group[open] > .check-group-head::before { content: "▾"; }
+.check-group-head:hover { color: var(--accent); }
+
+.check-group-head:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.check-group-label { flex: 1 1 auto; min-width: 0; }
+
+.check-group-meta {
+  flex: 0 0 auto;
+  display: inline-flex;
+  gap: 0.35rem;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  font-weight: 400;
+  color: var(--muted);
+}
+
+.check-tag-pass { color: var(--accent); }
+.check-tag-warn { color: #8a6d1f; }
+.check-tag-fail { color: var(--danger); }
+.check-tag-skip,
+.check-tag-idle { opacity: 0.7; }
+
+.check-table {
+  width: 100%;
+  margin: 0 0 0.35rem;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.check > td {
+  padding: 0.12rem 0.4rem 0.12rem 0;
+  vertical-align: baseline;
+}
+
+.check + .check > td { border-top: 1px solid rgba(212, 207, 196, 0.45); }
+
+.check-mark {
+  width: 1.1rem;
+  font-family: var(--mono);
+  font-size: 0.82rem;
+  color: var(--muted);
+}
+
+.check-rule {
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--ink);
+  overflow-wrap: anywhere;
+}
+
+/* Shown only for rules that did not simply pass — see ruleRow(). */
+.check-about {
+  display: block;
+  font-family: var(--sans);
+  font-size: 0.74rem;
+  line-height: 1.3;
+  color: var(--muted);
+}
+
+.check-count {
+  width: 1.6rem;
+  padding-right: 0;
+  text-align: right;
+  font-family: var(--mono);
+  font-size: 0.76rem;
+  color: var(--danger);
+}
+
+.check-pass .check-mark { color: var(--accent); }
+.check-warn .check-mark,
+.check-warn .check-rule { color: #8a6d1f; }
+.check-fail .check-mark,
+.check-fail .check-rule { color: var(--danger); }
+.check-skipped { opacity: 0.6; }
+.check-pending .check-mark { opacity: 0.5; }
+
+.findings-list {
+  margin: 0.35rem 0 0;
+  padding: 0.25rem 0.45rem;
+  list-style: none;
+  font-family: var(--mono);
+  font-size: 0.86rem;
+  height: 9rem;
+  min-height: 3.5rem;
+  max-height: min(50vh, 24rem);
+  overflow: auto;
+  resize: vertical;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: rgba(255, 252, 247, 0.7);
+}
+
+.findings-list:empty { display: none; }
+
+.finding {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.4rem;
+  padding: 0.15rem 0;
+  border-bottom: 1px solid rgba(212, 207, 196, 0.6);
+}
+
+.finding[data-line]:hover {
+  background: rgba(15, 107, 92, 0.08);
+  cursor: default;
+}
+
+.finding:last-child { border-bottom: none; }
+
+.finding-head {
+  flex: 1 1 100%;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+
+/* Same pill as the collapsed-header counts, so severity reads the same way. */
+.finding-sev {
+  flex: 0 0 auto;
+  align-self: center;
+  font-size: 0.7rem;
+  letter-spacing: 0.05em;
+}
+
+/* Keep rule and location legible when this resizable panel gets narrow. */
+@container (max-width: 24rem) {
+  .finding.warn .finding-sev {
+    padding-inline: 0.2rem;
+    font-size: 0;
+    letter-spacing: 0;
+  }
+
+  .finding.warn .finding-sev::after {
+    content: "⚠";
+    font-size: 0.9rem;
+  }
+}
+
+.finding.ok { color: var(--muted); }
+
+.finding-rule {
+  color: var(--muted);
+  line-height: 0.8;
+}
+
+/* Prose, not code: the condensed face fits a whole message on fewer lines. */
+.finding-msg {
+  flex: 1 1 100%;
+  min-width: 0;
+  font-family: var(--sans-narrow);
+  font-size: 0.92rem;
+  line-height: 1.3;
+  opacity: 0.5;
+}
+
+.finding-loc {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: auto;
+  display: inline-flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 0.3rem;
+  color: var(--muted);
+  font-family: var(--sans-narrow);
+  font-size: 0.8rem;
+}
+
+/* Truncate from left (".../main.ts:445") so line number stays visible. */
+.finding-loc-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  text-align: left;
+}
+
+.finding-loc-sev { font-size: 0.9em; }
+.finding.error .finding-loc-sev { color: var(--danger); }
+.finding.warn .finding-loc-sev { color: #8a6d1f; }
+
+/* Says the click leaves the panel and lands in the editor. */
+.finding-loc-go { font-size: 0.95em; opacity: 0.75; }
+
+/* The location doubles as the jump control when a line number is known. */
+button.finding-loc {
+  padding: 0;
+  border: none;
+  background: none;
+  font-family: var(--sans-narrow);
+  cursor: pointer;
+}
+
+/* Underline the file:line only, so the glyphs read as icons and not as link. */
+button.finding-loc .finding-loc-text {
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+button.finding-loc:hover,
+button.finding-loc:focus-visible {
+  color: var(--accent);
+}
+
+button.finding-loc:hover .finding-loc-text,
+button.finding-loc:focus-visible .finding-loc-text {
+  text-decoration-style: solid;
+}
+
+button.finding-loc:hover .finding-loc-go,
+button.finding-loc:focus-visible .finding-loc-go {
+  opacity: 1;
+}

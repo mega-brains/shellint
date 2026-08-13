@@ -14,7 +14,7 @@
  * below break-even naturally and are left alone.
  *
  * Never touches (same exclusions log-shorten applies to `#m`, for the same
- * reason — server/debug-log.ts parses metric lines from device log text):
+ * reason — server/device/debug-log.ts parses metric lines from device log text):
  *   - object-literal / method / accessor property keys
  *   - element access via string (`obj["key"]`) — that string is a key, not data
  *   - a leading directive prologue (`"use strict";`)
@@ -31,7 +31,7 @@ const LOG_CALLEES = new Set([
   "console.warn",
 ]);
 
-/** `#m <series> <value>` metric lines are parsed by server/debug-log.ts. */
+/** `#m <series> <value>` metric lines are parsed by server/device/debug-log.ts. */
 const METRIC_PREFIX = "#m";
 
 function byteLen(s) {

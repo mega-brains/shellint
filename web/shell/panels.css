@@ -1,0 +1,495 @@
+/* Footer panels: device telemetry + debug logs. */
+
+.footer {
+  flex: 0 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+/* An expanded log panel takes the leftover height instead of scrolling inside
+   a fixed 9rem box. Only then does the footer compete with the editor for
+   space, and the editor keeps a floor so it can never be squeezed away. */
+main:has(#logsPanel:not(.collapsed)) .footer {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+main:has(#logsPanel:not(.collapsed)) .workspace { min-height: 8rem; }
+
+main:has(#logsPanel:not(.collapsed)) #logsPanel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+#logsPanel:not(.collapsed) #logsBody {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+}
+
+#buildPanel,
+#checkPanel,
+#optionsPanel,
+#devicePanel { font-family: var(--sans-narrow); }
+
+/* The editor's right-hand sidebar: build sizes on top, check indicator below. */
+.side {
+  flex: 0 0 var(--side-w, clamp(15rem, 24vw, 21rem));
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  min-height: 0;
+  overflow: auto;
+  /* Reserved even when idle: expanding a panel must not shift the column. */
+  scrollbar-gutter: stable;
+  padding: 0.45rem 0.15rem 0.45rem 0.4rem;
+  border-left: 2px solid var(--line);
+
+  & section div+div {
+    /*margin-inline-start: .5em;*/
+    padding-left: .6em;
+  }
+
+}
+
+/* Collapsible panel chrome, shared by the build and device sections. */
+.panel-head {
+  display: flex;
+  flex-wrap: nowrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  cursor: pointer;
+  user-select: none;
+  min-width: 0;
+}
+
+.panel-head:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.panel-toggle {
+  font-family: var(--mono);
+  font-size: 1.15rem;
+  line-height: 1;
+  color: var(--muted);
+  width: 1.35rem;
+  height: 1.35rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.panel-head h2 {
+  margin: 0;
+  font-size: 0.85rem;
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+.panel-peek {
+  margin: 0;
+  flex: 1 1 auto;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--ink);
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  letter-spacing: -0.08em;
+}
+
+.panel-peek.error { color: var(--danger); }
+
+/* Peek stands in for the body; expanded, it would just repeat it. */
+.device:not(.collapsed) .panel-peek { display: none; }
+
+/* Identity line lives in the sticky header; when the panel is open the same
+   text also sits in the head so it stays on-screen if the chrome scrolled away. */
+.device.collapsed #deviceMetaHead { display: none; }
+.device:not(.collapsed) #deviceMetaHead {
+  display: block;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.build { flex: 0 0 auto; }
+
+.build.collapsed .sizes { display: none; }
+
+/* Minify knobs under build/check — collapsed by default. */
+.options {
+  flex: 0 0 auto;
+  border-top: 2px solid var(--line);
+  padding-top: 0.45rem;
+}
+
+.options.collapsed .options-body { display: none; }
+
+.options-body { margin-top: 0.35rem; }
+
+.options-note {
+  margin: 0 0 0.35rem;
+  font-family: var(--mono);
+  font-size: 0.72rem;
+  color: var(--muted);
+}
+
+.options-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(11rem, 1fr));
+  gap: 0.25rem 0.6rem;
+}
+
+.options-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.options-item input { accent-color: var(--accent); }
+
+.options-item input:disabled { cursor: wait; }
+
+.sizes {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 0.6rem;
+  margin: 0.45rem 0 0;
+}
+
+/* The panel head already carries the rule for this group. */
+.build .size-block {
+  border-top: none;
+  padding-top: 0;
+}
+
+.build .size-block + .size-block {
+  border-top: 1px dashed var(--line);
+  padding-top: 0.4rem;
+}
+
+.size-block {
+  border-top: 2px solid var(--line);
+  padding-top: 0.45rem;
+}
+
+.size-block h2 {
+  margin: 0;
+  font-size: 0.85rem;
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+.size-block p {
+  margin: 0.25rem 0 0;
+  font-family: var(--mono);
+  font-size: 0.95rem;
+  text-align: end; /* *************** */
+
+  &.mem-total {
+    margin-top: -1em;
+  }
+}
+
+/*
+ * One-second "this build moved it" pulse, applied by web/ui/use-flash.ts to any
+ * build-panel value that changed. Duration is mirrored by FLASH_MS there —
+ * keep the two in sync. Size tints (.size-low/.size-high) set their own
+ * background, so the pulse rides on box-shadow + color instead.
+ */
+@keyframes flash-change {
+  from {
+    box-shadow: 0 0 0 3px var(--flash-bg);
+    background-color: var(--flash-bg);
+  }
+  to {
+    box-shadow: 0 0 0 3px transparent;
+    background-color: transparent;
+  }
+}
+
+.flash-change {
+  --flash-bg: color-mix(in srgb, var(--accent, #4c9aff) 32%, transparent);
+  border-radius: 2px;
+  animation: flash-change 1s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flash-change {
+    animation-duration: 1ms;
+  }
+}
+
+.size-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+  margin-top: -0.9em;
+}
+
+.size-table th,
+.size-table td {
+  padding: 0.15rem 0.55rem 0.15rem 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.size-table thead th {
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.size-table tbody th {
+  text-align: left;
+  font-weight: 600;
+  color: var(--muted);
+  padding-left: 0;
+}
+
+.size-table tbody td {
+  color: var(--ink);
+}
+
+.size-table td.size-low {
+  background: var(--size-low-bg);
+}
+
+.size-table td.size-high {
+  background: var(--size-high-bg);
+}
+
+.size-table th:last-child,
+.size-table td:last-child {
+  padding-right: 0;
+}
+
+.size-stats p.stats-summary {
+  white-space: pre-wrap;
+  line-height: 1.25;
+  margin: 0.2rem 0 0.3rem;
+  font-size: 0.72rem;
+}
+
+.stats-chart { width: 100%; }
+
+.stats-bars {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  gap: 0.1rem 0.9rem;
+}
+
+.stats-bar {
+  display: grid;
+  grid-template-columns: minmax(0, auto) minmax(2.5rem, 1fr) auto;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--mono);
+  font-size: 0.68rem;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.stats-bar-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stats-bar-value {
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.stats-bar.warn .stats-bar-value { color: var(--danger); }
+
+.stats-bar-track,
+.gauge {
+  height: 0.3rem;
+  background: rgba(212, 207, 196, 0.55);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.stats-bar-fill,
+.gauge-fill {
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+  border-radius: 2px;
+}
+
+.stats-bar.warn .stats-bar-fill { background: var(--danger); }
+
+/* Advisory limits are cost warnings, not firmware caps — amber, not accent. */
+.stats-bar.soft:not(.warn) .stats-bar-fill { background: #8a6d1f; }
+.stats-bar.soft .stats-bar-label { font-style: italic; }
+
+.stats-bars-empty {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.75rem;
+  color: var(--muted);
+}
+
+.size-history-body { margin-top: 0.35rem; }
+.size-history.collapsed .size-history-body { display: none; }
+
+.history-list {
+  margin: 0.25rem 0 0;
+  padding: 0;
+  list-style: none;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  max-height: 12rem;
+  overflow: auto;
+  color: var(--ink);
+}
+
+.history-list li {
+  padding: 0.15rem 0;
+  border-bottom: 1px solid rgba(212, 207, 196, 0.6);
+}
+
+.history-list li:last-child { border-bottom: none; }
+
+.device {
+  border-top: 2px solid var(--line);
+  padding-top: 0.45rem;
+}
+
+.device-body { margin-top: 0.45rem; }
+.device.collapsed .device-body { display: none; }
+
+.device-meta {
+  margin: 0;
+  font-family: var(--mono);
+  font-size: 0.8rem;
+  color: var(--muted);
+  display: none;
+}
+
+/* Header identity strip — always visible under the toolbar row. */
+.top .device-meta {
+  margin-top: 0.35rem;
+}
+
+.eco {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  margin-left: auto;
+  font-size: 0.85rem;
+  color: var(--muted);
+  cursor: pointer;
+  user-select: none;
+}
+
+.eco input { accent-color: var(--accent); }
+
+.device-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-left: auto;
+}
+
+.device-actions .eco { margin-left: 0; }
+
+.device-menu {
+  position: relative;
+  display: inline-flex;
+}
+
+.device-menu-btn {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  padding: 0.15rem 0.45rem;
+  min-width: 1.75rem;
+  border-radius: 4px;
+  font-size: 1rem;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.device-menu-btn:hover:not(:disabled) {
+  background: #e7efe9;
+  filter: none;
+}
+
+.device-menu .menu {
+  left: auto;
+  right: 0;
+  min-width: 10rem;
+}
+
+.device-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.35rem 0.75rem;
+  margin: 0;
+}
+
+.device-grid > div { min-width: 0; }
+
+.device-grid dt {
+  margin: 0;
+  font-size: 0.7rem;
+  text-transform: lowercase;
+  letter-spacing: 0.03em;
+  color: var(--muted);
+}
+
+.device-grid dd {
+  margin: 0.1rem 0 0;
+  font-family: var(--mono);
+  font-size: 0.85rem;
+}
+
+.device-grid dd.ok { color: var(--accent); }
+.device-grid dd.warn { color: var(--danger); }
+
+/* Swaps a gauge cell for the history of the same value. Always grey, and the
+   same grey whichever view the cell is on: the cell itself shows the state. */
+.metric-swap {
+  padding: 0;
+  border: none;
+  background: none;
+  font-size: 0.68rem;
+  line-height: 1;
+  cursor: pointer;
+  filter: grayscale(1);
+  opacity: 0.45;
+}
+
+.metric-swap:hover,
+.metric-swap:focus-visible { opacity: 1; }
+
+.metric-swap:focus-visible { outline: 1px solid var(--accent); }
+
+.device-grid .gauge { margin-top: 0.25rem; }

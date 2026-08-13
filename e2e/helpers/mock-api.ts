@@ -13,7 +13,7 @@ export type MockCapture = {
   absent: number;
 };
 
-/** M16 probe-required gate — see probeState() in server/probe-store.ts. */
+/** M16 probe-required gate — see probeState() in server/probe/probe-store.ts. */
 export type MockProbeState = {
   required: boolean;
   reason: "never-probed" | "firmware-changed" | "none";

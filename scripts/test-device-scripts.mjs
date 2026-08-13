@@ -7,17 +7,17 @@
  */
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { ROOT, DIST_DIR, DEVICE_PROFILE_PATH, PROBE_PATH } from "../server/paths.ts";
+import { ROOT, DIST_DIR, DEVICE_PROFILE_PATH, PROBE_PATH } from "../server/core/paths.ts";
 import {
   createSlot,
   deleteSlot,
   getSlotCode,
   listSlots,
   rawList,
-} from "../server/device-scripts.ts";
-import { _resetCache, addDevice, loadDevices, setActive } from "../server/devices.ts";
-import { deploy } from "../server/deploy.ts";
-import { GENERATED_DTS_PATH } from "../server/probe-typings.ts";
+} from "../server/device/device-scripts.ts";
+import { _resetCache, addDevice, loadDevices, setActive } from "../server/device/devices.ts";
+import { deploy } from "../server/device/deploy.ts";
+import { GENERATED_DTS_PATH } from "../server/probe/probe-typings.ts";
 
 const DEVROOM_JSON = join(ROOT, "devroom.json");
 const DEVICES_DIR = join(ROOT, ".devroom");
