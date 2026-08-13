@@ -1,4 +1,5 @@
 import { Collapsible } from "./collapsible";
+import { flashClass, useChangeFlash } from "./use-flash";
 import { StatBadges } from "./stats-badges";
 import { StatsBars } from "./stats-chart";
 import { MemBreakdown, MemBullet, MemPeek } from "./mem-chart";
@@ -46,8 +47,9 @@ export type BuildPanelProps = {
 };
 
 function SizeCell(props: { n: number | undefined; tint: SizeTint | null }) {
+  const flash = useChangeFlash(props.n);
   return (
-    <td class={props.tint ? `size-${props.tint}` : undefined}>
+    <td class={flashClass(props.tint ? `size-${props.tint}` : undefined, flash)}>
       {formatSizeCell(props.n)}
     </td>
   );
@@ -102,6 +104,10 @@ export function BuildPanel(props: BuildPanelProps) {
     : 0;
   const showAdv = hasAdvColumn(props.sizeDebug, props.sizeProd);
   const extent = sizeExtent(props.sizeDebug, props.sizeProd, showAdv);
+  const estimateText = formatEstimate(props.patch.estimate);
+  const firmwareText = formatMinFirmware(props.patch.minFirmware);
+  const estimateFlash = useChangeFlash(estimateText);
+  const firmwareFlash = useChangeFlash(firmwareText);
 
   return (
     <Collapsible
@@ -151,10 +157,10 @@ export function BuildPanel(props: BuildPanelProps) {
           <StatsBars stats={stats} />
           <p
             id="minFirmware"
-            class="stats-summary"
+            class={flashClass("stats-summary", firmwareFlash)}
             title="Lowest Shelly firmware that implements every API this script uses"
           >
-            {formatMinFirmware(props.patch.minFirmware)}
+            {firmwareText}
           </p>
         </div>
         <Collapsible
@@ -180,10 +186,10 @@ export function BuildPanel(props: BuildPanelProps) {
           <div class="size-mem-body" id="memBody">
             <p
               id="memEstimate"
-              class="mem-total"
+              class={flashClass("mem-total", estimateFlash)}
               title="Static RAM estimate from an Espruino JsVar cost model — an estimate, not a measurement"
             >
-              {formatEstimate(props.patch.estimate)}
+              {estimateText}
             </p>
             <MemBreakdown estimate={props.patch.estimate} />
             <MemBullet

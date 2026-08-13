@@ -63,6 +63,28 @@ try {
     if (!debugOut.includes("console.log")) {
       fail(`dropConsole must never reach the debug variant: ${debugOut}`);
     }
+
+    // drop_console is a compress transform — it must still fire when the
+    // separate `compress` knob is off, or dropConsole silently no-ops.
+    const noCompress = await minifyPass(src, { ...prodOpts, compress: false });
+    if (noCompress.includes("console.log")) {
+      fail(`dropConsole must strip console.log with compress off: ${noCompress}`);
+    }
+    if (!noCompress.includes("#m t") || !noCompress.includes('print("ok")')) {
+      fail(`dropConsole with compress off must keep print(): ${noCompress}`);
+    }
+
+    // …and it must reach the *.raw.js artifact too, which is envPass output.
+    const rawProd = await envPass(src, { debug: false, prod: true }, {}, {
+      dropConsole: true,
+    });
+    const rawDebug = await envPass(src, { debug: true, prod: false }, {}, {});
+    if (rawProd.includes("console.log")) {
+      fail(`dropConsole must strip console.log from prod.raw.js: ${rawProd}`);
+    }
+    if (!rawDebug.includes("console.log")) {
+      fail(`dropConsole must not touch debug.raw.js: ${rawDebug}`);
+    }
   }
 
   // --- all four new options false: byte-identical to omitting them --------

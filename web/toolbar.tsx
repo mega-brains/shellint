@@ -30,8 +30,10 @@ export type ToolbarProps = {
   deployReady: boolean;
   buildAction: BuildAction;
   buildRunning: boolean;
+  skipTypeCheck: boolean;
   deployChoice: { mode: Mode; minify: Minify };
   autoBuildCheck: boolean;
+  onSkipTypeCheckChange: (skip: boolean) => void;
   onAutoChange: (on: boolean) => void;
   onSave: () => void;
   onHistory: () => void;
@@ -43,6 +45,8 @@ export type ToolbarProps = {
   onProbe: () => void;
   probeResults: ProbeResult[] | null;
   probeNote: string;
+  /** "Kitchen:1" — appended to the Deploy label so the target is never a guess. */
+  deployTarget?: string;
 };
 
 export function Toolbar(props: ToolbarProps) {
@@ -108,9 +112,14 @@ export function Toolbar(props: ToolbarProps) {
           }
           setSaveOpen(o);
         }}
-        disabled={saveDisabled}
-        toggleTitle="Save a checkpoint independent of the next Save"
-        onPick={() => props.onCheckpoint()}
+        /* Only the primary Save is blocked while previewing an artifact —
+           checkpoint/history stay reachable from the menu. */
+        disabled={props.busy}
+        toggleTitle="Checkpoint the file, or browse saved versions"
+        onPick={(item) => {
+          if (item.dataset.action === "history") props.onHistory();
+          else props.onCheckpoint();
+        }}
         primary={
           <button
             type="button"
@@ -128,24 +137,26 @@ export function Toolbar(props: ToolbarProps) {
               <button
                 type="button"
                 role="menuitem"
+                data-action="checkpoint"
                 title="Save a version-history checkpoint of the file on disk right now, independent of the next Save"
               >
                 checkpoint
               </button>
             </li>
+            <li role="none">
+              <button
+                type="button"
+                role="menuitem"
+                id="btnHistory"
+                data-action="history"
+                title="Browse and restore previous saved versions of scripts/main.ts"
+              >
+                history…
+              </button>
+            </li>
           </ul>
         }
       />
-
-      <button
-        type="button"
-        id="btnHistory"
-        title="Browse and restore previous saved versions of scripts/main.ts"
-        disabled={props.busy}
-        onClick={props.onHistory}
-      >
-        History
-      </button>
 
       <SplitButton
         rootId="buildSplit"
@@ -216,6 +227,23 @@ export function Toolbar(props: ToolbarProps) {
             <li role="none">
               <label
                 class="logs-follow menu-check"
+                title="Skip TypeScript check during Build"
+              >
+                <input
+                  type="checkbox"
+                  id="skipTypeCheck"
+                  checked={props.skipTypeCheck}
+                  onChange={(e: JSX.TargetedEvent<HTMLInputElement>) =>
+                    props.onSkipTypeCheckChange(e.currentTarget.checked)
+                  }
+                  onClick={(e) => e.stopPropagation()}
+                />
+                skip TypeScript check
+              </label>
+            </li>
+            <li role="none">
+              <label
+                class="logs-follow menu-check"
                 title="Save + Build + Check automatically 3s after each edit"
               >
                 <input
@@ -263,7 +291,7 @@ export function Toolbar(props: ToolbarProps) {
             disabled={deployDisabled}
             onClick={props.onDeploy}
           >
-            {`Deploy ${mode} · ${shortMinify(minify)}`}
+            {`Deploy ${mode} · ${shortMinify(minify)}${props.deployTarget ? ` → ${props.deployTarget}` : ""}`}
           </button>
         }
         menu={

@@ -1,6 +1,7 @@
 import WebSocket from "ws";
 import { loadConfig, assertDevroomCompiler } from "./config.ts";
-import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
+import { requireActive } from "./devices.ts";
+import { AuthNotSupportedError, ShellyRpc, type RpcTarget } from "./rpc.ts";
 
 export type LogLine = { seq: number; ts: number; level: number; text: string };
 export type MetricPoint = { ts: number; series: string; value: number };
@@ -18,6 +19,8 @@ export type LogSnapshot = {
   lines: LogLine[];
   metrics: MetricPoint[];
   dropped: number;
+  /** Bumped on every device switch — a poller sees this change and wipes its view. */
+  deviceGeneration: number;
 };
 
 const MAX_LINES = 500;
@@ -92,8 +95,8 @@ function ingest(raw: string): void {
 
 type EnableResult = { enabled: boolean; restartRequired: boolean; error?: string };
 
-async function enableDeviceDebug(deviceIp: string): Promise<EnableResult> {
-  const rpc = new ShellyRpc(deviceIp);
+async function enableDeviceDebug(target: RpcTarget): Promise<EnableResult> {
+  const rpc = new ShellyRpc(target);
   try {
     await rpc.connect();
     const result = (await rpc.call("Sys.SetConfig", {
@@ -103,7 +106,7 @@ async function enableDeviceDebug(deviceIp: string): Promise<EnableResult> {
   } catch (e) {
     const error =
       e instanceof AuthNotSupportedError
-        ? `${e.message} — cannot enable debug logging on ${deviceIp}`
+        ? `${e.message} — cannot enable debug logging on ${target.ip}`
         : msg(e);
     return { enabled: false, restartRequired: false, error };
   } finally {
@@ -174,16 +177,17 @@ function openLogSocket(deviceIp: string, gen: number): Promise<OpenResult> {
 
 async function begin(): Promise<LogStreamStart> {
   const gen = ++generation;
-  let deviceIp: string;
+  let target: RpcTarget;
   try {
     const cfg = loadConfig();
     assertDevroomCompiler(cfg);
-    deviceIp = cfg.deviceIp;
+    const active = requireActive();
+    target = { ip: active.device.ip, auth: active.device.auth };
   } catch (e) {
     return { connected: false, enabledDebug: false, restartRequired: false, error: msg(e) };
   }
 
-  const enable = await enableDeviceDebug(deviceIp);
+  const enable = await enableDeviceDebug(target);
   enabledDebug = enable.enabled;
   restartRequired = enable.restartRequired;
   if (!enable.enabled) {
@@ -195,7 +199,7 @@ async function begin(): Promise<LogStreamStart> {
     };
   }
 
-  const opened = await openLogSocket(deviceIp, gen);
+  const opened = await openLogSocket(target.ip, gen);
   return {
     connected: opened.ok,
     enabledDebug: true,
@@ -234,6 +238,21 @@ export function stopLogStream(): void {
 }
 
 /**
+ * Called on `/api/session/active` — the ring is per-device by construction
+ * (one socket), so a switch stops the stream, wipes the buffered lines/
+ * metrics, and bumps `generation` so the next `readLogs()` reports
+ * `deviceGeneration` changed and the panel wipes instead of interleaving two
+ * devices' output.
+ */
+export function resetForDeviceSwitch(): void {
+  stopLogStream();
+  lines.length = 0;
+  metrics.length = 0;
+  headSeq = 0;
+  evictedSeq = 0;
+}
+
+/**
  * Entries above `sinceSeq`, plus the head seq to poll from next.
  * The device buffer is circular and lossy — oldest lines may never be streamed —
  * so `dropped` is only what *this* ring evicted, and marks a gap the UI must not bridge.
@@ -248,6 +267,7 @@ export function readLogs(sinceSeq: number): LogSnapshot {
       .filter((m) => m.seq > from)
       .map((m) => ({ ts: m.ts, series: m.series, value: m.value })),
     dropped: Math.max(0, evictedSeq - from),
+    deviceGeneration: generation,
   };
 }
 

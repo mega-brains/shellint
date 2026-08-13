@@ -12,6 +12,7 @@ import { LogsPanel } from "./logs-panel";
 import { api } from "./api";
 import { createDeployGate } from "./deploy-gate";
 import { setDirtyBaseline } from "./dirty-gutter";
+import { ImportBanner, useSlotImport } from "./use-slot-import";
 import {
   clearBuildErrors,
   reportBuildFailure,
@@ -21,6 +22,8 @@ import { isEmptySizes, type Sizes } from "./sizes";
 import { ScriptHistoryModal } from "./script-history-modal";
 import { useScriptHistory } from "./use-script-history";
 import { useProbe } from "./use-probe";
+import { useDevices } from "./use-devices";
+import { DevicePicker } from "./device-picker";
 
 const AUTO_KEY = "shelly-devroom.autoBuildCheck";
 
@@ -32,6 +35,7 @@ export function App() {
   const [previewing, setPreviewing] = useState(false);
   const [deployReady, setDeployReady] = useState(false);
   const [buildAction, setBuildAction] = useState<BuildAction>("both");
+  const [skipTypeCheck, setSkipTypeCheck] = useState(false);
   const [deployChoice, setDeployChoice] = useState<{
     mode: Mode;
     minify: Minify;
@@ -40,7 +44,6 @@ export function App() {
     () => localStorage.getItem(AUTO_KEY) === "1",
   );
   const [deviceIp, setDeviceIp] = useState("");
-  const [configBase, setConfigBase] = useState("");
   const [configFail, setConfigFail] = useState<string | undefined>();
   const [identity, setIdentity] = useState<DeviceIdentity | null>(null);
   const [deviceMeta, setDeviceMeta] = useState("—");
@@ -125,6 +128,7 @@ export function App() {
     [checkScript],
   );
   const scriptHistory = useScriptHistory(viewRef, setStatus, checkScriptQuiet);
+  const slotImport = useSlotImport(viewRef, setStatus);
 
   const saveScript = useCallback(async () => {
     const view = viewRef.current;
@@ -136,10 +140,11 @@ export function App() {
     });
     setDirtyBaseline(view, source);
     scriptHistory.markSaved(source);
+    slotImport.clearImport();
     setStatus(`saved (${new TextEncoder().encode(source).length} B)`);
-  }, [setStatus, scriptHistory]);
+  }, [setStatus, scriptHistory, slotImport]);
 
-  const buildScript = useCallback(async () => {
+  const buildScript = useCallback(async (skipTypes = false) => {
     const view = viewRef.current;
     if (!view) return;
     setStatus("building…");
@@ -153,7 +158,10 @@ export function App() {
       estimate?: DashboardPatch["estimate"];
       minFirmware?: DashboardPatch["minFirmware"];
       dialect?: { file: string; findings: Finding[] }[];
-    }>("/api/build", { method: "POST", body: "{}" }).catch((e) =>
+    }>("/api/build", {
+      method: "POST",
+      body: JSON.stringify({ skipTypeCheck: skipTypes }),
+    }).catch((e) =>
       reportBuildFailure(view, e),
     );
     setSizeDebug(data.sizes.debug ?? {});
@@ -204,17 +212,17 @@ export function App() {
   }, [deployGate, setStatus, syncDeployReady]);
 
   const runBuildAction = useCallback(
-    async (action = buildAction) => {
+    async (action = buildAction, skipTypes = skipTypeCheck) => {
       setBuildRunning(true);
       try {
         if (action === "check") return await checkScript();
-        await buildScript();
+        await buildScript(skipTypes);
         if (action === "both") await checkScript();
       } finally {
         setBuildRunning(false);
       }
     },
-    [buildAction, buildScript, checkScript],
+    [buildAction, buildScript, checkScript, skipTypeCheck],
   );
 
   const deployScript = useCallback(
@@ -246,6 +254,17 @@ export function App() {
   const { probeResults, probeNoteText, probeProgress, probeDevice } =
     useProbe(setStatus);
 
+  const devicesState = useDevices();
+  const activeDevice = devicesState.devices.find(
+    (d) => d.id === devicesState.active?.device,
+  );
+  const deployTarget = activeDevice
+    ? `${activeDevice.label}:${devicesState.active?.slot ?? "?"}`
+    : undefined;
+  // The active device is the source of truth once devices have loaded; the
+  // /api/config IP is only the pre-load (and no-devices) fallback.
+  const shownIp = activeDevice?.ip ?? deviceIp;
+
   const scheduleAuto = useCallback(() => {
     if (!autoOn.current) return;
     if (artifactsRef.current?.previewing()) return;
@@ -266,7 +285,6 @@ export function App() {
           config: { deviceIp: string; scriptId: number };
         }>("/api/config");
         setDeviceIp(cfg.config.deviceIp);
-        setConfigBase(`script ${cfg.config.scriptId}`);
       } catch {
         setConfigFail("config unavailable");
       }
@@ -330,8 +348,7 @@ export function App() {
   return (
     <>
       <Header
-        deviceIp={deviceIp}
-        configBase={configBase}
+        deviceIp={shownIp}
         configFail={configFail}
         identity={identity}
         onToggleRun={(running) =>
@@ -361,6 +378,14 @@ export function App() {
         statusError={statusError}
         probeProgress={probeProgress}
         deviceMeta={deviceMeta}
+        deviceSelector={
+          <DevicePicker
+            devicesState={devicesState}
+            withBusy={withBusy}
+            setStatus={setStatus}
+            onImportSlot={slotImport.importSlot}
+          />
+        }
       >
         <Toolbar
           busy={busy}
@@ -368,8 +393,10 @@ export function App() {
           deployReady={deployReady}
           buildAction={buildAction}
           buildRunning={buildRunning}
+          skipTypeCheck={skipTypeCheck}
           deployChoice={deployChoice}
           autoBuildCheck={autoBuildCheck}
+          onSkipTypeCheckChange={setSkipTypeCheck}
           onAutoChange={(on) => {
             setAutoBuildCheck(on);
             localStorage.setItem(AUTO_KEY, on ? "1" : "0");
@@ -394,6 +421,7 @@ export function App() {
           onProbe={() => void withBusy(probeDevice)}
           probeResults={probeResults}
           probeNote={probeNoteText}
+          deployTarget={deployTarget}
         />
       </Header>
 
@@ -401,6 +429,12 @@ export function App() {
         onResize={() => viewRef.current?.requestMeasure()}
         editor={
           <EditorHost
+            banner={
+              <ImportBanner
+                imported={slotImport.imported}
+                onDiscard={slotImport.discardImport}
+              />
+            }
             onView={onView}
             onDocChange={scheduleAuto}
             onStatus={setStatus}
@@ -431,6 +465,7 @@ export function App() {
         footer={
           <>
             <DevicePanel
+              key={devicesState.sessionKey}
               api={api}
               onStatus={setStatus}
               onIdentity={(id) => {
@@ -443,7 +478,7 @@ export function App() {
                 deviceRef.current = ctl;
               }}
             />
-            <LogsPanel api={api} onStatus={setStatus} />
+            <LogsPanel key={devicesState.sessionKey} api={api} onStatus={setStatus} />
           </>
         }
       />

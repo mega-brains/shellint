@@ -1,7 +1,9 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { dirname } from "node:path";
-import { PROBE_PATH } from "./paths.ts";
+import { devicePaths } from "./paths.ts";
 import { loadConfig, assertDevroomCompiler } from "./config.ts";
+import { requireActive, mirrorActiveDevice } from "./devices.ts";
+import { createSlot, deleteSlot } from "./device-scripts.ts";
 import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
 // Script.Eval expressions, and they must stay side-effect-free: they may be
 // evaluated inside a script the user owns.
@@ -95,18 +97,15 @@ async function isRunning(rpc: ProbeRpc, id: number): Promise<boolean> {
 }
 
 /**
- * Script.Create a fresh slot, upload the keep-alive stub, start it.
- * Refuses to write to any id that already existed; cleans up on partial failure.
+ * Script.Create (via device-scripts.ts, the same helper the slot routes use)
+ * a fresh slot, upload the keep-alive stub, start it. Refuses to write to any
+ * id that already existed; cleans up on partial failure.
  */
 async function createScratchHost(
   rpc: ProbeRpc,
   existingIds: Set<number>,
 ): Promise<number> {
-  const created = (await rpc.call("Script.Create", { name: SCRATCH_NAME })) as {
-    id?: unknown;
-  } | null;
-  const id = typeof created?.id === "number" ? created.id : null;
-  if (id == null) throw new Error("Script.Create returned no id");
+  const id = await createSlot(rpc, SCRATCH_NAME);
   if (existingIds.has(id)) {
     throw new Error(
       `Script.Create returned pre-existing slot ${id} — refusing to overwrite a stored script`,
@@ -124,12 +123,7 @@ async function createScratchHost(
 }
 
 export async function removeScratch(rpc: ProbeRpc, id: number): Promise<void> {
-  try {
-    await rpc.call("Script.Stop", { id });
-  } catch {
-    // Not running is fine — Delete is what matters.
-  }
-  await rpc.call("Script.Delete", { id });
+  await deleteSlot(rpc, id);
 }
 
 /**
@@ -211,15 +205,16 @@ export async function acquireHost(
 export async function runProbe(): Promise<ProbeReport> {
   const cfg = loadConfig();
   assertDevroomCompiler(cfg);
+  const target = requireActive();
 
-  const rpc = new ShellyRpc(cfg.deviceIp);
+  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
   const results: ProbeEntry[] = [];
   let scratchRemoved = false;
   progressState = { done: 0, total: PROBES.length };
 
   try {
     await rpc.connect();
-    const host = await acquireHost(rpc, cfg.scriptId);
+    const host = await acquireHost(rpc, target.slot);
 
     try {
       for (const p of PROBES) {
@@ -255,9 +250,9 @@ export async function runProbe(): Promise<ProbeReport> {
     const report: ProbeReport = {
       probed: true,
       at: new Date().toISOString(),
-      deviceIp: cfg.deviceIp,
+      deviceIp: target.device.ip,
       scriptId: host.scriptId,
-      configuredScriptId: cfg.scriptId,
+      configuredScriptId: target.slot,
       strategy: host.strategy,
       existingScriptIds: host.existingScriptIds,
       scratchScriptId: host.scratchScriptId,
@@ -266,8 +261,10 @@ export async function runProbe(): Promise<ProbeReport> {
       results,
     };
 
-    mkdirSync(dirname(PROBE_PATH), { recursive: true });
-    writeFileSync(PROBE_PATH, JSON.stringify(report, null, 2) + "\n", "utf8");
+    const path = devicePaths(target.device.id).probe;
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify(report, null, 2) + "\n", "utf8");
+    mirrorActiveDevice(target.device.id);
     return report;
   } finally {
     rpc.close();

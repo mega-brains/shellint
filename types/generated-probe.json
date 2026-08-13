@@ -1,17 +1,20 @@
 {
   "probed": true,
-  "at": "2026-08-11T23:06:58.539Z",
-  "deviceIp": "192.168.3.106",
-  "scriptId": 1,
+  "at": "2026-08-12T23:55:56.509Z",
+  "deviceIp": "192.168.88.54",
+  "scriptId": 2,
   "configuredScriptId": 1,
-  "strategy": "configured",
+  "strategy": "scratch",
   "existingScriptIds": [
     1,
-    2
+    3
   ],
-  "scratchScriptId": null,
+  "scratchScriptId": 2,
   "scratchRemoved": false,
-  "notes": [],
+  "notes": [
+    "script 1 not running — probed in temporary slot 2 (\"devroom-probe\"), removed afterwards",
+    "WARNING: temporary slot 2 could not be removed (RPC timeout: Script.Delete) — delete it on the device"
+  ],
   "results": [
     {
       "id": "array.map",
@@ -371,13 +374,13 @@
       "id": "ArrayBuffer",
       "code": "typeof ArrayBuffer",
       "ok": true,
-      "result": "function"
+      "result": "undefined"
     },
     {
       "id": "Uint8Array",
       "code": "typeof Uint8Array",
       "ok": true,
-      "result": "function"
+      "result": "undefined"
     },
     {
       "id": "print",
@@ -539,7 +542,7 @@
       "id": "AES",
       "code": "typeof AES",
       "ok": true,
-      "result": "function"
+      "result": "undefined"
     },
     {
       "id": "nesting.anon.depth1",
@@ -599,37 +602,37 @@
       "id": "binary.uint8.construct",
       "code": "(function () { try { return typeof new Uint8Array(2); } catch (e) { return \"throws:\" + (e.message || e); } })()",
       "ok": true,
-      "result": "object"
+      "result": "throws:\"Uint8Array\" is not defined"
     },
     {
       "id": "binary.uint8.size",
       "code": "(function () { try { return \"\" + new Uint8Array(4).length; } catch (e) { return \"throws:\" + (e.message || e); } })()",
       "ok": true,
-      "result": "4"
+      "result": "throws:\"Uint8Array\" is not defined"
     },
     {
       "id": "binary.uint8.element",
       "code": "(function () { try { return typeof new Uint8Array(2)[0]; } catch (e) { return \"throws:\" + (e.message || e); } })()",
       "ok": true,
-      "result": "number"
+      "result": "throws:\"Uint8Array\" is not defined"
     },
     {
       "id": "binary.uint8.overBuffer",
       "code": "(function () { try { return \"\" + new Uint8Array(new ArrayBuffer(3)).length; } catch (e) { return \"throws:\" + (e.message || e); } })()",
       "ok": true,
-      "result": "3"
+      "result": "throws:\"Uint8Array\" is not defined"
     },
     {
       "id": "binary.uint8.backing",
       "code": "(function () { try { return typeof new Uint8Array(2).buffer; } catch (e) { return \"throws:\" + (e.message || e); } })()",
       "ok": true,
-      "result": "object"
+      "result": "throws:\"Uint8Array\" is not defined"
     },
     {
       "id": "binary.uint8.methods",
       "code": "(function () { try { var a = new Uint8Array(1); return typeof a.set + \"/\" + typeof a.fill + \"/\" + typeof a.subarray + \"/\" + typeof a.slice; } catch (e) { return \"throws:\" + (e.message || e); } })()",
       "ok": true,
-      "result": "function/undefined/undefined/undefined"
+      "result": "throws:\"Uint8Array\" is not defined"
     },
     {
       "id": "virtual.getHandle.call",

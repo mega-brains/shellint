@@ -104,7 +104,7 @@ export const OPT_TIPS: Record<string, OptTipContent> = {
   dropConsole: {
     name: "drop console",
     blurb:
-      "Prod only, never debug: Terser deletes every console.* call outright instead of shortening its string. Measured −4.4% on prod. print() calls (including the #m metric channel) are untouched — this only removes console.*.",
+      "Prod only, never debug: Terser deletes every console.* call outright instead of shortening its string. Measured −4.4% on prod. Applies to prod.raw.js and prod.js alike, and works even with compress off. print() calls (including the #m metric channel) are untouched — this only removes console.*.",
     before: ['console.log("polled status", st);'],
     after: ["/* dropped */"],
   },

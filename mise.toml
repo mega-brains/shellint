@@ -10,9 +10,17 @@ description = "Start DevRoom server (host/port from devroom.json)"
 alias = "dev"
 run = "npm run dev"
 
+[tasks."build:shelly"]
+description = "Build Shelly dual artifacts"
+run = "npm run build:shelly"
+
+[tasks."build:web"]
+description = "Build web UI bundle"
+run = "npm run build:web"
+
 [tasks.build]
-description = "Build Shelly dual artifacts + web UI bundle"
-run = "npm run build"
+description = "Build Shelly dual artifacts + web UI bundle (parallel)"
+depends = ["build:shelly", "build:web"]
 
 [tasks.deploy]
 description = "Build then deploy (MODE=debug|prod, MINIFY=min|raw)"
@@ -26,11 +34,23 @@ npm run deploy -- --mode "$mode" --minify "$minify"
 
 [tasks.lint]
 description = "Typecheck Shelly script + server + web"
-run = "npm run lint"
+depends = ["typecheck"]
+
+[tasks."typecheck:shelly"]
+description = "Typecheck Shelly script"
+run = "npm run typecheck:shelly"
+
+[tasks."typecheck:server"]
+description = "Typecheck server"
+run = "npm run typecheck:server"
+
+[tasks."typecheck:web"]
+description = "Typecheck web"
+run = "npm run typecheck:web"
 
 [tasks.typecheck]
-description = "Typecheck Shelly script + server + web"
-run = "npm run typecheck"
+description = "Typecheck Shelly script + server + web (parallel)"
+depends = ["typecheck:shelly", "typecheck:server", "typecheck:web"]
 
 [tasks."check:lines"]
 description = "Fail if any .ts/.tsx/.js/.mjs/.mts/.css source exceeds 500 lines"
@@ -44,9 +64,14 @@ run = "npm run test"
 description = "Playwright e2e (Chromium) against local DevRoom UI"
 run = "npm run test:e2e"
 
-[tasks.beforeCommit]
-description = "Pre-commit gate: line limit, typecheck, build, test, e2e"
-run = "npm run beforeCommit"
+[tasks.b]
+alias="beforeCommit"
+description = "Pre-commit gate: line limit + typecheck + build run in parallel, then test, then e2e"
+depends = ["check:lines", "typecheck", "build"]
+run = """
+npm run test
+npm run test:e2e
+"""
 
 [tasks.probe]
 description = "Run Script.Eval capability probe against device"

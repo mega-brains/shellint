@@ -154,7 +154,6 @@ main:has(#logsPanel:not(.collapsed)) #logsPanel {
   font-size: 0.85rem;
   color: var(--ink);
   cursor: pointer;
-  user-select: none;
 }
 
 .options-item input { accent-color: var(--accent); }
@@ -204,11 +203,41 @@ main:has(#logsPanel:not(.collapsed)) #logsPanel {
   }
 }
 
+/*
+ * One-second "this build moved it" pulse, applied by web/use-flash.ts to any
+ * build-panel value that changed. Duration is mirrored by FLASH_MS there —
+ * keep the two in sync. Size tints (.size-low/.size-high) set their own
+ * background, so the pulse rides on box-shadow + color instead.
+ */
+@keyframes flash-change {
+  from {
+    box-shadow: 0 0 0 3px var(--flash-bg);
+    background-color: var(--flash-bg);
+  }
+  to {
+    box-shadow: 0 0 0 3px transparent;
+    background-color: transparent;
+  }
+}
+
+.flash-change {
+  --flash-bg: color-mix(in srgb, var(--accent, #4c9aff) 32%, transparent);
+  border-radius: 2px;
+  animation: flash-change 1s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flash-change {
+    animation-duration: 1ms;
+  }
+}
+
 .size-table {
   width: 100%;
   border-collapse: collapse;
   font-family: var(--mono);
   font-size: 0.85rem;
+  margin-top: -0.9em;
 }
 
 .size-table th,

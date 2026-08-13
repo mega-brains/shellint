@@ -2,8 +2,6 @@ import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import type { DeviceIdentity } from "./device-panel";
 
-const MAX_SCRIPT_NAME = 28;
-
 const STATE_GLYPH = { running: "▶", stopped: "■", offline: "✕" } as const;
 type RunState = keyof typeof STATE_GLYPH;
 
@@ -15,7 +13,6 @@ const ACTION: Record<RunState, string> = {
 
 export type HeaderProps = {
   deviceIp: string;
-  configBase: string;
   configFail?: string;
   identity?: DeviceIdentity | null;
   onToggleRun?: (running: boolean) => void;
@@ -24,6 +21,8 @@ export type HeaderProps = {
   statusError?: boolean;
   probeProgress?: { done: number; total: number } | null;
   deviceMeta: string;
+  /** Device + slot pickers (web/device-select.tsx, web/slot-select.tsx), rendered next to the title. */
+  deviceSelector?: ComponentChildren;
 };
 
 export function Header(props: HeaderProps) {
@@ -31,15 +30,6 @@ export function Header(props: HeaderProps) {
   useEffect(() => setStatusHidden(false), [props.status]);
 
   const id = props.identity;
-  const name =
-    id?.scriptName && id.scriptName.length > MAX_SCRIPT_NAME
-      ? `${id.scriptName.slice(0, MAX_SCRIPT_NAME - 1)}…`
-      : id?.scriptName;
-
-  let configText = props.configFail ?? "";
-  if (!props.configFail && props.configBase) {
-    configText = name ? `${props.configBase} · “${name}”` : props.configBase;
-  }
 
   const warn =
     id?.state === "offline" || id?.state === "stopped" ? "warn" : "";
@@ -76,21 +66,22 @@ export function Header(props: HeaderProps) {
           </p>
           <h1>Shelly DevRoom</h1>
         </div>
-        <p class={`sub ${warn}`} id="configLine">
-          {configText || "loading config…"}
+        <div class={`sub device-picker-row ${warn}`} id="configLine">
+          {props.configFail ? (
+            <span class="picker-fail">{props.configFail}</span>
+          ) : (
+            props.deviceSelector
+          )}
           {id && id.state !== "unknown" && !props.configFail ? (
-            <>
-              {" · "}
-              <RunIcon
-                state={id.state}
-                onToggle={
-                  props.onToggleRun &&
-                  (() => props.onToggleRun!(id.state !== "running"))
-                }
-              />
-            </>
+            <RunIcon
+              state={id.state}
+              onToggle={
+                props.onToggleRun &&
+                (() => props.onToggleRun!(id.state !== "running"))
+              }
+            />
           ) : null}
-        </p>
+        </div>
         {props.children}
       </div>
       <p class="device-meta" id="deviceMeta">

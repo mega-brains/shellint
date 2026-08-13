@@ -113,8 +113,13 @@ export function deviceGlobalDefs(profilePath = DEVICE_PROFILE_PATH) {
   return defs;
 }
 
-/** Apply meta.env (+ optional meta.device) literals and DCE only — readable, no mangle. */
-export async function envPass(code, { debug, prod }, deviceDefs) {
+/**
+ * Apply meta.env (+ optional meta.device) literals and DCE only — readable, no
+ * mangle. `dropConsole` is honored here too (not only in `minifyPass`) so the
+ * `*.raw.js` artifact shown in the editor's artifact preview matches what the
+ * shipped `*.js` actually contains.
+ */
+export async function envPass(code, { debug, prod }, deviceDefs, opts = {}) {
   const result = await minify(code, {
     compress: {
       defaults: false,
@@ -125,6 +130,7 @@ export async function envPass(code, { debug, prod }, deviceDefs) {
       if_return: true,
       join_vars: false,
       sequences: false,
+      drop_console: !!opts.dropConsole,
       global_defs: {
         "meta.env.debug": debug,
         "meta.env.prod": prod,
@@ -192,6 +198,11 @@ export async function minifyPass(code, opts) {
     if (dropConsole) compressOpt.drop_console = true;
     if (passes) compressOpt.passes = 3;
     if (hoistProps) compressOpt.hoist_props = true;
+  } else if (dropConsole) {
+    // drop_console is a compress transform: with `compress: false` Terser never
+    // runs it, so dropConsole would silently no-op whenever the compress knob
+    // is off. Run a compress step that does nothing *but* drop console.*.
+    compressOpt = { ecma: 5, defaults: false, drop_console: true };
   }
 
   let mangleOpt = false;
@@ -239,7 +250,9 @@ function writeLogMap(map) {
  */
 async function buildVariant(tscJs, name, flags, minifyOpts, logMapState, deviceDefs) {
   const variantOpts = resolveVariantOptions(minifyOpts, name);
-  let raw = await envPass(tscJs, flags, deviceDefs);
+  let raw = await envPass(tscJs, flags, deviceDefs, {
+    dropConsole: variantOpts.dropConsole === true,
+  });
   // Log strings cost RAM on device; the log panel re-expands the ids.
   if (logMapState.shorten) {
     const shortened = shortenLogStrings(raw, logMapState.sharedIds);
@@ -307,7 +320,12 @@ async function main() {
 
   const tsc = spawnSync(
     process.execPath,
-    [tscBin, "-p", TSCONFIG],
+    [
+      tscBin,
+      "-p",
+      TSCONFIG,
+      ...(process.argv.includes("--no-typecheck") ? ["--noCheck"] : []),
+    ],
     { cwd: root, encoding: "utf8" },
   );
   if (tsc.status !== 0) {

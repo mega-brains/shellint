@@ -1,7 +1,8 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
-import { DEVICE_PROFILE_PATH } from "./paths.ts";
+import { DEVICE_PROFILE_PATH, devicePaths } from "./paths.ts";
 import { loadConfig, assertDevroomCompiler } from "./config.ts";
+import { requireActive, mirrorActiveDevice } from "./devices.ts";
 import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
 
 /**
@@ -48,8 +49,9 @@ async function fetchComponents(rpc: ShellyRpc): Promise<string[]> {
 export async function fetchDeviceProfile(): Promise<DeviceProfile> {
   const cfg = loadConfig();
   assertDevroomCompiler(cfg);
+  const target = requireActive();
 
-  const rpc = new ShellyRpc(cfg.deviceIp);
+  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
   try {
     await rpc.connect();
     const info = ((await rpc.call("Shelly.GetDeviceInfo", {})) ??
@@ -64,7 +66,7 @@ export async function fetchDeviceProfile(): Promise<DeviceProfile> {
 
     const profile: DeviceProfile = {
       at: new Date().toISOString(),
-      deviceIp: cfg.deviceIp,
+      deviceIp: target.device.ip,
       gen: typeof info.gen === "number" ? info.gen : null,
       ver: str(info, "ver"),
       model: str(info, "model"),
@@ -72,20 +74,23 @@ export async function fetchDeviceProfile(): Promise<DeviceProfile> {
       methods,
       components,
     };
-    writeDeviceProfile(profile);
+    writeDeviceProfile(profile, target.device.id);
     return profile;
   } finally {
     rpc.close();
   }
 }
 
-export function writeDeviceProfile(profile: DeviceProfile): void {
-  mkdirSync(dirname(DEVICE_PROFILE_PATH), { recursive: true });
-  writeFileSync(
-    DEVICE_PROFILE_PATH,
-    JSON.stringify(profile, null, 2) + "\n",
-    "utf8",
-  );
+/**
+ * Writes the per-device profile (the authoritative copy, under
+ * `.devroom/devices/<id>/`) and, since a fresh probe is always for the
+ * currently active device, re-mirrors it into `types/device-profile.json`.
+ */
+export function writeDeviceProfile(profile: DeviceProfile, deviceId: string): void {
+  const path = devicePaths(deviceId).profile;
+  mkdirSync(dirname(path), { recursive: true });
+  writeFileSync(path, JSON.stringify(profile, null, 2) + "\n", "utf8");
+  mirrorActiveDevice(deviceId);
 }
 
 export function readDeviceProfile(): DeviceProfile | null {

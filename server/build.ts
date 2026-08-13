@@ -67,7 +67,7 @@ function run(cmd: string, args: string[]): Promise<{ code: number; stdout: strin
 /**
  * Run dual debug/prod build via npm run build:shelly (or scripts/build-shelly.mjs fallback).
  */
-export async function runBuild(): Promise<{
+export async function runBuild(opts: { skipTypeCheck?: boolean } = {}): Promise<{
   sizes: BuildSizes;
   stdout: string;
   stderr: string;
@@ -83,16 +83,26 @@ export async function runBuild(): Promise<{
       scripts?: Record<string, string>;
     };
     if (pkg.scripts?.["build:shelly"]) {
-      result = await run("npm", ["run", "build:shelly"]);
+      result = await run("npm", [
+        "run",
+        "build:shelly",
+        ...(opts.skipTypeCheck ? ["--", "--no-typecheck"] : []),
+      ]);
     } else if (existsSync(join(ROOT, "scripts", "build-shelly.mjs"))) {
-      result = await run("node", ["scripts/build-shelly.mjs"]);
+      result = await run("node", [
+        "scripts/build-shelly.mjs",
+        ...(opts.skipTypeCheck ? ["--no-typecheck"] : []),
+      ]);
     } else {
       throw new Error(
         "build:shelly script missing — waiting on M1 agent (scripts/build-shelly.mjs / npm run build:shelly)",
       );
     }
   } else if (existsSync(join(ROOT, "scripts", "build-shelly.mjs"))) {
-    result = await run("node", ["scripts/build-shelly.mjs"]);
+    result = await run("node", [
+      "scripts/build-shelly.mjs",
+      ...(opts.skipTypeCheck ? ["--no-typecheck"] : []),
+    ]);
   } else {
     throw new Error(
       "package.json and scripts/build-shelly.mjs missing — waiting on M0/M1 scaffold agent",

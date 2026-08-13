@@ -14,5 +14,6 @@
 @import "./stats.css";
 @import "./diff.css";
 @import "./script-history.css";
+@import "./device-select.css";
 @import "./option-tip.css";
 @import "./build-error.css";

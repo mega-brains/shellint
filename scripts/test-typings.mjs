@@ -15,6 +15,13 @@ import {
   writeGeneratedTypings,
 } from "../server/probe-typings.ts";
 import { lintProbe } from "../server/lint-probe.ts";
+import { PROBE_PATH } from "../server/paths.ts";
+
+// Severity depends on which device the probe came from, so every lint call here
+// says so explicitly instead of inheriting whatever .devroom has active.
+const asForeign = (src, path = PROBE_PATH) => lintProbe(src, "scripts/main.ts", path, null);
+const asActive = (src, path = PROBE_PATH) =>
+  lintProbe(src, "scripts/main.ts", path, probedDeviceIp);
 
 function fail(msg) {
   console.error(`FAIL: ${msg}`);
@@ -72,23 +79,51 @@ if (!probedFirmware) fail("could not determine the probed firmware version");
   if (!written.path.endsWith("types/generated.d.ts")) fail("wrong output path");
 }
 
-// T3 — the lint pass warns only about confirmed-absent APIs.
+// T3 — the lint pass reports only confirmed-absent APIs. A probe from some
+// other device stays advisory.
 {
-  const warned = lintProbe('"x".padStart(2," ");');
+  const warned = asForeign('"x".padStart(2," ");');
   eq(warned.length, 1, "padStart use warns once");
   eq(warned[0].rule, "probe-absent-api", "rule id");
-  eq(warned[0].severity, "warn", "advisory severity");
+  eq(warned[0].severity, "warn", "advisory severity for a foreign probe");
   if (!warned[0].message.includes(probedDeviceIp)) {
     fail("the finding must name the device it came from");
   }
   if (!warned[0].message.includes(probedFirmware)) {
     fail("the finding must name the firmware it came from");
   }
+  if (!/advisory/.test(warned[0].message)) {
+    fail("a foreign probe must say the finding is advisory");
+  }
 
-  eq(lintProbe("[1,2].map(f);").length, 0, "a present API is silent");
-  eq(lintProbe("var x = 1;").length, 0, "unrelated code is silent");
-  eq(lintProbe("setTimeout(f, 10);").length, 1, "an absent global warns");
-  eq(lintProbe("Timer.set(1000, false, f);").length, 0, "a present global is silent");
+  eq(asForeign("[1,2].map(f);").length, 0, "a present API is silent");
+  eq(asForeign("var x = 1;").length, 0, "unrelated code is silent");
+  eq(asForeign("setTimeout(f, 10);").length, 1, "an absent global warns");
+  eq(asForeign("Timer.set(1000, false, f);").length, 0, "a present global is silent");
+}
+
+// T3b — same absences, but the probe is the active device's: the absence is a
+// fact about the deploy target, so it fails the check instead of nagging.
+{
+  const errored = asActive("setTimeout(f, 10);");
+  eq(errored.length, 1, "an absent global on the active device reports once");
+  eq(errored[0].severity, "error", "active-device severity");
+  if (!/ReferenceError/.test(errored[0].message)) {
+    fail("an active-device finding must say what happens at runtime");
+  }
+  if (/advisory/.test(errored[0].message)) {
+    fail("an active-device finding must not call itself advisory");
+  }
+  if (!errored[0].message.includes(probedDeviceIp)) {
+    fail("the finding must still name the device it came from");
+  }
+
+  eq(asActive('"x".padStart(2," ");')[0].severity, "error", "members escalate too");
+  eq(asActive("[1,2].map(f);").length, 0, "a present API stays silent");
+
+  // A different active device leaves the probe foreign, whatever its answers.
+  const other = lintProbe("setTimeout(f, 10);", "scripts/main.ts", PROBE_PATH, "10.0.0.1");
+  eq(other[0].severity, "warn", "another device keeps the finding advisory");
 }
 
 // T4 — no probe report, or an empty one: no typings, no findings, no throw.
@@ -99,19 +134,20 @@ if (!probedFirmware) fail("could not determine the probed firmware version");
   eq(empty.absent.length, 0, "missing report reports nothing absent");
   if (!empty.dts.includes("declare namespace")) fail("still emits valid TypeScript");
   eq(readProbeVerdicts(missing).length, 0, "missing report yields no verdicts");
-  eq(lintProbe('"x".padStart(2," ");', "scripts/main.ts", missing).length, 0, "no report, no findings");
+  eq(asForeign('"x".padStart(2," ");', missing).length, 0, "no report, no findings");
+  eq(asActive('"x".padStart(2," ");', missing).length, 0, "no report, no findings even for the active device");
 
   const dir = mkdtempSync(join(tmpdir(), "devroom-probe-"));
   const emptyPath = join(dir, "empty.json");
   writeFileSync(emptyPath, JSON.stringify({ probed: true, results: [] }), "utf8");
   eq(readProbeVerdicts(emptyPath).length, 0, "empty report yields no verdicts");
   eq(generateTypings(emptyPath).present.length, 0, "empty report declares nothing");
-  eq(lintProbe('"x".padStart(2," ");', "scripts/main.ts", emptyPath).length, 0, "empty report, no findings");
+  eq(asForeign('"x".padStart(2," ");', emptyPath).length, 0, "empty report, no findings");
 
   const corruptPath = join(dir, "corrupt.json");
   writeFileSync(corruptPath, "{not json", "utf8");
   eq(readProbeVerdicts(corruptPath).length, 0, "corrupt report yields no verdicts");
-  eq(lintProbe("setTimeout(f, 10);", "scripts/main.ts", corruptPath).length, 0, "corrupt report, no findings");
+  eq(asForeign("setTimeout(f, 10);", corruptPath).length, 0, "corrupt report, no findings");
 }
 
 console.log("typings: probe verdicts / generated.d.ts / probe-absent-api lint ok");
