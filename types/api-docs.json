@@ -32,15 +32,18 @@
     },
     "Virtual": {
       "signature": "declare var Virtual: VirtualStatic",
-      "doc": ""
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Virtual"
     },
     "BLE": {
       "signature": "declare var BLE: BLEStatic",
-      "doc": ""
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/BLE"
     },
     "AES": {
       "signature": "declare var AES: AESStatic",
-      "doc": ""
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/AES"
     },
     "console.log": {
       "signature": "log(...data: unknown[]): void",
@@ -149,15 +152,18 @@
     },
     "Virtual.getHandle": {
       "signature": "getHandle(key: string): VirtualComponentHandle",
-      "doc": "`key` is `\"<type>:<id>\"`, e.g. `\"number:200\"`."
+      "doc": "`key` is `\"<type>:<id>\"`, e.g. `\"number:200\"`.",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Virtual"
     },
     "BLE.Scanner": {
       "signature": "Scanner: BleScannerStatic",
-      "doc": ""
+      "doc": "",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/BLE"
     },
     "AES.encrypt": {
       "signature": "encrypt(\n    data: ArrayBuffer,\n    key: ArrayBuffer,\n    options: { mode: string }\n  ): ArrayBuffer | null",
-      "doc": "Returns null on failure. `mode` e.g. `\"ECB\"`."
+      "doc": "Returns null on failure. `mode` e.g. `\"ECB\"`.",
+      "doc_url": "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/AES"
     },
     "Console.log": {
       "signature": "log(...data: unknown[]): void",

@@ -20,6 +20,9 @@ const DOC_LINKS = {
   Script: "https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Script",
   console: "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Utilities",
   print: "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Utilities",
+  Virtual: "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Virtual",
+  AES: "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/AES",
+  BLE: "https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/BLE",
 };
 
 function jsDocOf(node) {

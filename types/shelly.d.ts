@@ -52,6 +52,7 @@ interface TimerStatic {
   getInfo(handle: number): TimerInfo | undefined;
 }
 
+/** @see {@link https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Timer} */
 declare var Timer: TimerStatic;
 
 // ---------------------------------------------------------------------------
@@ -140,6 +141,7 @@ interface ShellyStatic {
   getUptimeMs(): number;
 }
 
+/** @see {@link https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Shelly} */
 declare var Shelly: ShellyStatic;
 
 // ---------------------------------------------------------------------------
@@ -180,6 +182,7 @@ interface ScriptStatic {
   getVcHandle(role: string): unknown;
 }
 
+/** @see {@link https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Script} */
 declare var Script: ScriptStatic;
 
 // ---------------------------------------------------------------------------
@@ -220,6 +223,7 @@ interface HTTPServerStatic {
   ): string;
 }
 
+/** @see {@link https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/HTTPServer} */
 declare var HTTPServer: HTTPServerStatic;
 
 // ---------------------------------------------------------------------------
@@ -235,10 +239,14 @@ interface VirtualComponentHandle {
  * @see {@link https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Virtual}
  */
 interface VirtualStatic {
-  /** `key` is `"<type>:<id>"`, e.g. `"number:200"`. */
+  /**
+   * `key` is `"<type>:<id>"`, e.g. `"number:200"`.
+   * @see {@link https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Virtual}
+   */
   getHandle(key: string): VirtualComponentHandle;
 }
 
+/** @see {@link https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Virtual} */
 declare var Virtual: VirtualStatic;
 
 // ---------------------------------------------------------------------------
@@ -259,16 +267,21 @@ type BleScanCallback = (event: number, result: BleScanResult | null) => void;
 interface BleScannerStatic {
   readonly SCAN_RESULT: number;
   readonly INFINITE_SCAN: number;
+  /** @see {@link https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/BLE} */
   Start(
     params: { duration_ms: number; filters?: { addrs?: string[] }[] },
     callback: BleScanCallback
   ): boolean;
 }
 
+/**
+ * @see {@link https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/BLE}
+ */
 interface BLEStatic {
   Scanner: BleScannerStatic;
 }
 
+/** @see {@link https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/BLE} */
 declare var BLE: BLEStatic;
 
 // ---------------------------------------------------------------------------
@@ -279,7 +292,10 @@ declare var BLE: BLEStatic;
  * @see {@link https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/AES}
  */
 interface AESStatic {
-  /** Returns null on failure. `mode` e.g. `"ECB"`. */
+  /**
+   * Returns null on failure. `mode` e.g. `"ECB"`.
+   * @see {@link https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/AES}
+   */
   encrypt(
     data: ArrayBuffer,
     key: ArrayBuffer,
@@ -287,4 +303,5 @@ interface AESStatic {
   ): ArrayBuffer | null;
 }
 
+/** @see {@link https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/AES} */
 declare var AES: AESStatic;
