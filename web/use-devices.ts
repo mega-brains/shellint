@@ -3,6 +3,12 @@ import { api } from "./api";
 
 export type DeviceInfo = { model?: string; gen?: number; ver?: string; app?: string };
 export type SlotBinding = { script: string; name?: string };
+export type ProbeBadge = {
+  required: boolean;
+  reason: "never-probed" | "firmware-changed" | "none";
+  ver: string | null;
+  at: string | null;
+};
 export type Device = {
   id: string;
   label: string;
@@ -11,6 +17,7 @@ export type Device = {
   info?: DeviceInfo;
   lastSeen?: string;
   slots: Record<string, SlotBinding>;
+  probe: ProbeBadge;
 };
 export type ActiveSelection = { device: string; slot: number; script: string } | null;
 

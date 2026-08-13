@@ -130,3 +130,54 @@
   padding: 0.6rem 0.9rem;
   border-top: 1px solid var(--line);
 }
+
+.device-manager-captures {
+  padding: 0 0.9rem 0.8rem;
+  border-top: 1px solid var(--line);
+}
+
+.device-manager-captures-head {
+  margin: 0.6rem 0 0.3rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.device-manager-capture-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.76rem;
+}
+
+/* Eco-mode confirmation in front of a probe run — wider than the add-device
+   form because it is mostly prose. */
+.probe-eco-modal { width: min(460px, 94vw); }
+
+.probe-eco-text {
+  margin: 0;
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.probe-eco-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.45rem;
+  font-size: 0.8rem;
+}
+
+.probe-eco-option input { margin-top: 0.2rem; }
+
+.probe-eco-option span {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.probe-eco-option small { color: var(--muted); font-size: 0.72rem; }
+
+.probe-eco-modal .device-manager-actions { gap: 0.5rem; }

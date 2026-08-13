@@ -7,7 +7,7 @@ import type { api as apiFn } from "./api";
 type ApiFn = typeof apiFn;
 
 const POLL_MS = 2_000;
-const MAX_LINES = 200;
+const MAX_LINES = 400;
 const MAX_POINTS = 240;
 const MAX_SERIES = 4;
 

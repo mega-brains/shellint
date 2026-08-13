@@ -52,6 +52,46 @@
   border-color: var(--danger);
 }
 
+.probe-log-meta,
+.probe-copy-row {
+  display: flex;
+  align-items: baseline;
+  gap: 0.35rem;
+  min-width: 0;
+}
+
+.probe-log-path {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  text-decoration: underline;
+}
+
+.probe-log-path,
+.probe-copy.copied {
+  color: var(--accent);
+}
+
+.probe-copy:disabled { opacity: 0.45; }
+
+.probe-capture-modal { width: min(760px, 94vw); }
+
+.probe-capture-json {
+  margin: 0;
+  max-height: 60vh;
+  overflow: auto;
+  padding: 0.5rem;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+}
+
 .probe-log-list {
   margin: 0;
   padding: 0;
@@ -157,7 +197,8 @@
   color: var(--muted);
 }
 
-.artifact-bar:hover { border-color: var(--accent); }
+.artifact-bar:hover,
+.probe-copy.copied { border-color: var(--accent); }
 
 .artifact-bar select {
   max-width: 0;

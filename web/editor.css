@@ -217,3 +217,11 @@
 }
 
 .import-banner-discard:hover { background: rgba(139, 46, 26, 0.14); }
+
+/* Probe-required banner reuses .import-banner's shape; "skipped" is muted
+   rather than danger-red, since a skip is a deliberate choice, not an error. */
+.probe-banner-skipped {
+  border-bottom-color: var(--line);
+  background: #0000000a;
+  color: var(--muted);
+}

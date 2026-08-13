@@ -1,4 +1,5 @@
 import type { useDevices } from "./use-devices";
+import type { CaptureMeta } from "./use-probe-state";
 import { DeviceSelect } from "./device-select";
 import { SlotSelect } from "./slot-select";
 
@@ -8,6 +9,9 @@ export type DevicePickerProps = {
   setStatus: (msg: string, isError?: boolean) => void;
   /** Called with the slot and the label of the device it came from. */
   onImportSlot?: (slot: number, deviceId: string, deviceLabel: string) => void | Promise<void>;
+  /** Active device's probe captures, threaded down to the device manager modal. */
+  captures?: CaptureMeta[];
+  onDeleteCapture?: (verKey: string) => Promise<void>;
 };
 
 /** Header device + slot pickers — split out of app.tsx to stay under the 500-line cap. */
@@ -29,6 +33,8 @@ export function DevicePicker(props: DevicePickerProps) {
           })
         }
         onAdd={devicesState.addDevice}
+        captures={props.captures}
+        onDeleteCapture={props.onDeleteCapture}
       />
       <SlotSelect
         deviceId={devicesState.active?.device ?? null}

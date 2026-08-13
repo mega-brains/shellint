@@ -107,6 +107,9 @@ interface ShellyDeviceInfo {
   [key: string]: unknown;
 }
 
+/**
+ * @see {@link https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Shelly}
+ */
 interface ShellyStatic {
   /**
    * Async component call. Max 5 in flight.
@@ -161,6 +164,10 @@ type ScriptRpcHandler = (
   userdata?: unknown
 ) => void;
 
+/**
+ * @see {@link https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Script}
+ * @see {@link https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/RPCHandlers} for addRpcHandler
+ */
 interface ScriptStatic {
   readonly id: number;
   readonly storage: ScriptStorage;
@@ -197,6 +204,9 @@ interface HttpServerResponse {
   send(): boolean;
 }
 
+/**
+ * @see {@link https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/HTTPServer}
+ */
 interface HTTPServerStatic {
   /** Max 5 endpoints per script. */
   registerEndpoint(
@@ -221,6 +231,9 @@ interface VirtualComponentHandle {
   setValue(value: unknown): void;
 }
 
+/**
+ * @see {@link https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Virtual}
+ */
 interface VirtualStatic {
   /** `key` is `"<type>:<id>"`, e.g. `"number:200"`. */
   getHandle(key: string): VirtualComponentHandle;
@@ -262,6 +275,9 @@ declare var BLE: BLEStatic;
 // AES
 // ---------------------------------------------------------------------------
 
+/**
+ * @see {@link https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/AES}
+ */
 interface AESStatic {
   /** Returns null on failure. `mode` e.g. `"ECB"`. */
   encrypt(

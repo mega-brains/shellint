@@ -20,6 +20,13 @@ test.describe("device switch", () => {
   }) => {
     await openApp(page);
 
+    // Both mocked devices report a satisfied probe (mock-api.ts's default) —
+    // the M16 probe-required banner must stay hidden. See probe-required.spec.ts
+    // for the unsatisfied case (Deploy also needs a fresh Build + Check to be
+    // enabled, which this spec never runs, so it is not asserted here).
+    await expect(page.locator(".probe-banner-required")).toHaveCount(0);
+    await expect(page.locator(".probe-banner-skipped")).toHaveCount(0);
+
     // Deploy label carries the active device + slot (toolbar.tsx deployTarget).
     await expect(page.locator("#btnDeploy")).toContainText("e2e-device:1");
 

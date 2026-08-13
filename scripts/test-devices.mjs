@@ -18,7 +18,9 @@ import {
   removeDevice,
   requireActive,
   resolveTarget,
+  sanitizeDevice,
   setActive,
+  touchDeviceInfo,
 } from "../server/devices.ts";
 import {
   computeDigestResponse,
@@ -355,6 +357,42 @@ try {
   counter.reset();
   const ncAfterReset = counter.next(nonce);
   if (ncAfterReset !== "00000001") fail("nc should restart at 00000001 after reset (stale challenge)");
+
+  // --- touchDeviceInfo: refreshes info + lastSeen, no-ops when unchanged ---
+  setDevicesFile({ version: 1, active: null, devices: [] });
+  _resetCache();
+  const touched = await addDevice({ ip: "10.0.2.1", label: "Touch" }, fakeRpcFactory({ failConnect: true }));
+  touchDeviceInfo(touched.id, { model: "M1", gen: 2, ver: "1.0.0", app: "App" });
+  let reloaded2 = loadDevices().devices.find((d) => d.id === touched.id);
+  if (reloaded2.info?.ver !== "1.0.0") fail("touchDeviceInfo should write a fresh info block");
+  const seenAt = reloaded2.lastSeen;
+  if (!seenAt) fail("touchDeviceInfo should stamp lastSeen");
+  await new Promise((r) => setTimeout(r, 2));
+  touchDeviceInfo(touched.id, { model: "M1", gen: 2, ver: "1.0.0", app: "App" });
+  reloaded2 = loadDevices().devices.find((d) => d.id === touched.id);
+  if (reloaded2.lastSeen !== seenAt) {
+    fail("touchDeviceInfo should no-op (not rewrite lastSeen) when info is unchanged");
+  }
+  touchDeviceInfo(touched.id, { model: "M1", gen: 2, ver: "1.1.0", app: "App" });
+  reloaded2 = loadDevices().devices.find((d) => d.id === touched.id);
+  if (reloaded2.info?.ver !== "1.1.0") fail("touchDeviceInfo should write through a real change");
+  if (reloaded2.lastSeen === seenAt) fail("a real change should also refresh lastSeen");
+
+  // --- sanitizeDevice: carries probe state, never leaks auth.password ---
+  const withPw = await addDevice(
+    { ip: "10.0.2.2", label: "Guarded", password: "hunter2" },
+    fakeRpcFactory({ failConnect: true }),
+  );
+  const sanitized = sanitizeDevice(loadDevices().devices.find((d) => d.id === withPw.id));
+  if ("auth" in sanitized || "password" in sanitized) {
+    fail("sanitizeDevice must never leak the raw auth object");
+  }
+  if (!sanitized.probe || typeof sanitized.probe.required !== "boolean") {
+    fail("sanitizeDevice should expose a probe state summary");
+  }
+  if (!sanitized.probe.required || sanitized.probe.reason !== "never-probed") {
+    fail("a freshly added, never-probed device should report probe.required");
+  }
 
   console.log("OK: devices load/migration/CRUD, digest auth vector, nc increment/reset");
 } finally {

@@ -2,7 +2,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { DEVICE_PROFILE_PATH, devicePaths } from "./paths.ts";
 import { loadConfig, assertDevroomCompiler } from "./config.ts";
-import { requireActive, mirrorActiveDevice } from "./devices.ts";
+import { requireActive, mirrorActiveDevice, toDeviceInfo, touchDeviceInfo } from "./devices.ts";
 import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
 
 /**
@@ -63,6 +63,7 @@ export async function fetchDeviceProfile(): Promise<DeviceProfile> {
       ? listed.methods.filter((m): m is string => typeof m === "string")
       : [];
     const components = await fetchComponents(rpc);
+    touchDeviceInfo(target.device.id, toDeviceInfo(info));
 
     const profile: DeviceProfile = {
       at: new Date().toISOString(),

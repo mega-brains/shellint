@@ -4,7 +4,7 @@ import { Header } from "./header";
 import { Toolbar, type BuildAction, type Minify, type Mode } from "./toolbar";
 import { Layout } from "./layout";
 import { EditorHost } from "./editor-host";
-import { BuildPanel, loadStats, type DashboardPatch } from "./dashboard";
+import { BuildPanel, type DashboardPatch } from "./dashboard";
 import { CheckPanel, summarize, type CheckCatalog, type CheckReport, type Finding } from "./check-panel";
 import { OptionsPanel } from "./options-panel";
 import { DevicePanel, type DeviceIdentity } from "./device-panel";
@@ -22,8 +22,13 @@ import { isEmptySizes, type Sizes } from "./sizes";
 import { ScriptHistoryModal } from "./script-history-modal";
 import { useScriptHistory } from "./use-script-history";
 import { useProbe } from "./use-probe";
+import { useProbeBanner } from "./use-probe-banner";
+import { ProbeBanner } from "./probe-banner";
+import { useProbeEcoGate } from "./probe-eco-modal";
+import { ProbeCaptureModal } from "./probe-capture-modal";
 import { useDevices } from "./use-devices";
 import { DevicePicker } from "./device-picker";
+import { useInitialLoad } from "./use-initial-load";
 
 const AUTO_KEY = "shelly-devroom.autoBuildCheck";
 
@@ -251,10 +256,24 @@ export function App() {
     [deployChoice, setStatus],
   );
 
-  const { probeResults, probeNoteText, probeProgress, probeDevice } =
-    useProbe(setStatus);
-
   const devicesState = useDevices();
+  const activeDeviceId = devicesState.active?.device ?? null;
+
+  const { probeResults, probeNoteText, probeProgress, probeCapture, probeDevice } =
+    useProbe(setStatus, activeDeviceId, devicesState.sessionKey);
+  const [captureOpen, setCaptureOpen] = useState(false);
+
+  const { probeState, deleteCapture, runProbeFromBanner, skipProbeFromBanner } = useProbeBanner(
+    activeDeviceId,
+    devicesState.sessionKey,
+    probeDevice,
+    deployGate,
+    syncDeployReady,
+    setStatus,
+  );
+
+  const { requestProbe, ecoModal } = useProbeEcoGate(withBusy);
+
   const activeDevice = devicesState.devices.find(
     (d) => d.id === devicesState.active?.device,
   );
@@ -278,48 +297,7 @@ export function App() {
     }, 3000);
   }, [withBusy, saveScript, runBuildAction]);
 
-  useEffect(() => {
-    void (async () => {
-      try {
-        const cfg = await api<{
-          config: { deviceIp: string; scriptId: number };
-        }>("/api/config");
-        setDeviceIp(cfg.config.deviceIp);
-      } catch {
-        setConfigFail("config unavailable");
-      }
-      try {
-        const data = await api<CheckCatalog>("/api/checks");
-        setCatalog({ groups: data.groups, checks: data.checks });
-      } catch {
-        /* check panel shows unavailable via note when catalog null */
-      }
-      const stats = await loadStats();
-      try {
-        const hist = await api<{ history: NonNullable<DashboardPatch["history"]> }>(
-          "/api/history?limit=40",
-        );
-        setDash((prev) => ({
-          ...prev,
-          estimate: stats.estimate,
-          minFirmware: stats.minFirmware,
-          history: hist.history,
-          stats: stats.stats,
-          variants: stats.variants,
-        }));
-        const latest = hist.history[0];
-        if (latest) {
-          setSizeDebug(latest.sizes.debug ?? {});
-          setSizeProd(latest.sizes.prod ?? {});
-        }
-      } catch {
-        setDash((prev) => ({
-          ...prev, estimate: stats.estimate, minFirmware: stats.minFirmware,
-          history: [], stats: stats.stats, variants: stats.variants,
-        }));
-      }
-    })();
-  }, []);
+  useInitialLoad({ setDeviceIp, setConfigFail, setCatalog, setDash, setSizeDebug, setSizeProd });
 
   const onView = useCallback(
     (view: EditorView) => {
@@ -384,6 +362,8 @@ export function App() {
             withBusy={withBusy}
             setStatus={setStatus}
             onImportSlot={slotImport.importSlot}
+            captures={probeState.captures}
+            onDeleteCapture={deleteCapture}
           />
         }
       >
@@ -418,9 +398,11 @@ export function App() {
             setDeployChoice(choice);
             void withBusy(() => deployScript(choice));
           }}
-          onProbe={() => void withBusy(probeDevice)}
+          onProbe={() => void requestProbe(probeDevice)}
           probeResults={probeResults}
           probeNote={probeNoteText}
+          probeCapture={probeCapture}
+          onShowCapture={() => setCaptureOpen(true)}
           deployTarget={deployTarget}
         />
       </Header>
@@ -430,10 +412,20 @@ export function App() {
         editor={
           <EditorHost
             banner={
-              <ImportBanner
-                imported={slotImport.imported}
-                onDiscard={slotImport.discardImport}
-              />
+              <>
+                <ImportBanner
+                  imported={slotImport.imported}
+                  onDiscard={slotImport.discardImport}
+                />
+                {activeDevice ? (
+                  <ProbeBanner
+                    state={probeState}
+                    deviceLabel={activeDevice.label}
+                    onRunProbe={() => void requestProbe(runProbeFromBanner)}
+                    onSkip={() => void withBusy(skipProbeFromBanner)}
+                  />
+                ) : null}
+              </>
             }
             onView={onView}
             onDocChange={scheduleAuto}
@@ -492,6 +484,14 @@ export function App() {
         loadVersion={scriptHistory.loadHistoryVersion}
         onRestore={(id) => withBusy(() => scriptHistory.restoreVersion(id))}
         onClose={scriptHistory.closeHistory}
+      />
+
+      {ecoModal}
+      <ProbeCaptureModal
+        open={captureOpen}
+        capture={probeCapture}
+        deviceId={activeDeviceId}
+        onClose={() => setCaptureOpen(false)}
       />
     </>
   );

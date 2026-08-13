@@ -17,11 +17,18 @@ import {
 import { lintProbe } from "../server/lint-probe.ts";
 import { PROBE_PATH } from "../server/paths.ts";
 
-// Severity depends on which device the probe came from, so every lint call here
-// says so explicitly instead of inheriting whatever .devroom has active.
+// Severity depends on which device (and firmware) the probe came from, so
+// every lint call here says so explicitly instead of inheriting whatever
+// .devroom has active.
 const asForeign = (src, path = PROBE_PATH) => lintProbe(src, "scripts/main.ts", path, null);
+// The active device must match the fixture's own id and firmware for T3b's
+// "active device, current firmware" case to land on `error`.
 const asActive = (src, path = PROBE_PATH) =>
-  lintProbe(src, "scripts/main.ts", path, probedDeviceIp);
+  lintProbe(src, "scripts/main.ts", path, {
+    id: probedDeviceId,
+    ip: probedDeviceIp,
+    ver: probedFirmware,
+  });
 
 function fail(msg) {
   console.error(`FAIL: ${msg}`);
@@ -39,6 +46,8 @@ const verdictOf = (verdicts, id) => verdicts.find((v) => v.id === id);
 const probeReport = readProbeReport();
 const probedDeviceIp = probeReport?.deviceIp;
 if (!probedDeviceIp) fail("types/generated-probe.json should have a deviceIp");
+const probedDeviceId = probeReport?.deviceId;
+if (!probedDeviceId) fail("types/generated-probe.json should have a deviceId");
 const probedFirmware = probeOrigin(probeReport).match(/fw (\S+),/)?.[1];
 if (!probedFirmware) fail("could not determine the probed firmware version");
 
@@ -122,8 +131,26 @@ if (!probedFirmware) fail("could not determine the probed firmware version");
   eq(asActive("[1,2].map(f);").length, 0, "a present API stays silent");
 
   // A different active device leaves the probe foreign, whatever its answers.
-  const other = lintProbe("setTimeout(f, 10);", "scripts/main.ts", PROBE_PATH, "10.0.0.1");
+  const other = lintProbe(
+    "setTimeout(f, 10);",
+    "scripts/main.ts",
+    PROBE_PATH,
+    { id: "other", ip: "10.0.0.1", ver: null },
+  );
   eq(other[0].severity, "warn", "another device keeps the finding advisory");
+
+  // Same device, but firmware has moved on since the capture — still advisory,
+  // and the message says so (M16 §4.2).
+  const stale = lintProbe(
+    "setTimeout(f, 10);",
+    "scripts/main.ts",
+    PROBE_PATH,
+    { id: probedDeviceId, ip: probedDeviceIp, ver: "9.9.9" },
+  );
+  eq(stale[0].severity, "warn", "a firmware mismatch on the right device stays advisory");
+  if (!stale[0].message.includes("device now runs 9.9.9")) {
+    fail("a same-device firmware mismatch must say what the device runs now");
+  }
 }
 
 // T4 — no probe report, or an empty one: no typings, no findings, no throw.

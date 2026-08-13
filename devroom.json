@@ -17,6 +17,6 @@
     "passes": true,
     "hoistProps": true,
     "deviceDCE": false,
-    "internStrings": false
+    "internStrings": true
   }
 }

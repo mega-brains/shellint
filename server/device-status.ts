@@ -1,6 +1,6 @@
 import { loadConfig, assertDevroomCompiler } from "./config.ts";
 import { readDeviceProfile } from "./device-profile.ts";
-import { requireActive } from "./devices.ts";
+import { requireActive, toDeviceInfo, touchDeviceInfo } from "./devices.ts";
 import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
 
 export type DeviceStatus = {
@@ -125,6 +125,8 @@ export async function fetchDeviceStatus(): Promise<DeviceStatus> {
     const infoCall = await softCall(rpc, "Shelly.GetDeviceInfo", {});
     if (infoCall) rtts.push(infoCall.ms);
     const info = (infoCall?.result ?? {}) as Record<string, unknown>;
+    // Only on a successful answer — a failed poll must not blank out good info.
+    if (infoCall) touchDeviceInfo(target.device.id, toDeviceInfo(info));
 
     const scriptCall = await timedCall(rpc, "Script.GetStatus", {
       id: scriptId,
@@ -244,6 +246,60 @@ export type EcoResult = {
   restart_required: boolean | null;
 };
 
+/** Minimal RPC surface the eco helpers need, so `runProbe` can drive them on
+ * the connection it already holds instead of opening a second one. */
+export type EcoRpc = {
+  call(method: string, params?: Record<string, unknown>): Promise<unknown>;
+};
+
+/** Current `device.eco_mode`, or `null` when the device does not answer. */
+export async function readEcoConfig(rpc: EcoRpc): Promise<boolean | null> {
+  try {
+    const sysCfg = ((await rpc.call("Sys.GetConfig", {})) ?? {}) as Record<
+      string,
+      unknown
+    >;
+    const deviceCfg = (sysCfg.device ?? {}) as Record<string, unknown>;
+    return bool(deviceCfg.eco_mode);
+  } catch (e) {
+    if (e instanceof AuthNotSupportedError) throw e;
+    return null;
+  }
+}
+
+/** Writes `device.eco_mode` and reads it straight back — the device is the
+ * authority on what actually took, and it also reports whether a restart is
+ * needed before the change has any effect. */
+export async function applyEcoMode(
+  rpc: EcoRpc,
+  eco_mode: boolean,
+): Promise<EcoResult> {
+  const result = (await rpc.call("Sys.SetConfig", {
+    config: { device: { eco_mode } },
+  })) as Record<string, unknown>;
+  const confirmed = await readEcoConfig(rpc);
+  return {
+    eco_mode: confirmed ?? eco_mode,
+    restart_required: bool(result.restart_required),
+  };
+}
+
+/** One `Sys.GetConfig` round trip — the probe-eco prompt asks this before it
+ * decides whether to warn, and must not pay for a full status poll. */
+export async function fetchEcoMode(): Promise<{ eco_mode: boolean | null }> {
+  const cfg = loadConfig();
+  assertDevroomCompiler(cfg);
+  const target = requireActive();
+
+  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
+  try {
+    await rpc.connect();
+    return { eco_mode: await readEcoConfig(rpc) };
+  } finally {
+    rpc.close();
+  }
+}
+
 export async function setEcoMode(eco_mode: boolean): Promise<EcoResult> {
   const cfg = loadConfig();
   assertDevroomCompiler(cfg);
@@ -252,19 +308,7 @@ export async function setEcoMode(eco_mode: boolean): Promise<EcoResult> {
   const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
   try {
     await rpc.connect();
-    const result = (await rpc.call("Sys.SetConfig", {
-      config: { device: { eco_mode } },
-    })) as Record<string, unknown>;
-
-    const read = await softCall(rpc, "Sys.GetConfig", {});
-    const sysCfg = (read?.result ?? {}) as Record<string, unknown>;
-    const deviceCfg = (sysCfg.device ?? {}) as Record<string, unknown>;
-    const confirmed = bool(deviceCfg.eco_mode);
-
-    return {
-      eco_mode: confirmed ?? eco_mode,
-      restart_required: bool(result.restart_required),
-    };
+    return await applyEcoMode(rpc, eco_mode);
   } finally {
     rpc.close();
   }

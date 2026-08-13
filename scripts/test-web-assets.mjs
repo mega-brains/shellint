@@ -38,7 +38,7 @@ for (const f of REQUIRED) {
 const BUDGETS = [
   ["web/dist/app.js", 660_000],
   ["web/dist/app.js.br", 190_000],
-  ["web/dist/styles.css", 40_000],
+  ["web/dist/styles.css", 40_500],
   ["web/dist/api-docs.json", 40_000],
 ];
 

@@ -11,6 +11,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { PROBE_PATH, ROOT } from "./paths.ts";
 import { readDeviceProfile } from "./device-profile.ts";
+import { activeDeviceIdentity } from "./devices.ts";
 import type { ProbeEntry, ProbeReport } from "./probe.ts";
 
 export const GENERATED_DTS_PATH = join(ROOT, "types", "generated.d.ts");
@@ -28,6 +29,17 @@ const TYPE_FOR_ANSWER: Record<string, string> = {
 const ABSENT_ANSWER = "undefined";
 
 const IDENTIFIER = /^[A-Za-z_$][A-Za-z0-9_$]*$/;
+
+/** Reserved words are identifier-shaped but illegal as a `const`/`namespace`
+ * name — e.g. the `hoisting.var` probe id. Segments matching one are skipped
+ * rather than emitted as invalid `.d.ts` syntax. */
+const RESERVED = new Set([
+  "break", "case", "catch", "class", "const", "continue", "debugger",
+  "default", "delete", "do", "else", "enum", "export", "extends", "false",
+  "finally", "for", "function", "if", "import", "in", "instanceof", "new",
+  "null", "return", "super", "switch", "this", "throw", "true", "try",
+  "typeof", "var", "void", "while", "with",
+]);
 
 /**
  * `present` means the probe confirmed the API is there. It is *not* the
@@ -65,13 +77,14 @@ export function isAbsent(entry: ProbeEntry): boolean {
   return entry.ok === true && entry.result === ABSENT_ANSWER;
 }
 
-/** Which device, which firmware, when — so a finding can be falsified. */
+/** Which device, which firmware, when — so a finding can be falsified. `ver`
+ * comes from the report's own provenance (M16 §3.2) first; `device-profile.json`
+ * is only the fallback for a capture written before that field existed. */
 export function probeOrigin(report: ProbeReport): string {
-  const raw = report as unknown as Record<string, unknown>;
   const profile = readDeviceProfile();
   const ver =
-    typeof raw.ver === "string"
-      ? raw.ver
+    typeof report.ver === "string" && report.ver
+      ? report.ver
       : profile?.deviceIp === report.deviceIp && profile.ver
         ? profile.ver
         : "unknown";
@@ -97,7 +110,8 @@ function emptyNode(): Node {
 /** `string.padStart` becomes namespace `string` holding const `padStart`. */
 function insert(root: Node, entry: ProbeEntry): boolean {
   const segments = entry.id.split(".");
-  if (!segments.every((s) => IDENTIFIER.test(s))) return false;
+  if (!segments.every((s) => IDENTIFIER.test(s) && !RESERVED.has(s)))
+    return false;
   let node = root;
   for (const segment of segments.slice(0, -1)) {
     const next = node.children.get(segment) ?? emptyNode();
@@ -128,12 +142,29 @@ function render(node: Node, depth: number): string[] {
   return lines;
 }
 
+/** Set when the mirrored capture is *for* the active device but names a
+ * firmware different from what it reports right now — the mirror is still
+ * what Tier 4 lint reads, but the operator should re-probe before trusting
+ * it. Silent for a mirror from some other device: that is a separate,
+ * pre-existing advisory (`probe-absent-api`'s `warn` severity), not staleness. */
+function staleNote(report: ProbeReport | null): string {
+  if (!report || typeof report.ver !== "string" || !report.ver) return "";
+  const active = activeDeviceIdentity();
+  if (!active?.ver) return "";
+  const sameDevice =
+    typeof report.deviceId === "string" && report.deviceId.length > 0
+      ? report.deviceId === active.id
+      : report.deviceIp === active.ip;
+  if (!sameDevice || active.ver === report.ver) return "";
+  return ` (stale — device now runs ${active.ver})`;
+}
+
 function header(report: ProbeReport | null): string {
   const origin = report ? probeOrigin(report) : "no probe report yet";
   return [
     "/**",
     " * GENERATED FILE — do not edit by hand. Regenerate with `mise run probe`.",
-    ` * Source: types/generated-probe.json (${origin}).`,
+    ` * Source: types/generated-probe.json (${origin}${staleNote(report)}).`,
     " *",
     " * ADVISORY ONLY. It is not part of the device compile and does not stand in",
     " * for types/espruino-lib.d.ts: every declaration sits inside one namespace,",

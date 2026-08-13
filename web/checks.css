@@ -35,6 +35,7 @@
 .badge-idle {
   padding: 0;
   color: var(--muted);
+  letter-spacing: 0;
 }
 
 .badge-pass { color: var(--accent); }
@@ -80,7 +81,7 @@
   border-color: var(--accent);
 }
 
-.check-rules { margin-top: 0.35rem; }
+.check-rules { margin-top: 0.35rem; margin-inline-start: 1em; }
 
 .check-group + .check-group { border-top: 1px solid var(--line); }
 
@@ -244,12 +245,28 @@
 }
 
 .finding-loc {
-  flex: 0 0 auto;
+  flex: 1 1 auto;
+  min-width: 0;
+  margin-left: auto;
   display: inline-flex;
   align-items: baseline;
+  justify-content: flex-end;
   gap: 0.3rem;
   color: var(--muted);
   font-size: 0.8rem;
+}
+
+/* Truncate from the left ("...main.ts:445") so the line number always stays
+   visible — the rtl direction reverses ellipsis placement, and unicode-bidi
+   keeps the digits themselves in the right order. */
+.finding-loc-text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  direction: rtl;
+  unicode-bidi: plaintext;
+  text-align: left;
 }
 
 .finding-loc-sev { font-size: 0.9em; }

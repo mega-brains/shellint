@@ -1,3 +1,8 @@
+/** What the eco-mode confirmation dialog decided for a probe run: turn eco off
+ * only for the run, turn it off for good, or (undefined) leave it alone. */
+export type EcoChoice = "probe-only" | "permanent";
+export type ProbeRunOptions = { ecoOff?: EcoChoice };
+
 export type ProbeResult = {
   id: string;
   ok: boolean;

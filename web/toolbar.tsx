@@ -5,6 +5,8 @@ import {
   probeAvailable,
   type ProbeResult,
 } from "./probe-logic";
+import { ProbeCopyButtons } from "./probe-copy";
+import type { ProbeCapture } from "./use-probe";
 
 export type Mode = "debug" | "prod";
 export type Minify = "min" | "raw";
@@ -22,6 +24,12 @@ function shortMinify(m: Minify): string {
 
 function minifyLabel(m: Minify): string {
   return m === "raw" ? "non-minified" : "minified";
+}
+
+/** Capture timestamps are stored as ISO; show local time, fall back to raw. */
+function formatAt(at: string): string {
+  const ms = Date.parse(at);
+  return Number.isNaN(ms) ? at || "unknown time" : new Date(ms).toLocaleString();
 }
 
 export type ToolbarProps = {
@@ -45,6 +53,9 @@ export type ToolbarProps = {
   onProbe: () => void;
   probeResults: ProbeResult[] | null;
   probeNote: string;
+  /** Where the shown run is stored on disk; clicking the path opens it. */
+  probeCapture?: ProbeCapture | null;
+  onShowCapture?: () => void;
   /** "Kitchen:1" — appended to the Deploy label so the target is never a guess. */
   deployTarget?: string;
 };
@@ -80,7 +91,7 @@ export function Toolbar(props: ToolbarProps) {
   const deployBase = `Upload ${deployFile} (${mode}, ${minifyLabel(minify)}) to the Shelly script slot over WebSocket RPC`;
   const deployTitle = props.deployReady
     ? deployBase
-    : `${deployBase} — disabled until Build + Check succeed`;
+    : `${deployBase} — disabled until Build + Check succeed and the active device is probed (or skipped)`;
 
   const buildTitle =
     props.buildAction === "check"
@@ -336,6 +347,22 @@ export function Toolbar(props: ToolbarProps) {
             <p class="probe-log-note" id="probeLogNote">
               {props.probeNote}
             </p>
+            {props.probeCapture ? (
+              <div class="probe-log-note probe-log-meta" id="probeLogMeta">
+                <span class="probe-log-at" title="When this capture was taken">
+                  {formatAt(props.probeCapture.at)}
+                </span>
+                <button
+                  type="button"
+                  id="probeLogPath"
+                  class="probe-log-path"
+                  title={`Open ${props.probeCapture.path}`}
+                  onClick={() => props.onShowCapture?.()}
+                >
+                  {props.probeCapture.path}
+                </button>
+              </div>
+            ) : null}
             <div class="probe-log-row">
               <input
                 type="search"
@@ -359,6 +386,7 @@ export function Toolbar(props: ToolbarProps) {
                 failed only
               </button>
             </div>
+            <ProbeCopyButtons results={shown} />
             <ol class="probe-log-list" id="probeLogList">
               {shown.map((r) => (
                 <li key={r.id} class={probeAvailable(r) ? "ok" : "fail"}>

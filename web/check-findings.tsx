@@ -107,7 +107,6 @@ export function FindingsList(props: { findings: Finding[] }) {
               {isError ? "ERROR" : "WARN"}
             </span>
             <span class="finding-rule">{f.rule}</span>
-            <span class="finding-msg">{f.message}</span>
             {where ? (
               f.line != null && f.file ? (
                 <button
@@ -135,6 +134,7 @@ export function FindingsList(props: { findings: Finding[] }) {
                 </span>
               )
             ) : null}
+            <span class="finding-msg">{f.message}</span>
           </li>
         );
       })}

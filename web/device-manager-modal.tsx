@@ -1,10 +1,22 @@
 import { useEffect, useRef, useState } from "preact/hooks";
+import type { CaptureMeta } from "./use-probe-state";
 
 export type DeviceManagerModalProps = {
   open: boolean;
   onClose: () => void;
   onAdd: (input: { ip: string; label?: string; password?: string }) => Promise<void>;
+  /** Probe captures for the currently active device (M16 §5) — the modal
+   * has no per-device browsing of its own yet, so this is the one device
+   * whose captures can be managed here. */
+  activeDevice?: { id: string; label: string } | null;
+  captures?: CaptureMeta[];
+  onDeleteCapture?: (verKey: string) => Promise<void>;
 };
+
+function dateOnly(iso: string): string {
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? iso : d.toISOString().slice(0, 10);
+}
 
 /**
  * Add-device form. There is no "test before saving" round trip — `Save`
@@ -107,6 +119,45 @@ export function DeviceManagerModal(props: DeviceManagerModalProps) {
           {busy ? "adding…" : "add device"}
         </button>
       </div>
+      {props.activeDevice && props.captures ? (
+        <CaptureList
+          deviceLabel={props.activeDevice.label}
+          captures={props.captures}
+          onDelete={props.onDeleteCapture}
+        />
+      ) : null}
     </dialog>
+  );
+}
+
+function CaptureList(props: {
+  deviceLabel: string;
+  captures: CaptureMeta[];
+  onDelete?: (verKey: string) => Promise<void>;
+}) {
+  return (
+    <div class="device-manager-captures">
+      <p class="device-manager-captures-head">
+        Probe captures for {props.deviceLabel}
+      </p>
+      {props.captures.length === 0 ? (
+        <p class="device-manager-hint">none yet</p>
+      ) : (
+        <ul class="device-manager-capture-list">
+          {props.captures.map((c) => (
+            <li key={c.verKey} class="checks-note-row">
+              <span>
+                fw {c.ver ?? "unknown"} · {dateOnly(c.at)} · {c.present} present / {c.absent} absent
+              </span>
+              {props.onDelete ? (
+                <button type="button" onClick={() => void props.onDelete!(c.verKey)}>
+                  delete
+                </button>
+              ) : null}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

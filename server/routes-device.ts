@@ -12,8 +12,11 @@ import {
   resolveTarget,
   sanitizeDevice,
   setActive,
+  toDeviceInfo,
+  touchDeviceInfo,
   updateDevice,
 } from "./devices.ts";
+import { probeState, resolveCapture } from "./probe-store.ts";
 import {
   createSlot,
   deleteSlot,
@@ -21,10 +24,10 @@ import {
   listSlots,
 } from "./device-scripts.ts";
 import { ShellyRpc } from "./rpc.ts";
-import { deploy, AuthNotSupportedError, AuthFailedError } from "./deploy.ts";
-import { runProbe, getProbeProgress } from "./probe.ts";
+import { deploy, AuthNotSupportedError, AuthFailedError, ProbeRequiredError } from "./deploy.ts";
 import {
   fetchDeviceStatus,
+  fetchEcoMode,
   rebootDevice,
   setEcoMode,
   setScriptRunning,
@@ -44,9 +47,15 @@ import { writeGeneratedTypings } from "./probe-typings.ts";
  * `AuthNotSupportedError` → 401 (non-digest challenge), `CompilerNotWiredError`
  * → 400, everything else → 500.
  */
-function deviceError(c: Context, e: unknown) {
+export function deviceError(c: Context, e: unknown) {
   if (e instanceof NoDeviceError) {
     return c.json({ ok: false, error: e.message }, 409);
+  }
+  if (e instanceof ProbeRequiredError) {
+    return c.json(
+      { ok: false, error: e.message, code: "probe-required", probe: probeState(e.deviceId) },
+      409,
+    );
   }
   if (e instanceof AuthFailedError) {
     return c.json({ ok: false, error: e.message }, 401);
@@ -141,6 +150,7 @@ export function registerDeviceRoutes(app: Hono) {
         string,
         unknown
       >;
+      touchDeviceInfo(id, toDeviceInfo(info));
       return c.json({
         ok: true,
         online: true,
@@ -180,6 +190,7 @@ export function registerDeviceRoutes(app: Hono) {
       return c.json({
         ok: true,
         active: { device: target.device.id, slot: target.slot, script: target.script },
+        probe: probeState(target.device.id),
       });
     } catch (e) {
       return deviceError(c, e);
@@ -379,21 +390,6 @@ export function registerDeviceRoutes(app: Hono) {
     }
   });
 
-  app.get("/api/probe/progress", (c) => {
-    return c.json({ ok: true, ...getProbeProgress() });
-  });
-
-  app.post("/api/probe", async (c) => {
-    try {
-      const report = await runProbe();
-      // Same as `mise run probe`: fresh answers, freshly generated typings.
-      const typings = writeGeneratedTypings();
-      return c.json({ ok: true, report, typings });
-    } catch (e) {
-      return deviceError(c, e);
-    }
-  });
-
   app.get("/api/device/status", async (c) => {
     try {
       const status = await fetchDeviceStatus();
@@ -418,6 +414,16 @@ export function registerDeviceRoutes(app: Hono) {
     }
     try {
       return c.json({ ok: true, ...(await setScriptRunning(body.running)) });
+    } catch (e) {
+      return deviceError(c, e);
+    }
+  });
+
+  /** One `Sys.GetConfig` — the probe's eco prompt, which must not pay for a
+   * full status poll just to decide whether to warn. */
+  app.get("/api/device/eco", async (c) => {
+    try {
+      return c.json({ ok: true, ...(await fetchEcoMode()) });
     } catch (e) {
       return deviceError(c, e);
     }

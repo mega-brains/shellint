@@ -2,6 +2,33 @@ import type { Page, Route } from "@playwright/test";
 
 /** Fixed clock for log timestamps in screenshots / smoke. */
 export const MOCK_TS = 1_700_000_000;
+const MOCK_ISO = new Date(MOCK_TS * 1000).toISOString();
+
+export type MockCapture = {
+  ver: string | null;
+  verKey: string;
+  at: string;
+  path: string;
+  present: number;
+  absent: number;
+};
+
+/** M16 probe-required gate — see probeState() in server/probe-store.ts. */
+export type MockProbeState = {
+  required: boolean;
+  reason: "never-probed" | "firmware-changed" | "none";
+  ver: string | null;
+  matched: MockCapture | null;
+  newest: MockCapture | null;
+  skipped: { ver: string | null; at: string } | null;
+  captures: MockCapture[];
+};
+
+/** A satisfied state for `ver` — one capture, present-only, nothing skipped. */
+function mockProbeState(ver: string): MockProbeState {
+  const capture: MockCapture = { ver, verKey: ver, at: MOCK_ISO, path: `mock/${ver}.json`, present: 10, absent: 0 };
+  return { required: false, reason: "none", ver, matched: capture, newest: null, skipped: null, captures: [capture] };
+}
 
 export const mockDeviceStatus = {
   deviceIp: "192.168.3.106",
@@ -167,6 +194,12 @@ export async function mockDeviceApis(page: Page): Promise<void> {
     });
   });
 
+  // Default probe state: satisfied, so the M16 probe-required banner stays
+  // hidden and Deploy stays enabled for every spec that does not explicitly
+  // exercise it (see probe-required.spec.ts for the one that does).
+  const probedBadge = (ver: string) => ({ required: false, reason: "none" as const, ver, at: MOCK_ISO });
+  const probeStates: Record<string, MockProbeState> = {};
+
   const mockDevice = {
     id: mockDeviceStatus.device.id,
     label: "e2e-device",
@@ -178,6 +211,7 @@ export async function mockDeviceApis(page: Page): Promise<void> {
       ver: mockDeviceStatus.device.ver,
     },
     slots: { "1": { script: "main" } },
+    probe: probedBadge(mockDeviceStatus.device.ver),
   };
   // A second device, only for the device-switch spec — harmless to always
   // list, since nothing selects it unless a test explicitly switches to it.
@@ -188,7 +222,10 @@ export async function mockDeviceApis(page: Page): Promise<void> {
     hasPassword: false,
     info: { model: "SNSW-001P16EU", gen: 2, ver: "1.0.0" },
     slots: { "1": { script: "main" } },
+    probe: probedBadge("1.0.0"),
   };
+  probeStates[mockDevice.id] = mockProbeState(mockDeviceStatus.device.ver);
+  probeStates[mockDevice2.id] = mockProbeState("1.0.0");
   let mockActive = { device: mockDevice.id, slot: 1, script: "main" };
 
   await page.route("**/api/devices", async (route) => {
@@ -223,7 +260,25 @@ export async function mockDeviceApis(page: Page): Promise<void> {
     // mirror that so the next GET/POST /api/device/logs sees a fresh, disconnected stream.
     logConnected = false;
     logSeq = 0;
-    await json(route, { ok: true, active: mockActive });
+    const probe = probeStates[mockActive.device] ?? mockProbeState("unknown");
+    await json(route, { ok: true, active: mockActive, probe });
+  });
+
+  await page.route("**/api/probe/state**", async (route) => {
+    const url = new URL(route.request().url());
+    const deviceId = url.searchParams.get("device") ?? mockActive.device;
+    const state = probeStates[deviceId] ?? mockProbeState("unknown");
+    await json(route, { ok: true, ...state });
+  });
+
+  await page.route("**/api/probe/skip", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    const body = (route.request().postDataJSON() ?? {}) as { device?: string };
+    const deviceId = body.device ?? mockActive.device;
+    const current = probeStates[deviceId] ?? mockProbeState("unknown");
+    const skipped = { ver: current.ver, at: MOCK_ISO };
+    probeStates[deviceId] = { ...current, required: false, skipped };
+    await json(route, { ok: true, ...probeStates[deviceId] });
   });
 
   await page.route("**/api/device/scripts**", async (route) => {

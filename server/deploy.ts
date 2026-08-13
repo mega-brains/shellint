@@ -3,6 +3,7 @@ import { join } from "node:path";
 import { DIST_DIR } from "./paths.ts";
 import { loadConfig, assertDevroomCompiler } from "./config.ts";
 import { bindSlot, getDevice, requireActive } from "./devices.ts";
+import { probeState, type ProbeState } from "./probe-store.ts";
 import { createSlot } from "./device-scripts.ts";
 import {
   AuthNotSupportedError,
@@ -11,6 +12,22 @@ import {
   RpcError,
   type RpcTarget,
 } from "./rpc.ts";
+
+/** Thrown before the RPC connects — deploy is the one place the probe-required
+ * gate is enforced server-side (M16 §2.3), so a CLI deploy cannot bypass what
+ * the UI insists on. */
+export class ProbeRequiredError extends Error {
+  deviceId: string;
+  ver: string | null;
+  reason: ProbeState["reason"];
+  constructor(deviceId: string, label: string, ver: string | null, reason: ProbeState["reason"]) {
+    super(`run Probe (or Skip) for ${label} fw ${ver ?? "unknown"} first`);
+    this.name = "ProbeRequiredError";
+    this.deviceId = deviceId;
+    this.ver = ver;
+    this.reason = reason;
+  }
+}
 
 /** Minimal RPC surface `deploy` needs — lets tests supply a fake device. */
 export type DeployRpc = {
@@ -34,6 +51,8 @@ export type DeployOptions = {
   scriptKey?: string;
   /** Set ⇒ `Script.Create` first, deploy into the new slot, and bind it in devices.json. */
   createName?: string;
+  /** `mise run deploy -- --no-probe-check` — bypasses the probe-required gate. */
+  skipProbeCheck?: boolean;
   /** Test-only — production always uses the real `ShellyRpc`. */
   rpcFactory?: DeployRpcFactory;
 };
@@ -92,6 +111,13 @@ export async function deploy(
   const localBytes = Buffer.byteLength(code, "utf8");
   const active = requireActive();
   const device = opts.deviceId ? (getDevice(opts.deviceId) ?? active.device) : active.device;
+
+  if (opts.skipProbeCheck !== true) {
+    const state = probeState(device.id);
+    if (state.required) {
+      throw new ProbeRequiredError(device.id, device.label, state.ver, state.reason);
+    }
+  }
 
   const rpcFactory: DeployRpcFactory = opts.rpcFactory ?? ((t) => new ShellyRpc(t));
   const rpc = rpcFactory({ ip: device.ip, auth: device.auth });

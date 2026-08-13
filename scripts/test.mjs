@@ -39,8 +39,11 @@ const TESTS = [
   "test-intern-strings",
   "test-web-assets",
   "test-script-history",
+  "test-probe-store",
+  "test-probe-eco",
   "test-devices",
   "test-device-scripts",
+  "test-deploy-gate",
   "test-smoke",
 ];
 

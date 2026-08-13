@@ -17,8 +17,14 @@ export const DEVROOM_JSON = join(ROOT, "devroom.json");
  * Per-device state dir — the authoritative copy of a device's capability
  * profile/probe. `types/device-profile.json` and `types/generated-probe.json`
  * are mirrors of whichever device is active, rewritten on switch (M15 §3.2).
+ * `probe` is the legacy single-capture file (read-only after migration);
+ * `probesDir` holds one capture per firmware (`<verKey>.json`, M16 §3.1).
  */
-export function devicePaths(id: string): { profile: string; probe: string } {
+export function devicePaths(id: string): { profile: string; probe: string; probesDir: string } {
   const dir = join(ROOT, ".devroom", "devices", id);
-  return { profile: join(dir, "profile.json"), probe: join(dir, "probe.json") };
+  return {
+    profile: join(dir, "profile.json"),
+    probe: join(dir, "probe.json"),
+    probesDir: join(dir, "probes"),
+  };
 }

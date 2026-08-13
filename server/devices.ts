@@ -10,6 +10,7 @@ import { dirname, join } from "node:path";
 import { ROOT, DEVICE_PROFILE_PATH, PROBE_PATH, devicePaths } from "./paths.ts";
 import { AuthFailedError, ShellyRpc } from "./rpc.ts";
 import { writeGeneratedTypings } from "./probe-typings.ts";
+import { newestCapture, probeState, resolveCapture, type ProbeSkip } from "./probe-store.ts";
 
 export type DeviceAuth = { username: string; password: string };
 export type DeviceInfo = { model?: string; gen?: number; ver?: string; app?: string };
@@ -22,6 +23,9 @@ export type DeviceRecord = {
   info?: DeviceInfo;
   lastSeen?: string;
   slots: Record<string, SlotBinding>;
+  /** One slot, not a list — a skip for an older firmware is dead the moment
+   * `ver` moves (M16 §3.3). */
+  probeSkipped?: ProbeSkip;
 };
 export type ActiveSelection = { device: string; slot: number; script: string };
 export type DevicesFile = {
@@ -193,6 +197,40 @@ export type DeviceRpcFactory = (ip: string, auth?: DeviceAuth) => DeviceRpc;
 
 const defaultRpcFactory: DeviceRpcFactory = (ip, auth) => new ShellyRpc({ ip, auth });
 
+/** Narrows a raw `Shelly.GetDeviceInfo` answer down to the fields we cache. */
+export function toDeviceInfo(raw: Record<string, unknown>): DeviceInfo {
+  return {
+    model: typeof raw.model === "string" ? raw.model : undefined,
+    gen: typeof raw.gen === "number" ? raw.gen : undefined,
+    ver: typeof raw.ver === "string" ? raw.ver : undefined,
+    app: typeof raw.app === "string" ? raw.app : undefined,
+  };
+}
+
+/**
+ * Persists a fresh `GetDeviceInfo` answer, called from every RPC path that
+ * already fetches one (`addDevice`, the device-test route, `fetchDeviceProfile`,
+ * `fetchDeviceStatus`, `runProbe`) — `info.ver` is the probe gate's key half
+ * (M16 §3.3), and used to only ever be written once, at `addDevice`. No-ops
+ * when nothing changed, so a five-second status poll does not rewrite a
+ * `0600` JSON file every cycle.
+ */
+export function touchDeviceInfo(id: string, info: DeviceInfo): void {
+  const file = loadDevices();
+  const idx = file.devices.findIndex((d) => d.id === id);
+  if (idx === -1) return;
+  const current = file.devices[idx]!.info;
+  const changed =
+    current?.model !== info.model ||
+    current?.gen !== info.gen ||
+    current?.ver !== info.ver ||
+    current?.app !== info.app;
+  if (!changed) return;
+  const devices = [...file.devices];
+  devices[idx] = { ...devices[idx]!, info, lastSeen: new Date().toISOString() };
+  persist({ ...file, devices });
+}
+
 async function probeDeviceInfo(rpc: DeviceRpc): Promise<DeviceInfo & { id?: string }> {
   await rpc.connect();
   const info = ((await rpc.call("Shelly.GetDeviceInfo", {})) ?? {}) as Record<
@@ -201,10 +239,7 @@ async function probeDeviceInfo(rpc: DeviceRpc): Promise<DeviceInfo & { id?: stri
   >;
   return {
     id: typeof info.id === "string" ? info.id : undefined,
-    model: typeof info.model === "string" ? info.model : undefined,
-    gen: typeof info.gen === "number" ? info.gen : undefined,
-    ver: typeof info.ver === "string" ? info.ver : undefined,
-    app: typeof info.app === "string" ? info.app : undefined,
+    ...toDeviceInfo(info),
   };
 }
 
@@ -330,6 +365,11 @@ function atomicCopy(src: string, dest: string): void {
  * a real capture to say nothing, and both files name their source device
  * (`deviceIp`, echoed into the `generated.d.ts` header), so a stale mirror is
  * self-identifying. It refreshes as soon as that device answers.
+ *
+ * The probe half picks the capture for the device's *current* firmware when
+ * one exists, falling back to the newest capture on file, falling back to the
+ * legacy single-capture `probe.json` (M16 §4.2) — never all three absent at
+ * once falls through to "leave the previous mirror standing" above.
  */
 export function mirrorActiveDevice(deviceId: string): void {
   const src = devicePaths(deviceId);
@@ -338,8 +378,11 @@ export function mirrorActiveDevice(deviceId: string): void {
     atomicCopy(src.profile, DEVICE_PROFILE_PATH);
     changed = true;
   }
-  if (existsSync(src.probe)) {
-    atomicCopy(src.probe, PROBE_PATH);
+  const device = getDevice(deviceId);
+  const capture = resolveCapture(deviceId, device?.info?.ver) ?? newestCapture(deviceId);
+  const probeSrc = capture?.path ?? (existsSync(src.probe) ? src.probe : null);
+  if (probeSrc) {
+    atomicCopy(probeSrc, PROBE_PATH);
     changed = true;
   }
   if (changed) writeGeneratedTypings();
@@ -365,13 +408,18 @@ export function requireActive(): ActiveTarget {
   return { device, slot: file.active.slot, script: file.active.script };
 }
 
+export type ActiveIdentity = { id: string; ip: string; ver: string | null };
+
 /**
- * IP of the active device, or null when no device is configured. Never throws:
- * the lint pass asks this offline, where "no device yet" is a normal state.
+ * Identity of the active device, or null when none is configured. Never
+ * throws: the lint pass asks this offline, where "no device yet" is a normal
+ * state. `ver` is `device.info?.ver` — refreshed by `touchDeviceInfo`, not
+ * necessarily current the instant firmware changes underneath it.
  */
-export function activeDeviceIp(): string | null {
+export function activeDeviceIdentity(): ActiveIdentity | null {
   try {
-    return requireActive().device.ip;
+    const { device } = requireActive();
+    return { id: device.id, ip: device.ip, ver: device.info?.ver ?? null };
   } catch {
     return null;
   }
@@ -384,8 +432,39 @@ export function resolveTarget(deviceId?: string): { ip: string; auth?: DeviceAut
   return { ip: device.ip, auth: device.auth };
 }
 
+/**
+ * Records (or refreshes) a skip for the device's *current* firmware — one
+ * slot, not a list, since a skip for an older `ver` is dead the moment `ver`
+ * moves (M16 §3.3). `ver: null` covers the device-never-answered case, where
+ * the skip is exactly what unblocks an unreachable box.
+ */
+export function setProbeSkip(id: string, ver: string | null): ProbeSkip {
+  const file = loadDevices();
+  const idx = file.devices.findIndex((d) => d.id === id);
+  if (idx === -1) throw new Error(`unknown device "${id}"`);
+  const skip: ProbeSkip = { ver, at: new Date().toISOString() };
+  const devices = [...file.devices];
+  devices[idx] = { ...devices[idx]!, probeSkipped: skip };
+  persist({ ...file, devices });
+  return skip;
+}
+
+/** Called once a probe succeeds for `ver` — a skip for that same `ver` is now moot. */
+export function clearProbeSkip(id: string, ver: string | null): void {
+  const file = loadDevices();
+  const idx = file.devices.findIndex((d) => d.id === id);
+  if (idx === -1) return;
+  const current = file.devices[idx]!;
+  if (!current.probeSkipped || current.probeSkipped.ver !== ver) return;
+  const { probeSkipped: _drop, ...rest } = current;
+  const devices = [...file.devices];
+  devices[idx] = rest;
+  persist({ ...file, devices });
+}
+
 /** Public view of a device — never serialize `auth.password` to a client. */
 export function sanitizeDevice(d: DeviceRecord) {
+  const state = probeState(d.id);
   return {
     id: d.id,
     label: d.label,
@@ -394,6 +473,12 @@ export function sanitizeDevice(d: DeviceRecord) {
     info: d.info,
     lastSeen: d.lastSeen,
     slots: d.slots,
+    probe: {
+      required: state.required,
+      reason: state.reason,
+      ver: state.ver,
+      at: (state.matched ?? state.newest)?.at ?? null,
+    },
   };
 }
 

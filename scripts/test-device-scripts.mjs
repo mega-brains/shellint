@@ -196,7 +196,9 @@ try {
       "prod",
       () => {},
       "min",
-      { createName: "presence", rpcFactory: fakeDeployRpc },
+      // This test is about slot creation, not the probe-required gate (M16
+      // §2.3) — the fake device here was never probed.
+      { createName: "presence", rpcFactory: fakeDeployRpc, skipProbeCheck: true },
     );
     if (createCalls !== 1) fail(`expected exactly one Script.Create call, got ${createCalls}`);
     if (result.scriptId !== 42) fail(`expected deploy to target the new slot 42, got ${result.scriptId}`);

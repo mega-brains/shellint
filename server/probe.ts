@@ -1,13 +1,18 @@
-import { writeFileSync, mkdirSync } from "node:fs";
-import { dirname } from "node:path";
-import { devicePaths } from "./paths.ts";
 import { loadConfig, assertDevroomCompiler } from "./config.ts";
-import { requireActive, mirrorActiveDevice } from "./devices.ts";
+import {
+  clearProbeSkip,
+  mirrorActiveDevice,
+  requireActive,
+  toDeviceInfo,
+  touchDeviceInfo,
+} from "./devices.ts";
 import { createSlot, deleteSlot } from "./device-scripts.ts";
+import { applyEcoMode, readEcoConfig } from "./device-status.ts";
 import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
 // Script.Eval expressions, and they must stay side-effect-free: they may be
 // evaluated inside a script the user owns.
 import { PROBES } from "./probe-catalog.ts";
+import { writeCapture } from "./probe-store.ts";
 
 /** Live progress of the in-flight (or most recent) probe run, polled by the UI. */
 let progressState = { done: 0, total: 0 };
@@ -36,6 +41,15 @@ export type ProbeReport = {
   probed: true;
   at: string;
   deviceIp: string;
+  /**
+   * Provenance (M16 §3.2) — stamped from `Shelly.GetDeviceInfo`, fetched once
+   * up front since `runProbe` already holds the connection. Optional on read:
+   * the committed `types/generated-probe.json` fixture predates these fields.
+   */
+  deviceId?: string;
+  ver?: string | null;
+  model?: string | null;
+  gen?: number | null;
   /** Slot the probes actually ran in. */
   scriptId: number;
   configuredScriptId: number;
@@ -196,24 +210,80 @@ export async function acquireHost(
   );
 }
 
+/** What to do about eco mode for this run, as chosen in the UI's confirmation
+ * dialog. Omitted leaves eco exactly as it is. */
+export type EcoOverride = "probe-only" | "permanent";
+export type RunProbeOptions = { ecoOff?: EcoOverride };
+
+/**
+ * Eco mode buys power at the cost of "reduced execution speed and increased
+ * network latency" (Sys docs) — which a probe pays for `PROBES.length` times
+ * over, sequentially. Turning it off is the caller's explicit choice, never
+ * implicit: it is a persisted device config change, and on some firmwares it
+ * only takes effect after a restart (surfaced as a note rather than acted on —
+ * rebooting mid-probe would drop the connection this run needs).
+ *
+ * Returns whether the caller must switch eco back on when the run ends.
+ */
+export async function disableEcoForProbe(
+  rpc: ProbeRpc,
+  mode: EcoOverride | undefined,
+  notes: string[],
+): Promise<boolean> {
+  if (!mode) return false;
+  if ((await readEcoConfig(rpc)) !== true) return false;
+
+  const result = await applyEcoMode(rpc, false);
+  notes.push(
+    mode === "permanent"
+      ? "eco mode turned off (left off after the probe, as requested)"
+      : "eco mode turned off for this run — restored afterwards",
+  );
+  if (result.restart_required) {
+    notes.push(
+      "WARNING: device reports a restart is required for the eco-mode change to take effect — this run may still be slow",
+    );
+  }
+  return mode === "probe-only";
+}
+
 /**
  * Run Script.Eval capability checks and write types/generated-probe.json.
  * Never writes to or deletes a script slot that already existed on the device:
  * it evaluates in the configured slot when that is already running, otherwise in a
  * temporary slot it creates and removes, otherwise read-only in another running script.
  */
-export async function runProbe(): Promise<ProbeReport> {
+export async function runProbe(opts: RunProbeOptions = {}): Promise<ProbeReport> {
   const cfg = loadConfig();
   assertDevroomCompiler(cfg);
   const target = requireActive();
 
   const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
   const results: ProbeEntry[] = [];
+  const ecoNotes: string[] = [];
   let scratchRemoved = false;
+  let restoreEco = false;
   progressState = { done: 0, total: PROBES.length };
 
   try {
     await rpc.connect();
+    const info = ((await rpc.call("Shelly.GetDeviceInfo", {})) ?? {}) as Record<
+      string,
+      unknown
+    >;
+    // The report's `deviceId` must match the `.devroom/devices.json` key it is
+    // filed under (not necessarily `info.id`) — a device added while offline
+    // keeps its fallback slug id even after it later answers with its own,
+    // and every downstream match (mirrorActiveDevice, lintProbe) compares
+    // against the devices.json id.
+    const deviceId = target.device.id;
+    const ver = typeof info.ver === "string" ? info.ver : null;
+    const model = typeof info.model === "string" ? info.model : null;
+    const gen = typeof info.gen === "number" ? info.gen : null;
+    touchDeviceInfo(deviceId, toDeviceInfo(info));
+    // Before `acquireHost`: slot creation and the keep-alive stub are round
+    // trips that pay the eco penalty too.
+    restoreEco = await disableEcoForProbe(rpc, opts.ecoOff, ecoNotes);
     const host = await acquireHost(rpc, target.slot);
 
     try {
@@ -245,28 +315,46 @@ export async function runProbe(): Promise<ProbeReport> {
           );
         }
       }
+      if (restoreEco) {
+        try {
+          await applyEcoMode(rpc, true);
+          restoreEco = false;
+          ecoNotes.push("eco mode restored");
+        } catch (e) {
+          ecoNotes.push(
+            `WARNING: eco mode could not be restored (${msg(e)}) — turn it back on in the device panel`,
+          );
+          restoreEco = false;
+        }
+      }
     }
 
     const report: ProbeReport = {
       probed: true,
       at: new Date().toISOString(),
       deviceIp: target.device.ip,
+      deviceId,
+      ver,
+      model,
+      gen,
       scriptId: host.scriptId,
       configuredScriptId: target.slot,
       strategy: host.strategy,
       existingScriptIds: host.existingScriptIds,
       scratchScriptId: host.scratchScriptId,
       scratchRemoved,
-      notes: host.notes,
+      notes: [...ecoNotes, ...host.notes],
       results,
     };
 
-    const path = devicePaths(target.device.id).probe;
-    mkdirSync(dirname(path), { recursive: true });
-    writeFileSync(path, JSON.stringify(report, null, 2) + "\n", "utf8");
+    writeCapture(target.device.id, report);
+    clearProbeSkip(target.device.id, ver);
     mirrorActiveDevice(target.device.id);
     return report;
   } finally {
+    // Only reached when the run failed before the inner `finally` could
+    // restore it — a thrown probe must not leave eco off behind it.
+    if (restoreEco) await applyEcoMode(rpc, true).catch(() => {});
     rpc.close();
   }
 }

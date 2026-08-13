@@ -1,20 +1,22 @@
 {
   "probed": true,
-  "at": "2026-08-12T23:55:56.509Z",
-  "deviceIp": "192.168.88.54",
-  "scriptId": 2,
+  "at": "2026-08-13T09:14:42.545Z",
+  "deviceIp": "192.168.3.106",
+  "deviceId": "192-168-3-106",
+  "ver": "2.0.0",
+  "model": "S3PL-00112EU",
+  "gen": 3,
+  "scriptId": 1,
   "configuredScriptId": 1,
-  "strategy": "scratch",
+  "strategy": "configured",
   "existingScriptIds": [
     1,
+    2,
     3
   ],
-  "scratchScriptId": 2,
+  "scratchScriptId": null,
   "scratchRemoved": false,
-  "notes": [
-    "script 1 not running — probed in temporary slot 2 (\"devroom-probe\"), removed afterwards",
-    "WARNING: temporary slot 2 could not be removed (RPC timeout: Script.Delete) — delete it on the device"
-  ],
+  "notes": [],
   "results": [
     {
       "id": "array.map",
@@ -374,13 +376,13 @@
       "id": "ArrayBuffer",
       "code": "typeof ArrayBuffer",
       "ok": true,
-      "result": "undefined"
+      "result": "function"
     },
     {
       "id": "Uint8Array",
       "code": "typeof Uint8Array",
       "ok": true,
-      "result": "undefined"
+      "result": "function"
     },
     {
       "id": "print",
@@ -542,7 +544,7 @@
       "id": "AES",
       "code": "typeof AES",
       "ok": true,
-      "result": "undefined"
+      "result": "function"
     },
     {
       "id": "nesting.anon.depth1",
@@ -584,7 +586,7 @@
       "id": "hoisting.function-decl",
       "code": "(function () { try { return typeof h; } catch (e) { return \"throws:\" + (e.message || e); } function h() {} })()",
       "ok": true,
-      "result": "undefined"
+      "result": "string"
     },
     {
       "id": "hoisting.call",
@@ -596,43 +598,43 @@
       "id": "hoisting.var",
       "code": "(function () { try { return typeof v; } catch (e) { return \"throws:\" + (e.message || e); } var v = 1; })()",
       "ok": true,
-      "result": "undefined"
+      "result": "object"
     },
     {
       "id": "binary.uint8.construct",
       "code": "(function () { try { return typeof new Uint8Array(2); } catch (e) { return \"throws:\" + (e.message || e); } })()",
       "ok": true,
-      "result": "throws:\"Uint8Array\" is not defined"
+      "result": "object"
     },
     {
       "id": "binary.uint8.size",
       "code": "(function () { try { return \"\" + new Uint8Array(4).length; } catch (e) { return \"throws:\" + (e.message || e); } })()",
       "ok": true,
-      "result": "throws:\"Uint8Array\" is not defined"
+      "result": "4"
     },
     {
       "id": "binary.uint8.element",
       "code": "(function () { try { return typeof new Uint8Array(2)[0]; } catch (e) { return \"throws:\" + (e.message || e); } })()",
       "ok": true,
-      "result": "throws:\"Uint8Array\" is not defined"
+      "result": "number"
     },
     {
       "id": "binary.uint8.overBuffer",
       "code": "(function () { try { return \"\" + new Uint8Array(new ArrayBuffer(3)).length; } catch (e) { return \"throws:\" + (e.message || e); } })()",
       "ok": true,
-      "result": "throws:\"Uint8Array\" is not defined"
+      "result": "3"
     },
     {
       "id": "binary.uint8.backing",
       "code": "(function () { try { return typeof new Uint8Array(2).buffer; } catch (e) { return \"throws:\" + (e.message || e); } })()",
       "ok": true,
-      "result": "throws:\"Uint8Array\" is not defined"
+      "result": "object"
     },
     {
       "id": "binary.uint8.methods",
       "code": "(function () { try { var a = new Uint8Array(1); return typeof a.set + \"/\" + typeof a.fill + \"/\" + typeof a.subarray + \"/\" + typeof a.slice; } catch (e) { return \"throws:\" + (e.message || e); } })()",
       "ok": true,
-      "result": "throws:\"Uint8Array\" is not defined"
+      "result": "function/undefined/undefined/undefined"
     },
     {
       "id": "virtual.getHandle.call",
