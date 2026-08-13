@@ -296,7 +296,8 @@ export const CHECK_CATALOG: CheckSpec[] = [
   {
     rule: "probe-absent-api",
     group: "connected",
-    about: "the device probe answered \"undefined\" for this API — advisory only",
+    about:
+      "the device probe answered \"undefined\" for this API — error when the probe is the active device's, advisory when it came from another one",
   },
   ...CAPABILITY_CHECKS,
 

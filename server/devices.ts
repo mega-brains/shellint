@@ -365,6 +365,18 @@ export function requireActive(): ActiveTarget {
   return { device, slot: file.active.slot, script: file.active.script };
 }
 
+/**
+ * IP of the active device, or null when no device is configured. Never throws:
+ * the lint pass asks this offline, where "no device yet" is a normal state.
+ */
+export function activeDeviceIp(): string | null {
+  try {
+    return requireActive().device.ip;
+  } catch {
+    return null;
+  }
+}
+
 /** Every RPC call site resolves its target through here. */
 export function resolveTarget(deviceId?: string): { ip: string; auth?: DeviceAuth } {
   const device = deviceId ? getDevice(deviceId) : requireActive().device;

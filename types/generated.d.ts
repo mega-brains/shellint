@@ -1,6 +1,6 @@
 /**
  * GENERATED FILE — do not edit by hand. Regenerate with `mise run probe`.
- * Source: types/generated-probe.json (192.168.3.106 fw 2.0.0, probed 2026-08-11T23:06:58.539Z).
+ * Source: types/generated-probe.json (192.168.88.54 fw unknown, probed 2026-08-12T23:55:56.509Z).
  *
  * ADVISORY ONLY. It is not part of the device compile and does not stand in
  * for types/espruino-lib.d.ts: every declaration sits inside one namespace,
@@ -98,10 +98,6 @@ declare namespace ProbedDevice {
   const atob: (...args: unknown[]) => unknown;
   /** `typeof btoh` → "function" */
   const btoh: (...args: unknown[]) => unknown;
-  /** `typeof ArrayBuffer` → "function" */
-  const ArrayBuffer: (...args: unknown[]) => unknown;
-  /** `typeof Uint8Array` → "function" */
-  const Uint8Array: (...args: unknown[]) => unknown;
   /** `typeof print` → "function" */
   const print: (...args: unknown[]) => unknown;
   namespace console {
@@ -156,16 +152,4 @@ declare namespace ProbedDevice {
   const MQTT: (...args: unknown[]) => unknown;
   /** `typeof BLE` → "function" */
   const BLE: (...args: unknown[]) => unknown;
-  /** `typeof AES` → "function" */
-  const AES: (...args: unknown[]) => unknown;
-  namespace binary {
-    namespace uint8 {
-      /** `(function () { try { return typeof new Uint8Array(2); } catch (e) { return "throws:" + (e.message || e); } })()` → "object" */
-      const construct: object;
-      /** `(function () { try { return typeof new Uint8Array(2)[0]; } catch (e) { return "throws:" + (e.message || e); } })()` → "number" */
-      const element: number;
-      /** `(function () { try { return typeof new Uint8Array(2).buffer; } catch (e) { return "throws:" + (e.message || e); } })()` → "object" */
-      const backing: object;
-    }
-  }
 }

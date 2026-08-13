@@ -198,6 +198,11 @@ export async function minifyPass(code, opts) {
     if (dropConsole) compressOpt.drop_console = true;
     if (passes) compressOpt.passes = 3;
     if (hoistProps) compressOpt.hoist_props = true;
+  } else if (dropConsole) {
+    // drop_console is a compress transform: with `compress: false` Terser never
+    // runs it, so dropConsole would silently no-op whenever the compress knob
+    // is off. Run a compress step that does nothing *but* drop console.*.
+    compressOpt = { ecma: 5, defaults: false, drop_console: true };
   }
 
   let mangleOpt = false;
@@ -245,7 +250,9 @@ function writeLogMap(map) {
  */
 async function buildVariant(tscJs, name, flags, minifyOpts, logMapState, deviceDefs) {
   const variantOpts = resolveVariantOptions(minifyOpts, name);
-  let raw = await envPass(tscJs, flags, deviceDefs);
+  let raw = await envPass(tscJs, flags, deviceDefs, {
+    dropConsole: variantOpts.dropConsole === true,
+  });
   // Log strings cost RAM on device; the log panel re-expands the ids.
   if (logMapState.shorten) {
     const shortened = shortenLogStrings(raw, logMapState.sharedIds);

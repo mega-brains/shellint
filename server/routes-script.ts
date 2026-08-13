@@ -17,6 +17,7 @@ import { minFirmware } from "./min-firmware.ts";
 import { listArtifacts, readArtifact } from "./artifacts.ts";
 import { registerScriptRoutes } from "./script-routes.ts";
 import { listDevices, loadDevices, sanitizeDevice } from "./devices.ts";
+import { MINIFY_KEYS } from "../shared/minify-options.mjs";
 
 /** Config, build, check, stats, history, artifacts — plus script source CRUD (script-routes.ts). Split out of app.ts to stay under the 500-line cap. */
 export function registerScriptBuildRoutes(app: Hono) {
@@ -46,17 +47,11 @@ export function registerScriptBuildRoutes(app: Hono) {
         400,
       );
     }
-    const keys = [
-      "compress",
-      "mangle",
-      "toplevel",
-      "keepFnames",
-      "logMap",
-      "debugLogMap",
-      "advanced",
-    ] as const;
+    // Driven off the shared schema, never a hand-listed subset: a key added to
+    // shared/minify-options.mjs and rendered by the options panel would
+    // otherwise 400 here and silently never persist.
     const patch: Partial<MinifyConfig> = {};
-    for (const key of keys) {
+    for (const key of MINIFY_KEYS) {
       if (key in body.minify) {
         if (typeof body.minify[key] !== "boolean") {
           return c.json(

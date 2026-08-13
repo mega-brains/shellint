@@ -11,7 +11,9 @@ import { lintSemantics } from "../server/lint-semantics.ts";
 import { lintAdvisories, parseMeta } from "../server/lint-advisories.ts";
 import { lintConnected } from "../server/lint-connected.ts";
 import { runCheck } from "../server/check.ts";
+import { CHECK_CATALOG } from "../server/check-catalog.ts";
 import { acquireHost, removeScratch } from "../server/probe.ts";
+import { MINIFY_KEYS } from "../shared/minify-options.mjs";
 import { createApp } from "../server/app.ts";
 
 const dialect = checkBuildArtifacts();
@@ -313,8 +315,20 @@ try {
 if (!probeThrew) throw new Error("probe should fail loudly when it has no slot to use");
 
 const report = await runCheck();
-if (!report.ok) {
-  console.error(JSON.stringify(report.findings, null, 2));
+// Every tier-4 rule judges the sample against whichever device is active on
+// this machine — `types/device-profile.json` and `types/generated-probe.json`
+// are mirrors of local state no test controls, so a Gen2 device makes the
+// sample's AES call an error and a Gen3 one does not. Assert on the tiers that
+// are deterministic instead; tier 4 is pinned above against fixture profiles,
+// and scripts/test-typings.mjs pins both halves of the probe severity split.
+const connectedRules = new Set(
+  CHECK_CATALOG.filter((c) => c.group === "connected").map((c) => c.rule),
+);
+const blocking = report.findings.filter(
+  (f) => f.severity === "error" && !connectedRules.has(f.rule),
+);
+if (blocking.length) {
+  console.error(JSON.stringify(blocking, null, 2));
   throw new Error("runCheck should pass for the sample script");
 }
 if (!report.artifacts.length) throw new Error("runCheck should see dist artifacts");
@@ -369,6 +383,17 @@ for (const body of ["{}", '{"running":"yes"}', "not json"]) {
   await patch({ minify: { toplevel: was } });
   if ((await patch({ minify: { compress: "yes" } })).status !== 400) {
     throw new Error("PATCH /api/config accepted non-boolean");
+  }
+  // Every knob the options panel renders must be writable: a hand-listed
+  // allowlist here once 400'd the newer keys, so the UI toggles never stuck.
+  for (const key of MINIFY_KEYS) {
+    const prev = before.config.minify[key];
+    const res = await patch({ minify: { [key]: !prev } });
+    const json = await res.json();
+    if (res.status !== 200 || json.config.minify[key] !== !prev) {
+      throw new Error(`PATCH /api/config rejected minify.${key} (${res.status})`);
+    }
+    await patch({ minify: { [key]: prev } });
   }
 }
 

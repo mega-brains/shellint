@@ -7,8 +7,8 @@
   --accent: #0f6b5c;
   --accent-ink: #ffffff;
   --danger: #8b2e1a;
-  --size-low-bg: rgba(47, 143, 91, 0.5);
-  --size-high-bg: rgba(214, 158, 46, 0.5);
+  --size-low-bg: rgba(47, 143, 91, 0.2);
+  --size-high-bg: rgba(214, 158, 46, 0.2);
   /* OS-bundled faces only (macOS / Windows / Linux) — nothing is downloaded. */
   --mono: ui-monospace, "SF Mono", "Menlo", "Consolas", "DejaVu Sans Mono", monospace;
   --sans: system-ui, "Segoe UI", "Helvetica Neue", "DejaVu Sans", sans-serif;

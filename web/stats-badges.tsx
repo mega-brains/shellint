@@ -5,6 +5,7 @@ import { tipStyleFor } from "./option-tip";
 import { StatTip, type StatTipContent } from "./stat-tip";
 import type { StatSites, StatVariants } from "./stats-model";
 import { countersFromBadgeStats } from "./stats-model";
+import { flashClass, useChangeFlash } from "./use-flash";
 
 /** Uncapped script counters as a tile grid — no bar, because there is no cap. */
 export type BadgeStats = {
@@ -119,6 +120,14 @@ function badgesFrom(stats: BadgeStats): Badge[] {
   ];
 }
 
+/** Own component so each counter gets its own change-flash state. */
+function BadgeValue(props: { value: string }) {
+  const flash = useChangeFlash(props.value);
+  return (
+    <span class={flashClass("stat-badge-value", flash)}>{props.value}</span>
+  );
+}
+
 function highlight(lines: number[]): void {
   document.dispatchEvent(
     new CustomEvent<LineHighlight>(HIGHLIGHT_LINES_EVENT, {
@@ -186,7 +195,7 @@ export function StatBadges(props: {
               aria-describedby={tipId}
               {...tipHandlers(key)}
             >
-              <span class="stat-badge-value">{badge.value}</span>
+              <BadgeValue value={badge.value} />
               <span class="stat-badge-label">{badge.label}</span>
               {badge.hint ? (
                 <span class="stat-badge-hint">{badge.hint}</span>
@@ -208,7 +217,7 @@ export function StatBadges(props: {
               highlight(next ? lines : []);
             }}
           >
-            <span class="stat-badge-value">{badge.value}</span>
+            <BadgeValue value={badge.value} />
             <span class="stat-badge-label">{badge.label}</span>
             {badge.hint ? (
               <span class="stat-badge-hint">{badge.hint}</span>

@@ -6,17 +6,17 @@
   "port": 8787,
   "compiler": "devroom",
   "minify": {
-    "compress": false,
+    "compress": true,
     "mangle": true,
     "toplevel": true,
     "keepFnames": false,
     "logMap": true,
     "debugLogMap": true,
-    "advanced": true,
+    "advanced": false,
     "dropConsole": false,
-    "passes": false,
-    "hoistProps": false,
-    "deviceDCE": false,
-    "internStrings": false
+    "passes": true,
+    "hoistProps": true,
+    "deviceDCE": true,
+    "internStrings": true
   }
 }

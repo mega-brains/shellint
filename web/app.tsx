@@ -261,6 +261,9 @@ export function App() {
   const deployTarget = activeDevice
     ? `${activeDevice.label}:${devicesState.active?.slot ?? "?"}`
     : undefined;
+  // The active device is the source of truth once devices have loaded; the
+  // /api/config IP is only the pre-load (and no-devices) fallback.
+  const shownIp = activeDevice?.ip ?? deviceIp;
 
   const scheduleAuto = useCallback(() => {
     if (!autoOn.current) return;
@@ -345,7 +348,7 @@ export function App() {
   return (
     <>
       <Header
-        deviceIp={deviceIp}
+        deviceIp={shownIp}
         configFail={configFail}
         identity={identity}
         onToggleRun={(running) =>

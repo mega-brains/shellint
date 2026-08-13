@@ -17,6 +17,9 @@ const VOLATILE = [
   "#probeProgress",
   // Live /api/config minify flags (smoke can toggle; peek text drifts).
   "#optionsPeek",
+  // Pass/warn/skip tallies from a real /api/check run — the skipped count moves
+  // with whatever device profile + probe cache is mirrored into types/.
+  "#checkPeek",
   // Sits at (x≈18, y≈5) — right where a fresh page's un-moved cursor defaults
   // to — and is a dotted underline plus a 4-direction text-shadow halo on
   // small monospace text, which is the exact combination CDP/Chromium render
