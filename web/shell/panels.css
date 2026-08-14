@@ -61,7 +61,6 @@ main:has(#logsPanel:not(.collapsed)) #logsPanel {
   display: flex;
   flex-wrap: nowrap;
   align-items: center;
-  gap: 0.4rem 0.75rem;
   cursor: pointer;
   user-select: none;
   min-width: 0;
@@ -93,6 +92,10 @@ main:has(#logsPanel:not(.collapsed)) #logsPanel {
   color: var(--muted);
   font-weight: 600;
   flex-shrink: 0;
+}
+
+.panel-head .panel-toggle + * {
+  margin-inline-end: .6em;
 }
 
 .panel-peek {
@@ -135,7 +138,8 @@ main:has(#logsPanel:not(.collapsed)) #logsPanel {
 
 .options.collapsed .options-body { display: none; }
 
-.options-body { margin-top: 0.35rem; }
+.options-body { 
+top: 0.35rem; }
 
 .options-note {
   margin: 0 0 0.35rem;

@@ -117,6 +117,28 @@ test.describe("design baselines", () => {
     });
   });
 
+  test("build menu stays clickable below header", async ({ page }) => {
+    await page.setViewportSize({ width: 1012, height: 647 });
+    await openSettled(page);
+    await page.locator("#btnBuildMenu").click();
+    const itemWidths = await page.locator("#buildMenu > li > button").evaluateAll(
+      (items) => items.map((item) => {
+        const { width } = item.getBoundingClientRect();
+        return width === item.parentElement!.getBoundingClientRect().width;
+      }),
+    );
+    expect(itemWidths).toEqual([true, true, true]);
+    const reachable = await page.locator("#buildMenu").evaluate((menu) => {
+      const box = menu.getBoundingClientRect();
+      const target = document.elementFromPoint(
+        box.left + box.width / 2,
+        box.top + box.height / 2,
+      );
+      return target?.closest("#buildMenu") === menu;
+    });
+    expect(reachable).toBe(true);
+  });
+
   test("device + logs footer expanded", async ({ page }) => {
     await openSettled(page);
     await page.locator("#deviceHead").click();

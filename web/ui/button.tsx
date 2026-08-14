@@ -2,12 +2,24 @@ import type { ComponentChildren, JSX } from "preact";
 import { cloneElement, isValidElement, toChildArray } from "preact";
 import { useEffect, useRef, useState } from "preact/hooks";
 
-export type SplitButtonProps = {
+export type ButtonProps = JSX.ButtonHTMLAttributes<HTMLButtonElement> & {
+  children: ComponentChildren;
+};
+
+export function Button(props: ButtonProps) {
+  const { children, type, ...attrs } = props;
+  return (
+    <button {...attrs} type={type ?? "button"}>
+      {children}
+    </button>
+  );
+}
+
+export type ButtonDropdownProps = {
   rootId: string;
   toggleId: string;
   menuId: string;
   primary: ComponentChildren;
-  /** Single menu element (`ul` or `div`); `hidden` is applied from open state. */
   menu: ComponentChildren;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -19,10 +31,7 @@ export type SplitButtonProps = {
   closeOnOutside?: boolean;
 };
 
-/**
- * A primary action plus a dropdown of variants. Controlled or uncontrolled.
- */
-export function SplitButton(props: SplitButtonProps) {
+export function ButtonDropdown(props: ButtonDropdownProps) {
   const rootRef = useRef<HTMLDivElement>(null);
   const [internalOpen, setInternalOpen] = useState(false);
   const controlled = props.open !== undefined;
@@ -62,8 +71,7 @@ export function SplitButton(props: SplitButtonProps) {
     props.onPick?.(item);
   };
 
-  const kids = toChildArray(props.menu);
-  const menuChild = kids[0];
+  const menuChild = toChildArray(props.menu)[0];
   const menu = isValidElement(menuChild)
     ? cloneElement(menuChild, {
         hidden: !open,
@@ -82,8 +90,7 @@ export function SplitButton(props: SplitButtonProps) {
   return (
     <div class={props.className ?? "split"} id={props.rootId} ref={rootRef}>
       {props.primary}
-      <button
-        type="button"
+      <Button
         id={props.toggleId}
         class="split-toggle"
         aria-haspopup={props.toggleHasPopup ?? "menu"}
@@ -94,7 +101,7 @@ export function SplitButton(props: SplitButtonProps) {
         onClick={onToggle}
       >
         ▾
-      </button>
+      </Button>
       {menu}
     </div>
   );

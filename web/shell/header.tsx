@@ -1,6 +1,7 @@
 import type { ComponentChildren } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import type { DeviceIdentity } from "../device/device-panel";
+import { Button } from "../ui/button";
 
 const STATE_GLYPH = { running: "▶", stopped: "■", offline: "✕" } as const;
 type RunState = keyof typeof STATE_GLYPH;
@@ -105,15 +106,14 @@ export function Header(props: HeaderProps) {
         hidden={statusHidden}
       >
         {props.status}
-        <button
-          type="button"
+        <Button
           class="status-close"
           onClick={() => setStatusHidden(true)}
           aria-label="Dismiss status"
           title="Dismiss status"
         >
           ×
-        </button>
+        </Button>
       </p>
     </header>
   );
@@ -130,12 +130,12 @@ function RunIcon(props: { state: RunState; onToggle?: () => void }) {
     const preview: RunState =
       props.state === "running" ? "stopped" : "running";
     return (
-      <button type="button" {...common} onClick={props.onToggle}>
+      <Button {...common} onClick={props.onToggle}>
         <span class="run-glyph run-glyph-current">{STATE_GLYPH[props.state]}</span>
         <span class="run-glyph run-glyph-action" aria-hidden="true">
           {STATE_GLYPH[preview]}
         </span>
-      </button>
+      </Button>
     );
   }
   return (

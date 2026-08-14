@@ -1,6 +1,6 @@
 import type { JSX } from "preact";
 import { useEffect, useState } from "preact/hooks";
-import { SplitButton, CLOSE_MENUS_EVENT, closeAllMenus } from "../ui/split-button";
+import { Button, ButtonDropdown, CLOSE_MENUS_EVENT, closeAllMenus } from "../ui/button";
 import {
   probeAvailable,
   type ProbeResult,
@@ -110,7 +110,7 @@ export function Toolbar(props: ToolbarProps) {
 
   return (
     <div class="toolbar">
-      <SplitButton
+      <ButtonDropdown
         rootId="saveSplit"
         toggleId="btnSaveMenu"
         menuId="saveMenu"
@@ -132,44 +132,41 @@ export function Toolbar(props: ToolbarProps) {
           else props.onCheckpoint();
         }}
         primary={
-          <button
-            type="button"
+          <Button
             id="btnSave"
             title="Save editor contents to scripts/main.ts"
             disabled={saveDisabled}
             onClick={props.onSave}
           >
             Save
-          </button>
+          </Button>
         }
         menu={
           <ul class="menu" id="saveMenu" role="menu">
             <li role="none">
-              <button
-                type="button"
+              <Button
                 role="menuitem"
                 data-action="checkpoint"
                 title="Save a version-history checkpoint of the file on disk right now, independent of the next Save"
               >
                 checkpoint
-              </button>
+              </Button>
             </li>
             <li role="none">
-              <button
-                type="button"
+              <Button
                 role="menuitem"
                 id="btnHistory"
                 data-action="history"
                 title="Browse and restore previous saved versions of scripts/main.ts"
               >
                 history…
-              </button>
+              </Button>
             </li>
           </ul>
         }
       />
 
-      <SplitButton
+      <ButtonDropdown
         rootId="buildSplit"
         toggleId="btnBuildMenu"
         menuId="buildMenu"
@@ -190,8 +187,7 @@ export function Toolbar(props: ToolbarProps) {
           props.onBuildPick(action);
         }}
         primary={
-          <button
-            type="button"
+          <Button
             id="btnBuild"
             class={props.buildRunning ? "running" : undefined}
             title={buildTitle}
@@ -200,39 +196,36 @@ export function Toolbar(props: ToolbarProps) {
           >
             <span id="btnBuildLabel">{BUILD_LABEL[props.buildAction]}</span>
             <span class="btn-progress" id="btnBuildProgress" />
-          </button>
+          </Button>
         }
         menu={
           <ul class="menu" id="buildMenu" role="menu">
             <li role="none">
-              <button
-                type="button"
+              <Button
                 role="menuitem"
                 data-action="both"
                 title="Build, then run the compliance check over the fresh artifacts"
               >
                 build + check
-              </button>
+              </Button>
             </li>
             <li role="none">
-              <button
-                type="button"
+              <Button
                 role="menuitem"
                 data-action="build"
                 title="Compile TypeScript to ES5 and emit debug/prod raw + minified artifacts under dist/"
               >
                 build
-              </button>
+              </Button>
             </li>
             <li role="none">
-              <button
-                type="button"
+              <Button
                 role="menuitem"
                 data-action="check"
                 title="Shelly/Espruino compliance check of scripts/main.ts (and dist artifacts when present). Works offline; adds device capability checks when the device answers."
               >
                 check
-              </button>
+              </Button>
             </li>
             <li role="none" class="menu-sep" />
             <li role="none">
@@ -273,7 +266,7 @@ export function Toolbar(props: ToolbarProps) {
         }
       />
 
-      <SplitButton
+      <ButtonDropdown
         rootId="deploySplit"
         toggleId="btnDeployMenu"
         menuId="deployMenu"
@@ -295,15 +288,14 @@ export function Toolbar(props: ToolbarProps) {
           });
         }}
         primary={
-          <button
-            type="button"
+          <Button
             id="btnDeploy"
             title={deployTitle}
             disabled={deployDisabled}
             onClick={props.onDeploy}
           >
             {`Deploy ${mode} · ${shortMinify(minify)}${props.deployTarget ? ` → ${props.deployTarget}` : ""}`}
-          </button>
+          </Button>
         }
         menu={
           <ul class="menu" id="deployMenu" role="menu">
@@ -315,7 +307,7 @@ export function Toolbar(props: ToolbarProps) {
         }
       />
 
-      <SplitButton
+      <ButtonDropdown
         rootId="probeSplit"
         toggleId="btnProbeLog"
         menuId="probeLog"
@@ -332,15 +324,14 @@ export function Toolbar(props: ToolbarProps) {
         toggleTitle="Show the last probe run's per-feature results"
         toggleHasPopup="true"
         primary={
-          <button
-            type="button"
+          <Button
             id="btnProbe"
             title="Run Script.Eval capability checks on the device and write types/generated-probe.json — stored device scripts are never overwritten"
             disabled={props.busy}
             onClick={props.onProbe}
           >
             Probe
-          </button>
+          </Button>
         }
         menu={
           <div class="menu probe-log" id="probeLog">
@@ -352,15 +343,14 @@ export function Toolbar(props: ToolbarProps) {
                 <span class="probe-log-at" title="When this capture was taken">
                   {formatAt(props.probeCapture.at)}
                 </span>
-                <button
-                  type="button"
+                <Button
                   id="probeLogPath"
                   class="probe-log-path"
                   title={`Open ${props.probeCapture.path}`}
                   onClick={() => props.onShowCapture?.()}
                 >
                   {props.probeCapture.path}
-                </button>
+                </Button>
               </div>
             ) : null}
             <div class="probe-log-row">
@@ -375,8 +365,7 @@ export function Toolbar(props: ToolbarProps) {
                   setProbeFilter(e.currentTarget.value)
                 }
               />
-              <button
-                type="button"
+              <Button
                 id="probeLogFailBtn"
                 class="probe-log-quick"
                 aria-pressed={probeFailOnly ? "true" : "false"}
@@ -384,7 +373,7 @@ export function Toolbar(props: ToolbarProps) {
                 onClick={() => setProbeFailOnly((v) => !v)}
               >
                 failed only
-              </button>
+              </Button>
             </div>
             <ProbeCopyButtons results={shown} />
             <ol class="probe-log-list" id="probeLogList">
@@ -418,15 +407,14 @@ function DeployItem(props: { mode: Mode; minify: Minify }) {
     props.minify === "raw" ? "readable / non-minified" : "minified";
   return (
     <li role="none">
-      <button
-        type="button"
+      <Button
         role="menuitem"
         data-mode={props.mode}
         data-minify={props.minify}
         title={`Deploy ${file} (${env}, ${shape})`}
       >
         {label}
-      </button>
+      </Button>
     </li>
   );
 }

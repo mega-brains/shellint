@@ -4,7 +4,7 @@ import { Collapsible } from "../ui/collapsible";
 import { createHistory } from "../charts/metric-history";
 import { MiniBars } from "../charts/mini-bars";
 import { MetricSwapCell } from "../stats/metric-swap";
-import { CLOSE_MENUS_EVENT, closeAllMenus } from "../ui/split-button";
+import { Button, CLOSE_MENUS_EVENT, closeAllMenus } from "../ui/button";
 import type { SparkPoint } from "../charts/spark";
 import type { api as apiFn } from "../lib/api";
 import {
@@ -274,8 +274,7 @@ export function DevicePanel(props: DevicePanelProps) {
               eco
             </label>
             <div class="device-menu" id="deviceMenu" ref={menuRef}>
-              <button
-                type="button"
+              <Button
                 id="btnDeviceMenu"
                 class="device-menu-btn"
                 data-testid="device-menu-btn"
@@ -287,7 +286,7 @@ export function DevicePanel(props: DevicePanelProps) {
                 onClick={onMenuToggle}
               >
                 ⋯
-              </button>
+              </Button>
               <ul
                 class="menu"
                 id="deviceMenuList"
@@ -295,8 +294,7 @@ export function DevicePanel(props: DevicePanelProps) {
                 hidden={!menuOpen}
               >
                 <li role="none">
-                  <button
-                    type="button"
+                  <Button
                     role="menuitem"
                     data-testid="device-reboot-item"
                     title="Shelly.Reboot — soft restart (not factory reset)"
@@ -307,7 +305,7 @@ export function DevicePanel(props: DevicePanelProps) {
                     }}
                   >
                     Reboot device
-                  </button>
+                  </Button>
                 </li>
               </ul>
             </div>

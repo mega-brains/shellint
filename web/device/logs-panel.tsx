@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import { Collapsible } from "../ui/collapsible";
+import { Button } from "../ui/button";
 import { Sparkline } from "../charts/sparkline";
 import type { SparkPoint, SparkSeries } from "../charts/spark";
 import type { api as apiFn } from "../lib/api";
@@ -264,8 +265,7 @@ export function LogsPanel(props: LogsPanelProps) {
         <>
           <h2>logs</h2>
           <div class="logs-controls">
-            <button
-              type="button"
+            <Button
               id="btnLogs"
               disabled={busy}
               title="Enable sys.debug.websocket on the device and stream ws://<ip>/debug/log"
@@ -275,9 +275,8 @@ export function LogsPanel(props: LogsPanelProps) {
               }}
             >
               {streaming ? "stop stream" : "start stream"}
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
               class="logs-clear"
               id="btnLogsClear"
               title="Clear the lines held in the browser — the device buffer is untouched"
@@ -293,7 +292,7 @@ export function LogsPanel(props: LogsPanelProps) {
               }}
             >
               clear
-            </button>
+            </Button>
             <input
               type="search"
               id="logsFilter"

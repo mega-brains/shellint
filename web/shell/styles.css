@@ -63,7 +63,7 @@ body {
   background: rgba(243, 241, 236, 0.92);
   backdrop-filter: blur(8px);
   border-bottom: 1px solid var(--line);
-  overflow-x: auto;
+  overflow: visible;
 }
 
 .top-row {
@@ -349,6 +349,13 @@ button.running .btn-progress {
   font-size: 0.85rem;
 }
 
+.menu > li > button,
+.menu > li > .menu-check {
+  width: 100%;
+}
+
+.menu > li > .menu-check { display: block; }
+
 .menu button:hover {
   background: #e7efe9;
   filter: none;
@@ -361,10 +368,19 @@ button.running .btn-progress {
 }
 
 .menu .menu-check {
-  padding: 0.35rem 0.6rem;
+  border-radius: 3px;
+  padding: 0.45rem 0.6rem;
   font-family: var(--sans-narrow);
   font-size: 0.85rem;
+  cursor: pointer;
+
+  & input {
+    margin-inline-end: 1em; vertical-align: middle;
+  }
 }
+
+.menu .menu-check:hover,
+.menu .menu-check:focus-within { background: #e7efe9; }
 
 /* No gap: the splitter is its own spacing, drawn as a 2px line inside it. */
 .workspace {

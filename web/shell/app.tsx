@@ -17,7 +17,7 @@ import {
   clearBuildErrors,
   reportBuildFailure,
 } from "../editor/build-error-gutter";
-import { closeAllMenus } from "../ui/split-button";
+import { closeAllMenus } from "../ui/button";
 import { isEmptySizes, type Sizes } from "../lib/sizes";
 import { ScriptHistoryModal } from "../history/script-history-modal";
 import { useScriptHistory } from "../history/use-script-history";
