@@ -7,6 +7,8 @@ import type { Sizes } from "../lib/sizes";
 export type InitialLoadSetters = {
   setDeviceIp: (v: string) => void;
   setConfigFail: (v: string | undefined) => void;
+  /** `true` under the static/offline build (M17) — local-api.ts's `GET /api/config` sets it. */
+  setIsStatic: (v: boolean) => void;
   setCatalog: (v: CheckCatalog | null) => void;
   setDash: (fn: (prev: DashboardPatch) => DashboardPatch) => void;
   setSizeDebug: (v: Sizes) => void;
@@ -23,8 +25,10 @@ export function useInitialLoad(s: InitialLoadSetters) {
       try {
         const cfg = await api<{
           config: { deviceIp: string; scriptId: number };
+          static?: boolean;
         }>("/api/config");
         s.setDeviceIp(cfg.config.deviceIp);
+        s.setIsStatic(cfg.static === true);
       } catch {
         s.setConfigFail("config unavailable");
       }

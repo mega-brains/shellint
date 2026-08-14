@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { DIST_DIR, SCRIPT_PATH } from "../core/paths.ts";
 import { lintScriptFile } from "./lint-source.ts";
 import { lintSemanticsFile } from "./lint-semantics.ts";
-import { lintAdvisoriesFile } from "./lint-advisories.ts";
+import { lintAdvisoriesFile, typeDeclarationFiles } from "./lint-advisories.ts";
 import { lintConnected } from "./lint-connected.ts";
 import { lintProbe } from "./lint-probe.ts";
 import {
@@ -15,6 +15,7 @@ import type { Finding } from "./lint-util.ts";
 import { checkBuildArtifacts } from "./dialect-check.ts";
 import { analyzeScriptFile, type ScriptStats } from "../script/script-stats.ts";
 import { summarizeChecks, type CheckRow } from "./check-catalog.ts";
+import { readProbeReport } from "../probe/probe-typings.ts";
 
 export type CheckProfileInfo = {
   source: "live" | "cache";
@@ -154,6 +155,8 @@ export async function runCheck(opts: CheckOptions = {}): Promise<CheckReport> {
     checks: summarizeChecks(findings, {
       profile: profile !== null,
       artifacts,
+      probe: readProbeReport() !== null,
+      types: typeDeclarationFiles().length > 0,
     }),
     artifacts,
     stats,

@@ -20,7 +20,7 @@ export type CheckGroupId =
 export type CheckGroup = { id: CheckGroupId; label: string; about: string };
 
 /** What a check needs beyond the saved source before it can run at all. */
-export type CheckNeeds = "profile" | "artifacts";
+export type CheckNeeds = "profile" | "artifacts" | "probe" | "types";
 
 export type CheckSpec = {
   rule: string;
@@ -296,6 +296,7 @@ export const CHECK_CATALOG: CheckSpec[] = [
   {
     rule: "probe-absent-api",
     group: "connected",
+    needs: "probe",
     about:
       "the device probe answered \"undefined\" for this API — error when the probe is the active device's, advisory when it came from another one",
   },
@@ -309,6 +310,7 @@ export const CHECK_CATALOG: CheckSpec[] = [
   {
     rule: "dead-code",
     group: "advisories",
+    needs: "types",
     about: "unused declarations still cost bytes and JsVars on device",
   },
   {
@@ -329,6 +331,7 @@ export const CHECK_CATALOG: CheckSpec[] = [
   {
     rule: "@meta-must-survive",
     group: "advisories",
+    needs: "artifacts",
     about: "minifiers strip comments, but the device needs @meta to create VCs",
   },
 
@@ -369,11 +372,17 @@ export type CheckContext = {
   profile: boolean;
   /** Build artifacts the post-compile guard could read. */
   artifacts: string[];
+  /** A device capability probe (types/generated-probe.json) was readable. */
+  probe: boolean;
+  /** types/*.d.ts were readable for the dead-code TS program. */
+  types: boolean;
 };
 
 function unmetNeed(spec: CheckSpec, ctx: CheckContext): boolean {
   if (spec.needs === "profile") return !ctx.profile;
   if (spec.needs === "artifacts") return ctx.artifacts.length === 0;
+  if (spec.needs === "probe") return !ctx.probe;
+  if (spec.needs === "types") return !ctx.types;
   return false;
 }
 

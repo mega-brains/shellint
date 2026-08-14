@@ -13,7 +13,7 @@ import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "no
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { minify } from "terser";
+import { reattachMetaAndValidate } from "../shared/minify-adv-core.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
@@ -21,19 +21,6 @@ const root = path.resolve(__dirname, "..");
 const ENGINE = "espruino-esprima";
 const DEFAULT_BIN = path.join(root, "node_modules", "espruino", "bin", "espruino-cli.js");
 const TIMEOUT_MS = 15000;
-
-/** The CLI drops all comments, so `@meta` blocks are re-attached verbatim. */
-const META_COMMENT = /\/\*(?:[^*]|\*(?!\/))*@meta(?:[^*]|\*(?!\/))*\*\//g;
-
-/** Terser is only used as a parser here — broken output must not reach a device. */
-async function parses(code) {
-  try {
-    await minify(code, { compress: false, mangle: false });
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 /**
  * @param {string} code
@@ -82,16 +69,9 @@ export async function minifyAdvanced(code, options = {}) {
       return { ok: false, reason: "espruino produced empty output" };
     }
 
-    const meta = code.match(META_COMMENT);
-    if (meta) {
-      const missing = meta.filter((c) => !out.includes(c));
-      if (missing.length > 0) out = `${missing.join("\n")}\n${out}`;
-    }
-
-    if (!(await parses(out))) {
-      return { ok: false, reason: "espruino output does not parse" };
-    }
-    return { ok: true, code: out, engine: ENGINE };
+    const validated = await reattachMetaAndValidate(code, out);
+    if (!validated.ok) return validated;
+    return { ok: true, code: validated.code, engine: ENGINE };
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

@@ -7,12 +7,9 @@ import { EditorHost } from "../editor/editor-host";
 import { BuildPanel, type DashboardPatch } from "../stats/dashboard";
 import { CheckPanel, summarize, type CheckCatalog, type CheckReport, type Finding } from "../check/check-panel";
 import { OptionsPanel } from "./options-panel";
-import { DevicePanel, type DeviceIdentity } from "../device/device-panel";
-import { LogsPanel } from "../device/logs-panel";
 import { api } from "../lib/api";
 import { createDeployGate } from "../device/deploy-gate";
 import { setDirtyBaseline } from "../editor/dirty-gutter";
-import { ImportBanner, useSlotImport } from "../device/use-slot-import";
 import {
   clearBuildErrors,
   reportBuildFailure,
@@ -21,14 +18,9 @@ import { closeAllMenus } from "../ui/button";
 import { isEmptySizes, type Sizes } from "../lib/sizes";
 import { ScriptHistoryModal } from "../history/script-history-modal";
 import { useScriptHistory } from "../history/use-script-history";
-import { useProbe } from "../probe/use-probe";
-import { useProbeBanner } from "../probe/use-probe-banner";
-import { ProbeBanner } from "../probe/probe-banner";
-import { useProbeEcoGate } from "../probe/probe-eco-modal";
-import { ProbeCaptureModal } from "../probe/probe-capture-modal";
-import { useDevices } from "../device/use-devices";
-import { DevicePicker } from "../device/device-picker";
 import { useInitialLoad } from "./use-initial-load";
+import { useDeviceSection } from "./device-section";
+import { StaticFileControls } from "./static-file-controls";
 
 const AUTO_KEY = "shelly-devroom.autoBuildCheck";
 
@@ -50,9 +42,7 @@ export function App() {
   );
   const [deviceIp, setDeviceIp] = useState("");
   const [configFail, setConfigFail] = useState<string | undefined>();
-  const [identity, setIdentity] = useState<DeviceIdentity | null>(null);
-  const [deviceMeta, setDeviceMeta] = useState("—");
-  const [deviceOnline, setDeviceOnline] = useState(false);
+  const [isStatic, setIsStatic] = useState(false);
   const [sizeDebug, setSizeDebug] = useState<Sizes>({});
   const [sizeProd, setSizeProd] = useState<Sizes>({});
   const [dash, setDash] = useState<DashboardPatch>({ history: [] });
@@ -66,7 +56,6 @@ export function App() {
     refresh: () => Promise<void>;
     previewing: () => boolean;
   } | null>(null);
-  const deviceRef = useRef<{ refresh: () => Promise<void> } | null>(null);
   const deployGate = useRef(createDeployGate()).current;
   const autoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoOn = useRef(autoBuildCheck);
@@ -97,16 +86,35 @@ export function App() {
     [setStatus, syncDeployReady],
   );
 
+  // Owns everything that only makes sense with a real device on the LAN —
+  // gated internally on `isStatic` (web/shell/device-section.tsx). Called
+  // before checkScript below since its deps array reads deviceSection.deviceOnline.
+  const deviceSection = useDeviceSection({
+    isStatic,
+    viewRef,
+    setStatus,
+    withBusy,
+    deployGate,
+    syncDeployReady,
+    deviceIp,
+  });
+
+  // Folded into the shared dashboard patch rather than read directly, since
+  // BuildPanel already takes its `memPeak` from `dash`, not from device state.
+  useEffect(() => {
+    setDash((prev) => ({ ...prev, memPeak: deviceSection.memPeak }));
+  }, [deviceSection.memPeak]);
+
   const checkScript = useCallback(
     async ({ quiet = false } = {}) => {
       if (!quiet) {
         setStatus(
-          deviceOnline ? "checking (with device)…" : "checking…",
+          deviceSection.deviceOnline ? "checking (with device)…" : "checking…",
         );
       }
       const data = await api<{ report: CheckReport }>("/api/check", {
         method: "POST",
-        body: JSON.stringify({ connected: deviceOnline }),
+        body: JSON.stringify({ connected: deviceSection.deviceOnline }),
       });
       setReport(data.report);
       setDialectFindings(null);
@@ -125,7 +133,7 @@ export function App() {
         !data.report.ok,
       );
     },
-    [deviceOnline, deployGate, setStatus, syncDeployReady],
+    [deviceSection.deviceOnline, deployGate, setStatus, syncDeployReady],
   );
 
   const checkScriptQuiet = useCallback(
@@ -133,7 +141,21 @@ export function App() {
     [checkScript],
   );
   const scriptHistory = useScriptHistory(viewRef, setStatus, checkScriptQuiet);
-  const slotImport = useSlotImport(viewRef, setStatus);
+
+  // Static build only (M17.6): a file opened via web/shell/static-file-controls.tsx
+  // already updated the editor doc and persisted through /api/script — this just
+  // runs the same bookkeeping onView does for the initial load.
+  const handleFileOpened = useCallback(
+    (source: string) => {
+      const view = viewRef.current;
+      if (view) setDirtyBaseline(view, source);
+      scriptHistory.markSaved(source);
+      void checkScriptQuiet().catch(() => {
+        /* check note stays until user runs Check */
+      });
+    },
+    [scriptHistory, checkScriptQuiet],
+  );
 
   const saveScript = useCallback(async () => {
     const view = viewRef.current;
@@ -145,9 +167,9 @@ export function App() {
     });
     setDirtyBaseline(view, source);
     scriptHistory.markSaved(source);
-    slotImport.clearImport();
+    deviceSection.clearImportedBuffer();
     setStatus(`saved (${new TextEncoder().encode(source).length} B)`);
-  }, [setStatus, scriptHistory, slotImport]);
+  }, [setStatus, scriptHistory, deviceSection]);
 
   const buildScript = useCallback(async (skipTypes = false) => {
     const view = viewRef.current;
@@ -230,60 +252,6 @@ export function App() {
     [buildAction, buildScript, checkScript, skipTypeCheck],
   );
 
-  const deployScript = useCallback(
-    async (choice = deployChoice) => {
-      const { mode, minify } = choice;
-      const label = minify === "raw" ? "non-minified" : "minified";
-      setStatus(`deploy ${mode}/${label}: connecting…`);
-      const data = await api<{
-        localBytes: number;
-        deviceLen: number | null;
-        status: string;
-        scriptId: number;
-      }>("/api/deploy", {
-        method: "POST",
-        body: JSON.stringify({ mode, minify }),
-      });
-      const len =
-        data.deviceLen != null
-          ? `device len ${data.deviceLen} (local ${data.localBytes})`
-          : `local ${data.localBytes} B`;
-      setStatus(
-        `deploy ${mode}/${label}: ${data.status} · scriptId ${data.scriptId} · ${len}`,
-      );
-      void deviceRef.current?.refresh();
-    },
-    [deployChoice, setStatus],
-  );
-
-  const devicesState = useDevices();
-  const activeDeviceId = devicesState.active?.device ?? null;
-
-  const { probeResults, probeNoteText, probeProgress, probeCapture, probeDevice } =
-    useProbe(setStatus, activeDeviceId, devicesState.sessionKey);
-  const [captureOpen, setCaptureOpen] = useState(false);
-
-  const { probeState, deleteCapture, runProbeFromBanner, skipProbeFromBanner } = useProbeBanner(
-    activeDeviceId,
-    devicesState.sessionKey,
-    probeDevice,
-    deployGate,
-    syncDeployReady,
-    setStatus,
-  );
-
-  const { requestProbe, ecoModal } = useProbeEcoGate(withBusy);
-
-  const activeDevice = devicesState.devices.find(
-    (d) => d.id === devicesState.active?.device,
-  );
-  const deployTarget = activeDevice
-    ? `${activeDevice.label}:${devicesState.active?.slot ?? "?"}`
-    : undefined;
-  // The active device is the source of truth once devices have loaded; the
-  // /api/config IP is only the pre-load (and no-devices) fallback.
-  const shownIp = activeDevice?.ip ?? deviceIp;
-
   const scheduleAuto = useCallback(() => {
     if (!autoOn.current) return;
     if (artifactsRef.current?.previewing()) return;
@@ -297,7 +265,7 @@ export function App() {
     }, 3000);
   }, [withBusy, saveScript, runBuildAction]);
 
-  useInitialLoad({ setDeviceIp, setConfigFail, setCatalog, setDash, setSizeDebug, setSizeProd });
+  useInitialLoad({ setDeviceIp, setConfigFail, setIsStatic, setCatalog, setDash, setSizeDebug, setSizeProd });
 
   const onView = useCallback(
     (view: EditorView) => {
@@ -326,46 +294,15 @@ export function App() {
   return (
     <>
       <Header
-        deviceIp={shownIp}
+        deviceIp={deviceSection.shownIp}
         configFail={configFail}
-        identity={identity}
-        onToggleRun={(running) =>
-          void withBusy(async () => {
-            setStatus(running ? "starting script…" : "stopping script…");
-            const data = await api<{
-              running: boolean | null;
-              scriptId: number;
-            }>("/api/device/script", {
-              method: "POST",
-              body: JSON.stringify({ running }),
-            });
-            const state =
-              data.running === null
-                ? "unknown"
-                : data.running
-                  ? "running"
-                  : "stopped";
-            setStatus(
-              `script ${data.scriptId} ${state}`,
-              data.running !== running,
-            );
-            void deviceRef.current?.refresh();
-          })
-        }
+        identity={deviceSection.identity}
+        onToggleRun={deviceSection.onToggleRun}
         status={status}
         statusError={statusError}
-        probeProgress={probeProgress}
-        deviceMeta={deviceMeta}
-        deviceSelector={
-          <DevicePicker
-            devicesState={devicesState}
-            withBusy={withBusy}
-            setStatus={setStatus}
-            onImportSlot={slotImport.importSlot}
-            captures={probeState.captures}
-            onDeleteCapture={deleteCapture}
-          />
-        }
+        probeProgress={deviceSection.probeProgress}
+        deviceMeta={deviceSection.deviceMeta}
+        deviceSelector={deviceSection.selector}
       >
         <Toolbar
           busy={busy}
@@ -376,6 +313,16 @@ export function App() {
           skipTypeCheck={skipTypeCheck}
           deployChoice={deployChoice}
           autoBuildCheck={autoBuildCheck}
+          staticMode={isStatic}
+          staticControls={
+            isStatic ? (
+              <StaticFileControls
+                viewRef={viewRef}
+                setStatus={setStatus}
+                onOpened={handleFileOpened}
+              />
+            ) : undefined
+          }
           onSkipTypeCheckChange={setSkipTypeCheck}
           onAutoChange={(on) => {
             setAutoBuildCheck(on);
@@ -393,17 +340,17 @@ export function App() {
             setBuildAction(action);
             void withBusy(() => runBuildAction(action));
           }}
-          onDeploy={() => void withBusy(() => deployScript())}
+          onDeploy={() => void withBusy(() => deviceSection.deploy(deployChoice))}
           onDeployPick={(choice) => {
             setDeployChoice(choice);
-            void withBusy(() => deployScript(choice));
+            void withBusy(() => deviceSection.deploy(choice));
           }}
-          onProbe={() => void requestProbe(probeDevice)}
-          probeResults={probeResults}
-          probeNote={probeNoteText}
-          probeCapture={probeCapture}
-          onShowCapture={() => setCaptureOpen(true)}
-          deployTarget={deployTarget}
+          onProbe={deviceSection.onProbe}
+          probeResults={deviceSection.probeResults}
+          probeNote={deviceSection.probeNoteText}
+          probeCapture={deviceSection.probeCapture}
+          onShowCapture={deviceSection.onShowCapture}
+          deployTarget={deviceSection.deployTarget}
         />
       </Header>
 
@@ -411,22 +358,7 @@ export function App() {
         onResize={() => viewRef.current?.requestMeasure()}
         editor={
           <EditorHost
-            banner={
-              <>
-                <ImportBanner
-                  imported={slotImport.imported}
-                  onDiscard={slotImport.discardImport}
-                />
-                {activeDevice ? (
-                  <ProbeBanner
-                    state={probeState}
-                    deviceLabel={activeDevice.label}
-                    onRunProbe={() => void requestProbe(runProbeFromBanner)}
-                    onSkip={() => void withBusy(skipProbeFromBanner)}
-                  />
-                ) : null}
-              </>
-            }
+            banner={deviceSection.editorBanner}
             onView={onView}
             onDocChange={scheduleAuto}
             onStatus={setStatus}
@@ -454,25 +386,7 @@ export function App() {
             <OptionsPanel onStatus={setStatus} />
           </>
         }
-        footer={
-          <>
-            <DevicePanel
-              key={devicesState.sessionKey}
-              api={api}
-              onStatus={setStatus}
-              onIdentity={(id) => {
-                setIdentity(id);
-                setDeviceOnline(id.state !== "offline");
-                setDash((prev) => ({ ...prev, memPeak: id.memPeak }));
-              }}
-              onMeta={setDeviceMeta}
-              onReady={(ctl) => {
-                deviceRef.current = ctl;
-              }}
-            />
-            <LogsPanel key={devicesState.sessionKey} api={api} onStatus={setStatus} />
-          </>
-        }
+        footer={deviceSection.footer}
       />
 
       <ScriptHistoryModal
@@ -486,13 +400,8 @@ export function App() {
         onClose={scriptHistory.closeHistory}
       />
 
-      {ecoModal}
-      <ProbeCaptureModal
-        open={captureOpen}
-        capture={probeCapture}
-        deviceId={activeDeviceId}
-        onClose={() => setCaptureOpen(false)}
-      />
+
+      {deviceSection.modals}
     </>
   );
 }

@@ -23,7 +23,7 @@ export type CheckSpec = {
   rule: string;
   group: string;
   about: string;
-  needs?: "profile" | "artifacts";
+  needs?: "profile" | "artifacts" | "probe" | "types";
 };
 
 export type CheckRow = CheckSpec & { status: CheckStatus; count: number };
@@ -52,6 +52,8 @@ export const MARK: Record<CheckStatus, string> = {
 export const WHY_SKIPPED: Record<string, string> = {
   profile: "needs a device profile — run Probe or Check while the device answers",
   artifacts: "needs dist/*.raw.js — run Build first",
+  probe: "needs a device capability probe — run Probe first",
+  types: "needs types/*.d.ts to be readable",
 };
 
 export type Badge = { cls: string; text: string; label?: string };

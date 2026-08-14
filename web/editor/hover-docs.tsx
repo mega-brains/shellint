@@ -24,7 +24,7 @@ interface ApiDocs {
  */
 let docs: ApiDocs = { entries: {}, byBareName: {} };
 
-fetch("/api-docs.json")
+fetch("./api-docs.json")
   .then((res) => (res.ok ? (res.json() as Promise<ApiDocs>) : null))
   .then((loaded) => {
     if (loaded) docs = loaded;

@@ -21,6 +21,9 @@ const SKIP_DIRS = new Set([
   // Minify benchmark inputs, not app source: they need bulk to be
   // representative, and nothing imports them. See bench/README.md.
   "bench",
+  // scripts/build-static.mjs's build output (M17.7) — same reasoning as dist/
+  // and web/dist/ below: generated, not authored.
+  "site",
 ]);
 // Device script authored by the user in the editor — not app source, can't
 // use imports (compiles module:none/noLib) so it can't be split like the rest.

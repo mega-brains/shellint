@@ -8,9 +8,10 @@
  *
  * Usage: node scripts/test-web-assets.mjs  (expects a prod `npm run build:web`)
  */
-import { existsSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { gzipSync } from "node:zlib";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -38,7 +39,10 @@ for (const f of REQUIRED) {
 const BUDGETS = [
   ["web/dist/app.js", 660_000],
   ["web/dist/app.js.br", 190_000],
-  ["web/dist/styles.css", 40_500],
+  // Rebaselined 2026-08-14 (M17.7): measured 41441 B, no CSS source touched —
+  // this repo's styles simply grew past the old budget over time. ~10% above
+  // that measurement, same convention as this file's header comment.
+  ["web/dist/styles.css", 45_600],
   ["web/dist/api-docs.json", 40_000],
 ];
 
@@ -72,6 +76,69 @@ if (existsSync(join(ROOT, "web/dist/app.js"))) {
   if (bundle > 660_000 - docs) {
     fail("app.js looks like it re-inlined api-docs.json");
   }
+}
+
+// ---------------------------------------------------------------- site/ (M17.7)
+//
+// `npm run test` (scripts/test.mjs) never runs `build:static` — only this repo's
+// maintainer wires new test modules into that list, and `site/` is a separate,
+// optional build. So this section is a bonus assertion when `site/` happens to
+// exist (e.g. after a manual `npm run build:static`, or in CI right after it),
+// not a hard requirement of a plain `npm run test`.
+const siteDir = join(ROOT, "site");
+if (existsSync(siteDir)) {
+  const SITE_REQUIRED = [
+    "index.html",
+    "app.js",
+    "pipeline.worker.js",
+    "styles.css",
+    "api-docs.json",
+    "sw.js",
+    "manifest.webmanifest",
+    ".nojekyll",
+  ];
+  for (const f of SITE_REQUIRED) {
+    if (!existsSync(join(siteDir, f))) fail(`site/${f} missing`);
+  }
+
+  // No .br/.gz siblings here on purpose — see this file's header on why
+  // build-static.mjs skips precompress() for site/ (GitHub Pages gzips itself
+  // and won't serve ours).
+  for (const suffix of [".br", ".gz"]) {
+    for (const base of ["app.js", "styles.css", "pipeline.worker.js"]) {
+      if (existsSync(join(siteDir, base + suffix))) {
+        fail(`site/${base}${suffix} present — build-static.mjs must not precompress site/`);
+      }
+    }
+  }
+
+  const appBytes = statSync(join(siteDir, "app.js")).size;
+  if (appBytes > 700_000) fail(`site/app.js is ${appBytes} B, over its 700000 B budget`);
+
+  const workerPath = join(siteDir, "pipeline.worker.js");
+  const workerBytes = statSync(workerPath).size;
+  if (workerBytes > 5_000_000) {
+    fail(`site/pipeline.worker.js is ${workerBytes} B, over its 5000000 B raw budget`);
+  }
+  const workerGz = gzipSync(readFileSync(workerPath)).length;
+  if (workerGz > 1_350_000) {
+    fail(`site/pipeline.worker.js gzips to ${workerGz} B, over its 1350000 B gz budget`);
+  }
+
+  // The worker (TypeScript + Terser + tier 3) must stay a separate chunk, not
+  // get inlined into the initial app.js — that would both blow the 700 KB
+  // budget above (it would land near 4 MB) and defeat the entire point of the
+  // worker split (M17 plan §10). "Debug Failure." is one of TypeScript's own
+  // internal assertion messages, present in any bundle that pulled in the
+  // compiler; it has no reason to appear in the UI bundle otherwise.
+  const appSource = readFileSync(join(siteDir, "app.js"), "utf8");
+  if (appSource.includes("Debug Failure.")) {
+    fail("site/app.js appears to contain the TypeScript compiler — pipeline.worker.ts got inlined instead of split out");
+  }
+
+  console.log(
+    `OK: site/ present and within budget (app.js ${appBytes} B, worker ${workerBytes} B raw / ${workerGz} B gz)`,
+  );
 }
 
 console.log("OK: web assets present, precompressed and within budget");

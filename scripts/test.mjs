@@ -28,6 +28,14 @@ const filters = argv.filter((a) => !a.startsWith("--"));
 
 /** Order is load-bearing: artifact readers run after the builds that write dist/. */
 const TESTS = [
+  // Parity first: both compare against the dist/ this file just built, before
+  // any later module rewrites devroom.json or scripts/main.ts underneath them.
+  "test-transpile-parity",
+  "test-pipeline-parity",
+  "test-static-pipeline",
+  "test-static-check",
+  "test-local-api",
+  "test-static-bundle",
   "test-dialect-artifacts",
   "test-dashboard",
   "test-tier3",
@@ -87,9 +95,14 @@ function runParallel(jobs) {
   );
 }
 
+// build:static is self-contained (it runs gen-api-docs and bundles its own CSS,
+// reading nothing out of web/dist), so it overlaps with the other two for free
+// — and running it here is what lets test-static-bundle assert against a real
+// site/ under a bare `npm run test`, not only under beforeCommit.
 await runParallel([
   ["npm", ["run", "build:shelly"]],
   ["npm", ["run", "build:web"]],
+  ["npm", ["run", "build:static"]],
 ]);
 
 const selected = TESTS.filter((t) => !filters.length || filters.some((f) => t.includes(f)));

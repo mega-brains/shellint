@@ -269,8 +269,12 @@ button.running .btn-progress {
 }
 
 /* Header actions share the compact outlined treatment of the device and slot
-   selectors. The split seam keeps the primary action and its menu distinct. */
-.toolbar .split > button {
+   selectors. The split seam keeps the primary action and its menu distinct.
+   Bare toolbar buttons (the static build's Save/Open/Download, which have no
+   menu to hang off a split) are included so every control in the row reads as
+   one family instead of falling through to the global filled `button` style. */
+.toolbar .split > button,
+.toolbar > button {
   padding: 0.25rem 0.5rem;
   border-color: var(--line);
   border-radius: 2px;
@@ -293,13 +297,15 @@ button.running .btn-progress {
 }
 
 .toolbar .split > button:hover:not(:disabled),
+.toolbar > button:hover:not(:disabled),
 .toolbar .split > button[aria-expanded="true"] {
   border-color: var(--accent);
   box-shadow: inset 0 -2px 0 var(--accent);
   filter: none;
 }
 
-.toolbar .split > button:focus-visible {
+.toolbar .split > button:focus-visible,
+.toolbar > button:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
@@ -309,7 +315,8 @@ button.running .btn-progress {
 @media (min-width: 1001px) {
   .toolbar { gap: 0.35rem; }
 
-  .toolbar .split > button {
+  .toolbar .split > button,
+  .toolbar > button {
     padding: 0.35rem 0.65rem;
     font-size: 0.82rem;
   }

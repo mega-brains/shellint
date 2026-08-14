@@ -22,6 +22,15 @@ run = "npm run build:web"
 description = "Build Shelly dual artifacts + web UI bundle (parallel)"
 depends = ["build:shelly", "build:web"]
 
+[tasks."build:static"]
+description = "Build the static/offline GitHub Pages bundle into site/ (M17)"
+run = "npm run build:static"
+
+[tasks."preview:static"]
+description = "Serve site/ with a plain static file server — proves build:static needs no server (M17)"
+depends = "build:static"
+run = "npm run preview:static -- \"$@\""
+
 [tasks.deploy]
 description = "Build then deploy (MODE=debug|prod, MINIFY=min|raw)"
 # Usage: mise run deploy -- debug min   OR   MODE=prod MINIFY=raw mise run deploy
@@ -71,9 +80,10 @@ run = "npm run test:e2e"
 
 [tasks.b]
 alias="beforeCommit"
-description = "Pre-commit gate: line limit + typecheck + build run in parallel, then test, then e2e"
+description = "Pre-commit gate: line limit + typecheck + build run in parallel, then static build, test, then e2e"
 depends = ["check:lines", "typecheck", "build"]
 run = """
+npm run build:static
 npm run test
 npm run test:e2e
 """

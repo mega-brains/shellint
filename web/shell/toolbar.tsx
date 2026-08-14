@@ -1,4 +1,4 @@
-import type { JSX } from "preact";
+import type { ComponentChildren, JSX } from "preact";
 import { useEffect, useState } from "preact/hooks";
 import { Button, ButtonDropdown, CLOSE_MENUS_EVENT, closeAllMenus } from "../ui/button";
 import {
@@ -41,6 +41,13 @@ export type ToolbarProps = {
   skipTypeCheck: boolean;
   deployChoice: { mode: Mode; minify: Minify };
   autoBuildCheck: boolean;
+  /** Static/offline build (M17): device-touching controls (Deploy, Probe) and
+   * the server-backed script history (history/checkpoint) don't apply — see
+   * web/shell/device-section.tsx. */
+  staticMode?: boolean;
+  /** `web/shell/static-file-controls.tsx` (M17.6), constructed by app.tsx — kept as
+   * an opaque slot here rather than a static-only import (see that file's header). */
+  staticControls?: ComponentChildren;
   onSkipTypeCheckChange: (skip: boolean) => void;
   onAutoChange: (on: boolean) => void;
   onSave: () => void;
@@ -266,6 +273,7 @@ export function Toolbar(props: ToolbarProps) {
         }
       />
 
+      {props.staticMode ? null : (
       <ButtonDropdown
         rootId="deploySplit"
         toggleId="btnDeployMenu"
@@ -306,7 +314,9 @@ export function Toolbar(props: ToolbarProps) {
           </ul>
         }
       />
+      )}
 
+      {props.staticMode ? null : (
       <ButtonDropdown
         rootId="probeSplit"
         toggleId="btnProbeLog"
@@ -389,6 +399,9 @@ export function Toolbar(props: ToolbarProps) {
           </div>
         }
       />
+      )}
+
+      {props.staticControls}
     </div>
   );
 }

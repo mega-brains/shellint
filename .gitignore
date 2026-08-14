@@ -5,6 +5,7 @@ node_modules/
 dist/
 .tsc-out/
 web/dist/
+site/
 .devroom/
 test-results/
 playwright-report/

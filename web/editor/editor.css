@@ -11,6 +11,14 @@
   flex-direction: column;
 }
 
+/* Drag-over feedback for web/shell/static-file-controls.tsx's drop-to-open
+   (M17.6, static build only — dragover only fires the class when a file is
+   actually being dragged). */
+.editor.file-drop-active {
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+}
+
 .editor .cm-host {
   flex: 1 1 auto;
   min-height: 0;

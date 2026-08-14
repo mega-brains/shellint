@@ -30,16 +30,23 @@ export type TestResult =
  * switch — components that own live device state (device panel, logs panel)
  * key off it so a switch resets them instead of blending two devices.
  */
-export function useDevices() {
+/**
+ * `enabled: false` (the static/offline build — M17) keeps the mount-time
+ * fetch from firing at all. The rest of the device UI already short-circuits
+ * on an empty device list, so leaving the list empty is enough to keep every
+ * downstream probe/slot hook quiet too.
+ */
+export function useDevices(enabled = true) {
   const [devices, setDevices] = useState<Device[]>([]);
   const [active, setActive] = useState<ActiveSelection>(null);
   const [sessionKey, setSessionKey] = useState(0);
 
   const refresh = useCallback(async () => {
+    if (!enabled) return;
     const data = await api<{ devices: Device[]; active: ActiveSelection }>("/api/devices");
     setDevices(data.devices);
     setActive(data.active);
-  }, []);
+  }, [enabled]);
 
   useEffect(() => {
     void refresh().catch(() => {

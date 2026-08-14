@@ -49,7 +49,7 @@ export function parseMeta(source: string): MetaBlock {
   }
 }
 
-function typeDeclarationFiles(): string[] {
+export function typeDeclarationFiles(): string[] {
   const dir = join(ROOT, "types");
   if (!existsSync(dir)) return [];
   return readdirSync(dir)

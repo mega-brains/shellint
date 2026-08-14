@@ -34,8 +34,11 @@ const LOG_CALLEES = new Set([
 /** `#m <series> <value>` metric lines are parsed by server/device/debug-log.ts. */
 const METRIC_PREFIX = "#m";
 
+// Buffer.byteLength is a Node global; this module is on the browser path
+// (shared/device-pipeline.mjs -> intern-strings.mjs), so use the Web API
+// that both Node and a browser Worker provide instead.
 function byteLen(s) {
-  return Buffer.byteLength(s, "utf8");
+  return new TextEncoder().encode(s).length;
 }
 
 function calleeName(expr) {
