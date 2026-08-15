@@ -18,6 +18,43 @@ export function calleeName(expr: ts.Expression): string | null {
   return null;
 }
 
+/** Literal or identifier key of an object-literal member: `{ get: … }`, `{ "get": … }`. */
+function propertyKey(prop: ts.ObjectLiteralElementLike): string | null {
+  if (!prop.name) return null;
+  return ts.isIdentifier(prop.name) || ts.isStringLiteralLike(prop.name)
+    ? prop.name.text
+    : null;
+}
+
+/**
+ * `Object.defineProperty(o, "k", { get: … })` — an accessor under another
+ * name, and the shape tsc's ES5 emit turns a class getter into.
+ */
+export function definesAccessor(node: ts.CallExpression): boolean {
+  if (calleeName(node.expression) !== "Object.defineProperty") return false;
+  const descriptor = node.arguments[2];
+  if (!descriptor || !ts.isObjectLiteralExpression(descriptor)) return false;
+  return descriptor.properties.some((p) => {
+    const key = propertyKey(p);
+    return key === "get" || key === "set";
+  });
+}
+
+/**
+ * True when `raw` (a literal's source text) carries a live `\uXXXX` escape.
+ * The backslash run before the `u` must be odd: in `"a\\ub"` the first
+ * backslash escapes the second, leaving a plain `u` the device accepts.
+ */
+export function hasUnicodeEscape(raw: string): boolean {
+  for (let i = 1; i < raw.length; i += 1) {
+    if (raw[i] !== "u") continue;
+    let slashes = 0;
+    for (let j = i - 1; j >= 0 && raw[j] === "\\"; j -= 1) slashes += 1;
+    if (slashes % 2 === 1) return true;
+  }
+  return false;
+}
+
 export function stringArg(node: ts.CallExpression, index: number): string | null {
   const arg = node.arguments[index];
   if (!arg) return null;

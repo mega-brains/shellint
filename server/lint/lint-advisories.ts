@@ -3,6 +3,8 @@ import { join } from "node:path";
 import ts from "typescript";
 import { DIST_DIR, ROOT, SCRIPT_PATH } from "../core/paths.ts";
 import { analyzeSource } from "../script/script-stats.ts";
+import { lintComplexity } from "./lint-complexity.ts";
+import { lintMemory } from "./lint-memory.ts";
 import {
   calleeName,
   createSink,
@@ -203,6 +205,8 @@ export function lintAdvisories(
 
   visit(sf);
   unusedGlobals(sf, sink);
+  sink.findings.push(...lintMemory(sf, fileName));
+  sink.findings.push(...lintComplexity(sf, fileName));
 
   const stats = analyzeSource(source, fileName);
   const logs = stats.logging.consoleLog + stats.logging.print;

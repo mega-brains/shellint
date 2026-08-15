@@ -123,9 +123,33 @@
 .editor .cm-dirty-change { color: var(--warn); }
 .editor .cm-dirty-del { color: var(--danger); }
 
-/* Unified diff of two artifacts, tinted by the leading +/- column. */
-.editor .cm-diff-add { background: color-mix(in srgb, var(--ok) 14%, transparent); }
-.editor .cm-diff-del { background: color-mix(in srgb, var(--danger) 13%, transparent); }
+/*
+ * Unified diff of two artifacts, tinted by the leading +/- column. Same fills
+ * and inks as the side-by-side modal (web/diff/diff.css) — one grammar for
+ * both. The edge bar repeats .cm-stat-line's device: a changed row is legible
+ * as changed before any colour is decoded.
+ */
+.editor .cm-diff-add {
+  background: var(--diff-add-fill);
+  box-shadow: inset 3px 0 0 var(--diff-add-ink);
+  color: var(--ink);
+}
+
+.editor .cm-diff-del {
+  background: var(--diff-del-fill);
+  box-shadow: inset 3px 0 0 var(--diff-del-ink);
+  color: var(--ink);
+}
+
+/*
+ * Held at (0,2,1) on purpose: it has to outrank the highlighter's own
+ * single-class rules and stay under the ± mark rules below.
+ */
+.cm-diff-doc .cm-line span { color: inherit; }
+
+.editor .cm-line .cm-diff-mark { font-weight: 700; }
+.editor .cm-line .cm-diff-mark-add { color: var(--diff-add-ink); }
+.editor .cm-line .cm-diff-mark-del { color: var(--diff-del-ink); }
 
 .editor .cm-diff-meta {
   background: var(--surface-2);

@@ -25,6 +25,21 @@
   --gutter-ink: #4a5462;
   --tier-fill: #1f242c;
   --run-fill: #12312a;
+  /*
+   * Artifact diff (web/diff/, and the in-editor patch buffer). The two fills
+   * are translucent so CodeMirror's selection layer still shows through a
+   * changed line; every ratio below is against the fill as it composites over
+   * --surface. Add is deliberately the lighter of the two (1.17:1 apart in
+   * luminance) so the pair does not rest on hue alone.
+   * add fill 1.79:1 vs surface · del fill 1.53:1 · --ink on either ≥ 7.7:1
+   * ± glyph 5.65:1 (add) / 5.39:1 (del) · --ink on a word fill ≥ 5.0:1
+   */
+  --diff-add-fill: rgba(38, 206, 131, 0.28);
+  --diff-del-fill: rgba(250, 88, 81, 0.3);
+  --diff-add-ink: #69e0ae;
+  --diff-del-ink: #ff9d92;
+  --diff-add-word: #297054;
+  --diff-del-word: #94464b;
   --scrim: rgba(20, 23, 28, 0.7);
   --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.5);
   /* OS-bundled faces only (macOS / Windows / Linux) — nothing is downloaded. */
@@ -60,6 +75,18 @@
     --gutter-ink: #a8b1bd;
     --tier-fill: #f0f3f7;
     --run-fill: #e2f2ea;
+    /*
+     * add fill 1.35:1 vs surface · del fill 1.58:1 · --ink on either ≥ 11:1
+     * ± glyph 4.98:1 (add) / 5.05:1 (del) · --ink on a word fill ≥ 8.0:1
+     * The glyph inks are a step darker than --ok / --danger: those two only
+     * reach 4.6:1 on plain white, so they drop under AA on any fill at all.
+     */
+    --diff-add-fill: rgba(55, 172, 112, 0.3);
+    --diff-del-fill: rgba(212, 55, 38, 0.3);
+    --diff-add-ink: #0d6947;
+    --diff-del-ink: #9a2418;
+    --diff-add-word: #7fceaa;
+    --diff-del-word: #f0998f;
     --scrim: rgba(242, 244, 247, 0.7);
   }
 }
@@ -84,6 +111,13 @@
   --gutter-ink: #a8b1bd;
   --tier-fill: #f0f3f7;
   --run-fill: #e2f2ea;
+  /* Ratios as in the prefers-color-scheme block above. */
+  --diff-add-fill: rgba(55, 172, 112, 0.3);
+  --diff-del-fill: rgba(212, 55, 38, 0.3);
+  --diff-add-ink: #0d6947;
+  --diff-del-ink: #9a2418;
+  --diff-add-word: #7fceaa;
+  --diff-del-word: #f0998f;
   --scrim: rgba(242, 244, 247, 0.7);
 }
 

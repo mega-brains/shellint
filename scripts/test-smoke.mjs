@@ -31,6 +31,28 @@ for (const src of ["var a = o.x, { b } = o;", "var [c] = arr;"]) {
 if (emitted("var d = arr[0];").has("no-destructuring")) {
   throw new Error("dialect guard false positive no-destructuring on element access");
 }
+// Guard parity: the post-compile guard covers the same tier-1 set as the source lint.
+for (const [src, rule] of [
+  ['var re = RegExp("a");', "no-regexp"],
+  ['Object.defineProperty(o, "k", { get: function () { return 1; } });', "no-accessors"],
+  ["var o = { get a() { return 1; } };", "no-accessors"],
+  ["function* g() { yield 1; }", "no-generators"],
+  ["outer: for (;;) { break outer; }", "no-labeled-statements"],
+  ["with (o) { x = 1; }", "no-with"],
+  ['var s = "\\u00e9";', "no-unicode-escapes"],
+]) {
+  if (!emitted(src).has(rule)) throw new Error("dialect guard missed " + rule + " in: " + src);
+}
+if (emitted('var s = "a\\\\ub";').has("no-unicode-escapes")) {
+  throw new Error("dialect guard false positive no-unicode-escapes on an escaped backslash");
+}
+// Registrations are counted on the AST, so text inside a string is not one.
+if (!emitted("Timer.set(1,0,f);".repeat(6)).has("max-timers")) {
+  throw new Error("dialect guard missed max-timers on six real Timer.set calls");
+}
+if (emitted('var s = "' + "Timer.set(".repeat(6) + '";').has("max-timers")) {
+  throw new Error("dialect guard counted Timer.set inside a string literal");
+}
 
 const stats = analyzeScriptFile();
 const timerSample = analyzeSource("Timer.set(1000, false, function () {});", "sample.ts");
@@ -73,6 +95,24 @@ has(
 );
 has('Script.addRpcHandler("GetStatus", f);', "no-reserved-rpc-name");
 has('Script.storage.setItem("a-very-long-storage-key", "v");', "storage-key-length");
+has('var re = RegExp("a");', "no-regexp");
+has("Shelly.call('X', {}).then(function () {});", "no-async");
+has('Object.defineProperty(o, "k", { get: function () { return 1; } });', "no-accessors");
+// `"a\\ub"` is an escaped backslash then a plain u — legal on device.
+hasNot('var s = "a\\\\ub";', "no-unicode-escapes");
+has("print(x); var x = 1;", "no-use-before-define");
+has("f(); function f() {}", "no-use-before-define");
+// Same function, so text order is execution order: still a real read of undefined.
+has("function f() { print(y); var y = 1; }", "no-use-before-define");
+hasNot("var x = 1; print(x);", "no-use-before-define");
+hasNot("function f() {} f();", "no-use-before-define");
+hasNot("function f(msg) { print(msg); } var msg = 1;", "no-use-before-define");
+// The device idiom: the callback runs long after the script has been parsed.
+hasNot(
+  "Timer.set(1000, true, function () { tick(); }); function tick() {}",
+  "no-use-before-define",
+);
+hasNot("function a() { return b(); } function b() { return a; }", "no-use-before-define");
 
 const expect = (fn, src, rule, want) => {
   const hit = new Set(fn(src).map((f) => f.rule)).has(rule);

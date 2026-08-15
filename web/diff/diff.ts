@@ -164,6 +164,16 @@ const DECO: Record<string, Decoration> = {
   "@": Decoration.line({ class: "cm-diff-meta" }),
 };
 
+/**
+ * The leading ± is the one add/remove cue that survives a red/green colour
+ * deficiency, but as plain document text it is just another character in the
+ * line. Marking it lets the stylesheet give it weight and full contrast.
+ */
+const MARK: Record<string, Decoration> = {
+  "+": Decoration.mark({ class: "cm-diff-mark cm-diff-mark-add" }),
+  "-": Decoration.mark({ class: "cm-diff-mark cm-diff-mark-del" }),
+};
+
 function keyFor(text: string, isHeader: boolean): string {
   if (isHeader) return "@";
   if (text.startsWith(" @@")) return "@";
@@ -174,8 +184,14 @@ function build(state: EditorView["state"]): DecorationSet {
   const ranges: ReturnType<Decoration["range"]>[] = [];
   for (let n = 1; n <= state.doc.lines; n++) {
     const line = state.doc.line(n);
-    const deco = DECO[keyFor(line.text, n <= 2)];
-    if (deco) ranges.push(deco.range(line.from));
+    const key = keyFor(line.text, n <= 2);
+    const deco = DECO[key];
+    if (!deco) continue;
+    ranges.push(deco.range(line.from));
+    const mark = MARK[key];
+    if (mark && line.to > line.from) {
+      ranges.push(mark.range(line.from, line.from + 1));
+    }
   }
   return Decoration.set(ranges, true);
 }
@@ -194,6 +210,14 @@ const diffField = StateField.define<DecorationSet>({
 
 export const diffHighlight: Extension = [diffField];
 
+/**
+ * `cm-diff-doc` on the editor is what lets the stylesheet flatten the syntax
+ * highlighter over a patch. A unified diff is not JavaScript — the ± column
+ * derails the parser, so those colours are noise, and they are also the reason
+ * text on a tinted line could not be held to a contrast floor: three of the
+ * light-theme token colours only clear AA against plain white.
+ */
 export function showDiffTint(view: EditorView, on: boolean): void {
+  view.dom.classList.toggle("cm-diff-doc", on);
   view.dispatch({ effects: setDiff.of(on) });
 }

@@ -78,11 +78,12 @@
 
 .diff-table td { vertical-align: top; }
 
+/* --gutter-ink only reaches ~2.2:1 on --surface-3; these numbers are read. */
 .diff-num {
   width: 3rem;
   padding: 0 0.4rem;
   text-align: right;
-  color: var(--gutter-ink);
+  color: var(--muted);
   background: var(--surface-3);
   user-select: none;
 }
@@ -116,9 +117,41 @@
 .diff-labels.stacked { grid-template-columns: auto auto; justify-content: start; }
 .diff-labels.stacked .diff-pick { width: auto; }
 
-.diff-del { background: color-mix(in srgb, var(--danger) 14%, transparent); }
-.diff-add { background: color-mix(in srgb, var(--ok) 14%, transparent); }
+.diff-del { background: var(--diff-del-fill); }
+.diff-add { background: var(--diff-add-fill); }
 .diff-blank { background: var(--surface-3); }
+
+/*
+ * Never hue alone: red/green is the one pairing colour-blind readers cannot
+ * split. So the ± glyph goes bold at full contrast, and each changed cell
+ * carries an edge bar at its own left margin — shape and position first,
+ * colour as reinforcement. Scoped to .diff-table so the minify option tip,
+ * which borrows .diff-add / .diff-del for its before/after card, keeps its
+ * own flat treatment.
+ */
+.diff-table .diff-sign.diff-add,
+.diff-table .diff-sign.diff-del {
+  font-weight: 700;
+}
+
+.diff-table .diff-sign.diff-add {
+  color: var(--diff-add-ink);
+  box-shadow: inset 3px 0 0 var(--diff-add-ink);
+}
+
+.diff-table .diff-sign.diff-del {
+  color: var(--diff-del-ink);
+  box-shadow: inset 3px 0 0 var(--diff-del-ink);
+}
+
+/* Two columns have no sign column, so the bar moves onto the code cell. */
+.diff-table:not(.diff-unified) .diff-code.diff-add {
+  box-shadow: inset 3px 0 0 var(--diff-add-ink);
+}
+
+.diff-table:not(.diff-unified) .diff-code.diff-del {
+  box-shadow: inset 3px 0 0 var(--diff-del-ink);
+}
 
 /* Inside an edited line, the words that actually differ. */
 .diff-word {
@@ -127,11 +160,11 @@
 }
 
 .diff-word-del {
-  background: color-mix(in srgb, var(--danger) 30%, transparent);
+  background: var(--diff-del-word);
   color: var(--ink);
 }
 
 .diff-word-add {
-  background: color-mix(in srgb, var(--ok) 28%, transparent);
+  background: var(--diff-add-word);
   color: var(--ink);
 }

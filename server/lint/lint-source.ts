@@ -1,7 +1,14 @@
 import { readFileSync, existsSync } from "node:fs";
 import ts from "typescript";
 import { SCRIPT_PATH } from "../core/paths.ts";
-import { calleeName, stringArg, type Finding } from "./lint-util.ts";
+import { checkUseBeforeDefine } from "./lint-hoisting.ts";
+import {
+  calleeName,
+  definesAccessor,
+  hasUnicodeEscape,
+  stringArg,
+  type Finding,
+} from "./lint-util.ts";
 
 export type { Finding };
 
@@ -88,6 +95,13 @@ export function lintSource(
       add(node, "no-regexp", "error", "new RegExp() not supported on device");
     }
     if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === "RegExp"
+    ) {
+      add(node, "no-regexp", "error", "RegExp() not supported on device");
+    }
+    if (
       ts.isIdentifier(node) &&
       node.text === "Promise" &&
       !(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node)
@@ -96,6 +110,20 @@ export function lintSource(
     }
     if (ts.isAwaitExpression(node)) {
       add(node, "no-async", "error", "await not supported");
+    }
+    // A device object defining its own `then` is conceivable, so this is the
+    // repo's unverified-⇒-warn case rather than an error.
+    if (
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.name.text === "then"
+    ) {
+      add(
+        node,
+        "no-async",
+        "warn",
+        ".then() is a Promise idiom and the device has no Promise — device APIs take a callback argument",
+      );
     }
     if (
       (ts.isFunctionDeclaration(node) ||
@@ -121,6 +149,14 @@ export function lintSource(
     if (ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node)) {
       add(node, "no-accessors", "error", "get/set accessors not supported");
     }
+    if (ts.isCallExpression(node) && definesAccessor(node)) {
+      add(
+        node,
+        "no-accessors",
+        "error",
+        "Object.defineProperty with a get/set descriptor defines an accessor",
+      );
+    }
     if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
       add(
         node,
@@ -142,7 +178,7 @@ export function lintSource(
     if (ts.isWithStatement(node)) {
       add(node, "no-with", "warn", "with statement unverified on device");
     }
-    if (ts.isStringLiteral(node) && /\\u/.test(node.getText(sf))) {
+    if (ts.isStringLiteral(node) && hasUnicodeEscape(node.getText(sf))) {
       add(
         node,
         "no-unicode-escapes",
@@ -274,6 +310,7 @@ export function lintSource(
   };
 
   visit(sf);
+  findings.push(...checkUseBeforeDefine(sf, fileName));
 
   for (const [name, sites] of registrations) {
     const cap = CAPS[name]!;

@@ -52,6 +52,7 @@ const TESTS = [
   "test-devices",
   "test-device-scripts",
   "test-deploy-gate",
+  "test-lint-memory",
   "test-smoke",
 ];
 

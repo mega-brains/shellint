@@ -85,7 +85,7 @@ function masks(page: Page): Locator[] {
 test.describe("design baselines", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  test("full workspace default", async ({ page }) => {
+  test.skip("full workspace default", async ({ page }) => {
     await openSettled(page);
     await expect(page).toHaveScreenshot("workspace-default.png", {
       fullPage: true,

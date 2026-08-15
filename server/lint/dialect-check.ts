@@ -2,6 +2,7 @@ import { readFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import ts from "typescript";
 import { DIST_DIR } from "../core/paths.ts";
+import { calleeName, definesAccessor, hasUnicodeEscape } from "./lint-util.ts";
 
 export type DialectFinding = {
   rule: string;
@@ -14,6 +15,19 @@ export type DialectReport = {
   file: string;
   ok: boolean;
   findings: DialectFinding[];
+};
+
+/**
+ * Registration caps re-counted on emitted code — same thresholds as Tier 2.
+ * Counted on the AST walk below, so a `Timer.set(` inside a string or a
+ * comment is not mistaken for a registration.
+ */
+const EMIT_CAPS: Record<string, { rule: string; limit: number }> = {
+  "Timer.set": { rule: "max-timers", limit: 5 },
+  "Shelly.addEventHandler": { rule: "max-event-handlers", limit: 5 },
+  "Shelly.addStatusHandler": { rule: "max-status-handlers", limit: 5 },
+  "HTTPServer.registerEndpoint": { rule: "max-http-endpoints", limit: 5 },
+  "Script.addRpcHandler": { rule: "max-rpc-handlers", limit: 5 },
 };
 
 /**
@@ -32,6 +46,7 @@ export function checkDialectSource(
     ts.ScriptKind.JS,
   );
   const findings: DialectFinding[] = [];
+  const registrations = new Map<string, number>();
 
   const add = (
     node: ts.Node,
@@ -54,6 +69,13 @@ export function checkDialectSource(
     ) {
       add(node, "no-regexp", "error", "new RegExp() not supported on device");
     }
+    if (
+      ts.isCallExpression(node) &&
+      ts.isIdentifier(node.expression) &&
+      node.expression.text === "RegExp"
+    ) {
+      add(node, "no-regexp", "error", "RegExp() not supported on device");
+    }
     if (ts.isArrowFunction(node)) {
       add(node, "no-arrow-functions", "error", "arrow functions not supported");
     }
@@ -75,6 +97,44 @@ export function checkDialectSource(
     ) {
       add(node, "no-async", "error", "async functions not supported");
     }
+    if (
+      (ts.isFunctionDeclaration(node) ||
+        ts.isFunctionExpression(node) ||
+        ts.isMethodDeclaration(node)) &&
+      node.asteriskToken
+    ) {
+      add(node, "no-generators", "error", "generator functions not supported");
+    }
+    if (ts.isYieldExpression(node)) {
+      add(node, "no-generators", "error", "yield not supported");
+    }
+    if (ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node)) {
+      add(node, "no-accessors", "error", "get/set accessors not supported");
+    }
+    // The shape a class getter takes once tsc has down-levelled it to ES5 —
+    // the one accessor form the guard can actually expect to meet.
+    if (ts.isCallExpression(node) && definesAccessor(node)) {
+      add(
+        node,
+        "no-accessors",
+        "error",
+        "Object.defineProperty with a get/set descriptor defines an accessor",
+      );
+    }
+    if (ts.isLabeledStatement(node)) {
+      add(node, "no-labeled-statements", "warn", "labeled statement unverified on device");
+    }
+    if (ts.isWithStatement(node)) {
+      add(node, "no-with", "warn", "with statement unverified on device");
+    }
+    if (ts.isStringLiteral(node) && hasUnicodeEscape(node.getText(sf))) {
+      add(
+        node,
+        "no-unicode-escapes",
+        "warn",
+        "only \\xHH escapes are supported in device strings",
+      );
+    }
     if (ts.isObjectBindingPattern(node) || ts.isArrayBindingPattern(node)) {
       add(node, "no-destructuring", "error", "destructuring not supported");
     }
@@ -89,11 +149,10 @@ export function checkDialectSource(
     }
 
     // Resource counts on emitted code (warn)
-    if (ts.isCallExpression(node) && ts.isPropertyAccessExpression(node.expression)) {
-      const obj = node.expression.expression;
-      const method = node.expression.name.text;
-      if (ts.isIdentifier(obj) && obj.text === "Timer" && method === "set") {
-        // counted later
+    if (ts.isCallExpression(node)) {
+      const name = calleeName(node.expression);
+      if (name && EMIT_CAPS[name]) {
+        registrations.set(name, (registrations.get(name) ?? 0) + 1);
       }
     }
 
@@ -102,41 +161,13 @@ export function checkDialectSource(
 
   visit(sf);
 
-  // Registration caps (warn) — same thresholds as Tier 2
-  const caps: Array<{ re: RegExp; rule: string; limit: number; label: string }> = [
-    { re: /\bTimer\.set\s*\(/g, rule: "max-timers", limit: 5, label: "Timer.set" },
-    {
-      re: /\bShelly\.addEventHandler\s*\(/g,
-      rule: "max-event-handlers",
-      limit: 5,
-      label: "Shelly.addEventHandler",
-    },
-    {
-      re: /\bShelly\.addStatusHandler\s*\(/g,
-      rule: "max-status-handlers",
-      limit: 5,
-      label: "Shelly.addStatusHandler",
-    },
-    {
-      re: /\bHTTPServer\.registerEndpoint\s*\(/g,
-      rule: "max-http-endpoints",
-      limit: 5,
-      label: "HTTPServer.registerEndpoint",
-    },
-    {
-      re: /\bScript\.addRpcHandler\s*\(/g,
-      rule: "max-rpc-handlers",
-      limit: 5,
-      label: "Script.addRpcHandler",
-    },
-  ];
-  for (const cap of caps) {
-    const n = source.match(cap.re)?.length ?? 0;
+  for (const [label, cap] of Object.entries(EMIT_CAPS)) {
+    const n = registrations.get(label) ?? 0;
     if (n > cap.limit) {
       findings.push({
         rule: cap.rule,
         severity: "warn",
-        message: `${cap.label} count ${n} exceeds device cap ${cap.limit}`,
+        message: `${label} count ${n} exceeds device cap ${cap.limit}`,
       });
     }
   }

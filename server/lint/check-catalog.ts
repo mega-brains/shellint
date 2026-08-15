@@ -152,6 +152,12 @@ export const CHECK_CATALOG: CheckSpec[] = [
     group: "dialect",
     about: "device strings take \\xHH escapes, not \\uXXXX",
   },
+  {
+    rule: "no-use-before-define",
+    group: "dialect",
+    about:
+      "the LanguageReference says Espruino does not hoist — a read above its var/function declaration in the same function is undefined on device, unless a probe falsifies it",
+  },
 
   {
     rule: "max-timers",
@@ -322,6 +328,21 @@ export const CHECK_CATALOG: CheckSpec[] = [
     rule: "prefer-short-strings",
     group: "advisories",
     about: "over 1 KB of string literals is resident device RAM",
+  },
+  {
+    rule: "no-concat-in-loop",
+    group: "advisories",
+    about: "growing a string or array by concatenation in a loop costs O(n²) heap",
+  },
+  {
+    rule: "prefer-hoisted-callback",
+    group: "advisories",
+    about: "a nested callback capturing nothing allocates a function object per call",
+  },
+  {
+    rule: "max-cognitive-complexity",
+    group: "advisories",
+    about: "nesting-weighted complexity over 15 — the callback-pyramid measure cyclomatic complexity misses",
   },
   {
     rule: "meta-vc-role-matches",
