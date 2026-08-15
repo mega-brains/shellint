@@ -117,8 +117,23 @@
 .diff-labels.stacked { grid-template-columns: auto auto; justify-content: start; }
 .diff-labels.stacked .diff-pick { width: auto; }
 
-.diff-del { background: var(--diff-del-fill); }
-.diff-add { background: var(--diff-add-fill); }
+/*
+ * A changed cell also republishes its side as --diff-ink / --diff-word, so the
+ * ± glyph, the edge bar and the word highlight inside it all resolve without a
+ * second pair of selectors. Same trick in web/editor/editor.css.
+ */
+.diff-del {
+  --diff-ink: var(--diff-del-ink);
+  --diff-word: var(--diff-del-word);
+  background: var(--diff-del-fill);
+}
+
+.diff-add {
+  --diff-ink: var(--diff-add-ink);
+  --diff-word: var(--diff-add-word);
+  background: var(--diff-add-fill);
+}
+
 .diff-blank { background: var(--surface-3); }
 
 /*
@@ -127,44 +142,25 @@
  * carries an edge bar at its own left margin — shape and position first,
  * colour as reinforcement. Scoped to .diff-table so the minify option tip,
  * which borrows .diff-add / .diff-del for its before/after card, keeps its
- * own flat treatment.
+ * own flat treatment. Two columns have no sign column, so there the bar rides
+ * the code cell instead.
  */
 .diff-table .diff-sign.diff-add,
 .diff-table .diff-sign.diff-del {
   font-weight: 700;
+  color: var(--diff-ink);
+  box-shadow: inset 3px 0 0 var(--diff-ink);
 }
 
-.diff-table .diff-sign.diff-add {
-  color: var(--diff-add-ink);
-  box-shadow: inset 3px 0 0 var(--diff-add-ink);
-}
-
-.diff-table .diff-sign.diff-del {
-  color: var(--diff-del-ink);
-  box-shadow: inset 3px 0 0 var(--diff-del-ink);
-}
-
-/* Two columns have no sign column, so the bar moves onto the code cell. */
-.diff-table:not(.diff-unified) .diff-code.diff-add {
-  box-shadow: inset 3px 0 0 var(--diff-add-ink);
-}
-
+.diff-table:not(.diff-unified) .diff-code.diff-add,
 .diff-table:not(.diff-unified) .diff-code.diff-del {
-  box-shadow: inset 3px 0 0 var(--diff-del-ink);
+  box-shadow: inset 3px 0 0 var(--diff-ink);
 }
 
 /* Inside an edited line, the words that actually differ. */
 .diff-word {
   border-radius: 2px;
   padding: 0 0.05em;
-}
-
-.diff-word-del {
-  background: var(--diff-del-word);
-  color: var(--ink);
-}
-
-.diff-word-add {
-  background: var(--diff-add-word);
+  background: var(--diff-word);
   color: var(--ink);
 }

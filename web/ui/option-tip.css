@@ -66,5 +66,7 @@
   color: var(--ink);
 }
 
-.opt-tip-line.diff-del .diff-sign { color: var(--danger); }
-.opt-tip-line.diff-add .diff-sign { color: var(--ok); }
+/* The tip borrows .diff-del / .diff-add, so it borrows their inks too —
+   --danger / --ok sit at ~3.3:1 on those fills, the diff inks at ~4.8:1. */
+.opt-tip-line.diff-del .diff-sign { color: var(--diff-del-ink); }
+.opt-tip-line.diff-add .diff-sign { color: var(--diff-add-ink); }

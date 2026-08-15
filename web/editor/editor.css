@@ -129,27 +129,25 @@
  * both. The edge bar repeats .cm-stat-line's device: a changed row is legible
  * as changed before any colour is decoded.
  */
-.editor .cm-diff-add {
-  background: var(--diff-add-fill);
-  box-shadow: inset 3px 0 0 var(--diff-add-ink);
-  color: var(--ink);
-}
+.editor .cm-diff-add { --diff-ink: var(--diff-add-ink); background: var(--diff-add-fill); }
+.editor .cm-diff-del { --diff-ink: var(--diff-del-ink); background: var(--diff-del-fill); }
 
+.editor .cm-diff-add,
 .editor .cm-diff-del {
-  background: var(--diff-del-fill);
-  box-shadow: inset 3px 0 0 var(--diff-del-ink);
+  box-shadow: inset 3px 0 0 var(--diff-ink);
   color: var(--ink);
 }
 
 /*
  * Held at (0,2,1) on purpose: it has to outrank the highlighter's own
- * single-class rules and stay under the ± mark rules below.
+ * single-class rules and stay under the ± mark rule below.
  */
 .cm-diff-doc .cm-line span { color: inherit; }
 
-.editor .cm-line .cm-diff-mark { font-weight: 700; }
-.editor .cm-line .cm-diff-mark-add { color: var(--diff-add-ink); }
-.editor .cm-line .cm-diff-mark-del { color: var(--diff-del-ink); }
+.editor .cm-line .cm-diff-mark {
+  font-weight: 700;
+  color: var(--diff-ink);
+}
 
 .editor .cm-diff-meta {
   background: var(--surface-2);

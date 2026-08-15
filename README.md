@@ -80,6 +80,22 @@ mise run beforeCommit           # lines + typecheck + build + test
 
 Unauthenticated devices only; a 401 surfaces as **auth not supported yet**.
 
+## Using the checks in your editor
+
+DevRoom's own checks run behind the **Check** button — they are hand-rolled
+TypeScript-AST passes, not a linter, because none of the cooperative scheduler,
+the RAM budget, `Shelly.*` existence or the live capability probe is something
+an off-the-shelf ESLint plugin can express.
+
+The *syntax* half of Tier 1 is another matter: it needs no custom rule code at
+all. [`templates/eslint.config.mjs`](./templates/eslint.config.mjs) is that
+half as a flat config you can copy into your own Shelly script repo, so your
+editor and your CI flag the same dialect bans DevRoom does. It is a template —
+DevRoom itself neither installs nor runs ESLint.
+
+Rationale, the plugin survey behind it, and what it deliberately leaves out:
+[`.claude/plans/2026-08-15_19_lint-gaps-and-eslint.md`](./.claude/plans/2026-08-15_19_lint-gaps-and-eslint.md).
+
 ## Ideas / Features
 
 - node.js server app with code editor

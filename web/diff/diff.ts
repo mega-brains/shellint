@@ -170,8 +170,8 @@ const DECO: Record<string, Decoration> = {
  * line. Marking it lets the stylesheet give it weight and full contrast.
  */
 const MARK: Record<string, Decoration> = {
-  "+": Decoration.mark({ class: "cm-diff-mark cm-diff-mark-add" }),
-  "-": Decoration.mark({ class: "cm-diff-mark cm-diff-mark-del" }),
+  "+": Decoration.mark({ class: "cm-diff-mark" }),
+  "-": Decoration.mark({ class: "cm-diff-mark" }),
 };
 
 function keyFor(text: string, isHeader: boolean): string {

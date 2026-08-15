@@ -84,8 +84,7 @@ description = "Pre-commit gate: line limit + typecheck + build run in parallel, 
 depends = ["check:lines", "typecheck", "build"]
 run = """
 npm run build:static
-npm run test
-npm run test:e2e
+/usr/bin/time npm run test && npm run test:e2e
 """
 
 [tasks.probe]
