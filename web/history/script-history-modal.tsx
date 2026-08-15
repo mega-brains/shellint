@@ -121,7 +121,7 @@ export function ScriptHistoryModal(props: ScriptHistoryModalProps) {
                   disabled={props.busy}
                   onClick={() => setPendingId(r.id)}
                 >
-                  restore
+                  restore...
                 </button>
               </li>
             ))}
