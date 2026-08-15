@@ -5,9 +5,11 @@
  * ORDER IS THE CASCADE. It mirrors the <link> order web/index.html used
  * before the bundle existed; do not sort or regroup these lines.
  */
+@import "./shell/tokens.css";
 @import "./shell/styles.css";
 @import "./editor/editor.css";
 @import "./shell/panels.css";
+@import "./ui/tiles.css";
 @import "./shell/panels-extra.css";
 @import "./check/checks.css";
 @import "./charts/charts.css";
@@ -15,5 +17,6 @@
 @import "./diff/diff.css";
 @import "./history/script-history.css";
 @import "./device/device-select.css";
+@import "./ui/modal.css";
 @import "./ui/option-tip.css";
 @import "./editor/build-error.css";

@@ -2,12 +2,14 @@
  * Memory estimate visuals: where the estimated JsVar bytes go, and how the
  * estimate lands against the mem_peak the device actually reported.
  */
+import { MeasureList, MeasureRow } from "../ui/measure";
+
 export type MemoryEstimate = {
   bytes: number;
   breakdown: Record<string, number>;
 };
 
-export function MemBreakdown(props: {
+export function MemMeasures(props: {
   estimate: MemoryEstimate | null | undefined;
 }) {
   const entries = Object.entries(props.estimate?.breakdown ?? {})
@@ -17,94 +19,70 @@ export function MemBreakdown(props: {
 
   if (!entries.length) {
     return (
-      <div id="memBreakdown" aria-label="Estimated RAM by cost bucket">
-        <p class="stats-bars-empty">no estimate yet — Build to analyze</p>
-      </div>
+      <p class="group-empty" id="memBreakdown">
+        no estimate yet — Build to analyze
+      </p>
     );
   }
 
+  // Scaled to the largest bucket, not to the total: the point of the group is
+  // which bucket dominates, and a share-of-total scale flattens all of them.
+  const largest = Math.max(1, ...entries.map(([, bytes]) => bytes));
   return (
-    <div id="memBreakdown" aria-label="Estimated RAM by cost bucket">
-      <ul class="mem-bars">
-        {entries.map(([label, bytes]) => {
-          const pct = total > 0 ? Math.min(100, (bytes / total) * 100) : 0;
-          return (
-            <li key={label} class="mem-bar">
-              <span class="mem-bar-label">{label}</span>
-              <div
-                class="mem-bar-track"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={total}
-                aria-valuenow={bytes}
-                aria-label={`${label} ${bytes} B of ${total} B estimated`}
-              >
-                <div class="mem-bar-fill" style={{ width: `${pct}%` }} />
-              </div>
-              <span
-                class="mem-bar-value"
-                title={`${Math.round(pct)}% of the estimate`}
-              >
-                {`${bytes} B`}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+    <MeasureList id="memBreakdown">
+      {entries.map(([label, bytes]) => (
+        <MeasureRow
+          key={label}
+          label={label}
+          value={`${bytes} B`}
+          fraction={bytes / largest}
+          ariaLabel={`${label} ${bytes} B of ${total} B estimated`}
+          title={`${Math.round((bytes / (total || 1)) * 100)}% of the estimate`}
+        />
+      ))}
+    </MeasureList>
   );
 }
 
-export function MemPeek(props: {
+function pct(n: number): string {
+  return `${n > 0 ? "+" : ""}${n}%`;
+}
+
+/**
+ * Estimate versus the device's reported peak, in one well: the delta in words,
+ * a track whose fill is the peak's share of the larger of the two, and a tick
+ * where the peak sits. Without a device (static build) it says so rather than
+ * drawing a tick at zero.
+ */
+export function MemWell(props: {
   estimate: MemoryEstimate | null | undefined;
   memPeak: number | null | undefined;
 }) {
   const est = props.estimate?.bytes ?? 0;
-  if (!est) {
-    return <span class="mem-peek" id="memPeek">—</span>;
-  }
   const peak = props.memPeak != null && props.memPeak > 0 ? props.memPeak : null;
-  const share = peak ? Math.min(1, est / peak) : null;
-  return (
-    <span
-      class="mem-peek"
-      id="memPeek"
-      title={
-        peak
-          ? `estimated ${est} B against the device peak of ${peak} B`
-          : `estimated ${est} B, no device peak reported yet`
-      }
-    >
-      <span class="mem-peek-value">{`~${est} B`}</span>
-      {share != null ? (
-        <span class="mem-peek-track">
-          <span
-            class="mem-peek-fill"
-            style={{ width: `${(share * 100).toFixed(1)}%` }}
-          />
-        </span>
-      ) : null}
-    </span>
-  );
-}
+  if (!est) return <div class="well" id="memWell" hidden />;
 
-export function MemBullet(props: {
-  estimate: MemoryEstimate | null | undefined;
-  memPeak: number | null | undefined;
-}) {
-  const est = props.estimate?.bytes ?? 0;
-  if (!est) return <div id="memBullet" />;
-
-  const peak = props.memPeak != null && props.memPeak > 0 ? props.memPeak : null;
-  const scale = Math.max(est, peak ?? 0);
+  const scale = Math.max(est, peak ?? 0) || 1;
+  const delta = peak == null ? null : est - peak;
+  const deltaPct = peak == null ? 0 : Math.round(((est - peak) / peak) * 100);
+  const over = delta != null && delta > 0;
 
   return (
     <div
-      id="memBullet"
+      class="well"
+      id="memWell"
       title="Estimate versus the mem_peak the device reported for the running script"
     >
+      <div class="well-head">
+        <span class="well-label">estimate vs device peak</span>
+        <span class={`well-delta${over ? " warn" : ""}`} id="memCompare">
+          {delta == null
+            ? "peak not reported"
+            : `${delta > 0 ? "+" : ""}${delta} B · ${pct(deltaPct)}`}
+        </span>
+      </div>
       <div
-        class="mem-bullet-track"
+        class="well-track"
         role="img"
         aria-label={
           peak
@@ -112,24 +90,22 @@ export function MemBullet(props: {
             : `estimate ${est} B, no device peak yet`
         }
       >
+        {/* Without a device peak there is nothing to compare against, so the
+            fill goes neutral rather than reading as a full accent bar. */}
         <div
-          class="mem-bullet-fill"
-          style={{ width: `${(est / scale) * 100}%` }}
-          title={`estimate ${est} B`}
+          class={`well-fill${peak ? "" : " tone-neutral"}`}
+          style={{ width: `${((peak ?? est) / scale) * 100}%` }}
         />
         {peak ? (
-          <div
-            class="mem-bullet-tick"
-            style={{ left: `${(peak / scale) * 100}%` }}
-            title={`device mem_peak ${peak} B`}
-          />
+          <div class="well-tick" style={{ left: `${(peak / scale) * 100}%` }} />
         ) : null}
       </div>
-      <p class="mem-bullet-legend">
-        {peak
-          ? `est ${est} B · peak ${peak} B`
-          : `est ${est} B · peak not reported yet`}
-      </p>
+      <div class="well-legend">
+        <span>{peak ? `peak ${peak} B` : "peak not reported"}</span>
+        <span id="memEstimate">
+          {peak ? `est ${est} B` : `est ${est} B · attach a device to compare`}
+        </span>
+      </div>
     </div>
   );
 }

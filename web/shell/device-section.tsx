@@ -2,8 +2,11 @@ import type { ComponentChildren, RefObject } from "preact";
 import { useCallback, useRef, useState } from "preact/hooks";
 import type { EditorView } from "@codemirror/view";
 import { api } from "../lib/api";
-import { DevicePanel, type DeviceIdentity } from "../device/device-panel";
+import { DevicePanel } from "../device/device-panel";
 import { LogsPanel } from "../device/logs-panel";
+import { Dock } from "../device/dock";
+import { useDeviceStatus } from "../device/use-device-status";
+import type { DeviceIdentity } from "../device/device-format";
 import { DevicePicker } from "../device/device-picker";
 import { useDevices } from "../device/use-devices";
 import { ImportBanner, useSlotImport } from "../device/use-slot-import";
@@ -46,9 +49,14 @@ export type DeviceSectionResult = {
   probeProgress: { done: number; total: number } | null;
   probeCapture: ProbeCapture | null;
   onShowCapture: () => void;
+  /** Readiness-rail inputs (web/shell/readiness.ts). */
+  hasDevice: boolean;
+  probeRequired: boolean;
+  probeSkipped: boolean;
   editorBanner: ComponentChildren;
   clearImportedBuffer: () => void;
-  footer: ComponentChildren;
+  /** The bottom dock (device telemetry + debug logs); null in the static build. */
+  dock: ComponentChildren;
   modals: ComponentChildren;
 };
 
@@ -64,12 +72,11 @@ export type DeviceSectionResult = {
  * `useProbeEcoGate`/`useSlotImport` all mount-fetch at most once (no
  * `setInterval`) and fail silently through the static router's rejections
  * (web/static/local-api.ts), so calling them unconditionally costs nothing
- * offline. The two genuinely polling widgets — `DevicePanel`
- * (device-panel.tsx:120) and `LogsPanel` (logs-panel.tsx:140), both
- * `setInterval` from mount — are the reason `footer`/`selector`/
- * `editorBanner`/`modals` below are `null` in static mode instead of merely
- * CSS-hidden: a `null` in returned JSX means Preact never constructs those
- * components, so their timers never start.
+ * offline. The two genuinely polling paths — `useDeviceStatus` (gated by its
+ * own `enabled` flag) and `LogsPanel` (`setInterval` from mount) — are why
+ * `dock`/`selector`/`editorBanner`/`modals` below are `null` in static mode
+ * instead of merely CSS-hidden: a `null` in returned JSX means Preact never
+ * constructs those components, so their timers never start.
  */
 export function useDeviceSection(props: DeviceSectionProps): DeviceSectionResult {
   const { isStatic, viewRef, setStatus, withBusy, deployGate, syncDeployReady, deviceIp } = props;
@@ -80,6 +87,21 @@ export function useDeviceSection(props: DeviceSectionProps): DeviceSectionResult
   const [memPeak, setMemPeak] = useState<number | null>(null);
   const [captureOpen, setCaptureOpen] = useState(false);
   const deviceRef = useRef<{ refresh: () => Promise<void> } | null>(null);
+
+  const deviceStatus = useDeviceStatus({
+    enabled: !isStatic,
+    api,
+    onStatus: setStatus,
+    onIdentity: (id) => {
+      setIdentity(id);
+      setDeviceOnline(id.state !== "offline");
+      setMemPeak(id.memPeak);
+    },
+    onMeta: setDeviceMeta,
+    onReady: (ctl) => {
+      deviceRef.current = ctl;
+    },
+  });
 
   const devicesState = useDevices(!isStatic);
   const activeDeviceId = devicesState.active?.device ?? null;
@@ -170,6 +192,9 @@ export function useDeviceSection(props: DeviceSectionProps): DeviceSectionResult
     probeProgress,
     probeCapture,
     onShowCapture: () => setCaptureOpen(true),
+    hasDevice: !!activeDevice,
+    probeRequired: probeState.required,
+    probeSkipped: !!probeState.skipped,
     editorBanner: isStatic ? null : (
       <>
         <ImportBanner imported={slotImport.imported} onDiscard={slotImport.discardImport} />
@@ -184,24 +209,14 @@ export function useDeviceSection(props: DeviceSectionProps): DeviceSectionResult
       </>
     ),
     clearImportedBuffer: slotImport.clearImport,
-    footer: isStatic ? null : (
-      <>
-        <DevicePanel
-          key={devicesState.sessionKey}
-          api={api}
-          onStatus={setStatus}
-          onIdentity={(id) => {
-            setIdentity(id);
-            setDeviceOnline(id.state !== "offline");
-            setMemPeak(id.memPeak);
-          }}
-          onMeta={setDeviceMeta}
-          onReady={(ctl) => {
-            deviceRef.current = ctl;
-          }}
-        />
-        <LogsPanel key={devicesState.sessionKey} api={api} onStatus={setStatus} />
-      </>
+    dock: isStatic ? null : (
+      <Dock
+        key={devicesState.sessionKey}
+        state={deviceStatus}
+        onResize={() => viewRef.current?.requestMeasure()}
+        device={<DevicePanel state={deviceStatus} />}
+        logs={<LogsPanel key={devicesState.sessionKey} api={api} onStatus={setStatus} />}
+      />
     ),
     modals: isStatic ? null : (
       <>

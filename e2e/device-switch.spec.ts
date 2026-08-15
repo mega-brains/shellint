@@ -32,7 +32,7 @@ test.describe("device switch", () => {
 
     // Start the log stream on the first device and let mocked lines populate.
     await page.locator("#logsHead").click();
-    await expect(page.locator("#logsPanel")).not.toHaveClass(/collapsed/);
+    await expect(page.locator("#logsPanel")).toBeVisible();
     await page.locator("#btnLogs").click();
     await expect(page.locator("#logsList li")).toHaveCount(3, { timeout: 10_000 });
 

@@ -7,12 +7,12 @@ test.describe("editor smoke", () => {
     await expect(page).toHaveTitle("Shelly DevRoom");
     await expect(page.locator("#editor")).toBeVisible();
     await expect(page.locator("#side")).toBeVisible();
-    await expect(page.locator("#devicePanel")).toBeVisible();
-    await expect(page.locator("#logsPanel")).toBeVisible();
+    await expect(page.locator("#dock")).toBeVisible();
     await expect(page.locator("#btnSave")).toBeVisible();
-    // Select collapses to opacity 0 until the bar is hovered.
-    await page.locator(".artifact-bar").hover();
-    await expect(page.locator("#artifactSel")).toBeVisible();
+    await expect(page.locator(".artifact-strip")).toBeVisible();
+    await expect(
+      page.locator('.artifact-chip[data-value="source"]'),
+    ).toHaveAttribute("aria-pressed", "true");
   });
 
   test("loads script source into CodeMirror", async ({ page }) => {
@@ -46,57 +46,42 @@ test.describe("editor smoke", () => {
       timeout: 45_000,
     });
     await expect(page.locator("#checkRules")).not.toBeEmpty();
-    await expect(page.locator("#checkPeek")).not.toHaveText("not run yet");
+    await expect(page.getByTestId("gate-checked")).not.toContainText("not checked");
   });
 
-  test("artifact select can leave source mode", async ({ page }) => {
+  test("artifact chips can leave source mode", async ({ page }) => {
     await openApp(page);
-    const bar = page.locator(".artifact-bar");
-    const sel = page.locator("#artifactSel");
-    await bar.hover();
-    await expect(sel).toBeVisible();
-    const options = sel.locator("option");
-    await expect(options.first()).toHaveAttribute("value", "source");
-    const count = await options.count();
+    const chips = page.locator(".artifact-chip[data-value]");
+    await expect(chips.first()).toHaveAttribute("data-value", "source");
+    const count = await chips.count();
     if (count < 2) {
       test.info().annotations.push({
         type: "note",
-        description: "no dist artifacts yet — only source option present",
+        description: "no dist artifacts yet — only the source chip is present",
       });
       return;
     }
-    const value = await options.nth(1).getAttribute("value");
-    expect(value).toBeTruthy();
-    await sel.selectOption(value!);
-    if (value!.startsWith("diff:")) {
-      await expect(page.locator("#artifactMeta")).toBeVisible();
-    } else {
-      await expect(page.locator("#artifactMeta")).toContainText(/B|bytes|preview/i);
-      await expect(page.locator("#btnSave")).toBeDisabled();
-    }
+    await chips.nth(1).click();
+    await expect(page.locator("#artifactMeta")).toContainText(/B|bytes|preview/i);
+    await expect(page.locator("#btnSave")).toBeDisabled();
   });
 
   test("diff modal reports per-side size in chars and bytes", async ({
     page,
   }) => {
     await openApp(page);
-    await page.locator(".artifact-bar").hover();
-    const sel = page.locator("#artifactSel");
-    await expect(sel).toBeVisible();
-    const values = await sel.locator("option").evaluateAll((els) =>
-      els.map((el) => (el as HTMLOptionElement).value),
-    );
+    const item = page.locator('#diffMenu button[data-value="diff:side-by-side"]');
     // Only the side-by-side entry opens the modal; "diff:debug↔prod" renders
     // inline in the editor and has no head of its own.
-    const diffValue = values.find((v) => v === "diff:side-by-side");
-    if (!diffValue) {
+    if ((await item.count()) === 0) {
       test.info().annotations.push({
         type: "note",
         description: "no side-by-side diff option — dist not built",
       });
       return;
     }
-    await sel.selectOption(diffValue);
+    await page.locator("#btnDiffMenu").click();
+    await item.click();
     const size = /^\d+ ch · \d+ B$/;
     await expect(page.getByTestId("diff-size-left")).toHaveText(size, {
       timeout: 10_000,

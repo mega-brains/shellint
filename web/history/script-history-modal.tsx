@@ -94,8 +94,11 @@ export function ScriptHistoryModal(props: ScriptHistoryModalProps) {
       >
         <div class="script-history-head">
           <p>Script version history</p>
-          <button type="button" onClick={props.onClose}>
-            close
+          <span class="modal-context">scripts/main.ts</span>
+          <span class="modal-spacer" />
+          <span class="modal-esc">esc</span>
+          <button type="button" class="modal-close" onClick={props.onClose} aria-label="Close">
+            ×
           </button>
         </div>
         {props.rows.length === 0 ? (
@@ -105,16 +108,20 @@ export function ScriptHistoryModal(props: ScriptHistoryModalProps) {
           </p>
         ) : (
           <ol class="script-history-list">
-            {props.rows.map((r) => (
+            {props.rows.map((r, i) => (
               <li key={r.id} class="script-history-row">
                 <span class="script-history-when">{relativeTime(r.ts)}</span>
+                <span class="script-history-tag">
+                  {i === 0 ? "newest" : i === props.rows.length - 1 ? "first" : ""}
+                </span>
                 <span class="script-history-bytes">{fmtBytes(r.bytes)}</span>
                 <button
                   type="button"
+                  class="script-history-restore"
                   disabled={props.busy}
                   onClick={() => setPendingId(r.id)}
                 >
-                  Restore
+                  restore
                 </button>
               </li>
             ))}

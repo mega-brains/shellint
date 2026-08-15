@@ -63,7 +63,7 @@ async function runFullCycle(page: Page, name: string, source: string) {
   await page.locator("#btnBuildMenu").click();
   await page.locator('#buildMenu button[data-action="check"]').click();
   await expect(page.locator("#checkNote")).toContainText("device profile", { timeout: 45_000 });
-  const componentExists = page.locator("#checkRules tr.check", {
+  const componentExists = page.locator("#checkRules .check", {
     has: page.locator(".check-rule-name", { hasText: "component-exists" }),
   });
   await expect(componentExists).toHaveClass(/check-skipped/);
@@ -74,25 +74,19 @@ async function runFullCycle(page: Page, name: string, source: string) {
   await expect(page.locator("#statusLine")).toContainText("build ok", { timeout: 45_000 });
 
   // Artifact preview.
-  await page.locator(".artifact-bar").hover();
-  const sel = page.locator("#artifactSel");
-  await expect(sel).toBeVisible();
-  const values = await sel
-    .locator("option")
-    .evaluateAll((els) => els.map((el) => (el as HTMLOptionElement).value));
-  expect(values).toContain("debug.js");
-  await sel.selectOption("debug.js");
+  await expect(page.locator('.artifact-chip[data-value="debug.js"]')).toBeVisible();
+  await page.locator('.artifact-chip[data-value="debug.js"]').click();
   await expect(page.locator("#artifactMeta")).toContainText("B");
 
   // Diff: debug ↔ prod (raw).
-  expect(values.some((v) => v.startsWith("diff:"))).toBe(true);
-  await sel.selectOption(values.find((v) => v.startsWith("diff:"))!);
+  await page.locator("#btnDiffMenu").click();
+  await page.locator('#diffMenu button[data-value="diff:debug↔prod"]').click();
   await expect(page.locator("#artifactMeta")).toBeVisible();
 
   // Download: the primary "Artifacts" button fires every built artifact
   // sequentially; the first `download` event is enough to prove the pipeline
   // is real (non-empty bytes), not a stub.
-  await sel.selectOption("source");
+  await page.locator('.artifact-chip[data-value="source"]').click();
   const downloadPromise = page.waitForEvent("download");
   await page.locator("#btnDownloadArtifacts").click();
   const download = await downloadPromise;
@@ -118,6 +112,11 @@ test.describe("static/offline build (M17)", () => {
   test("device-only controls absent, Save menu intact", async ({ page }) => {
     await openStatic(page);
     await expect(page.locator("#btnSave")).toBeVisible();
+    // No device means no pickers, no run-state chip, and a hollow probe gate.
+    await expect(page.locator("#staticNote")).toContainText("no device");
+    await expect(page.locator("#deviceSelect")).toHaveCount(0);
+    await expect(page.getByTestId("gate-probed")).toHaveClass(/gate-unavailable/);
+    await expect(page.locator("#dock")).toHaveCount(0);
     for (const id of ["#deploySplit", "#probeSplit"]) {
       await expect(page.locator(id)).toHaveCount(0);
     }

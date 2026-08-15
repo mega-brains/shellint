@@ -105,28 +105,6 @@ export type MinFirmware = {
   reasons: { api: string; version: string }[];
 };
 
-export function formatEstimate(
-  estimate: MemoryEstimate | null | undefined,
-): string {
-  if (!estimate) return "—";
-  return `est RAM ~${estimate.bytes} B`;
-}
-
-/**
- * Estimate against the device's own `mem_peak`. Shown as a signed error so the
- * cost model stays honest rather than quietly trusted.
- */
-export function formatMemCompare(
-  estimate: MemoryEstimate | null | undefined,
-  memPeak: number | null | undefined,
-): string {
-  if (!estimate || memPeak == null || memPeak <= 0) return "";
-  const delta = estimate.bytes - memPeak;
-  const pct = Math.round((delta / memPeak) * 100);
-  const sign = delta > 0 ? "+" : "";
-  return `vs peak ${memPeak} B → ${sign}${delta} B (${sign}${pct}%)`;
-}
-
 export function formatMinFirmware(min: MinFirmware | null | undefined): string {
   if (!min) return "—";
   if (!min.reasons.length) return `min fw ${min.version} (baseline)`;

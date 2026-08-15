@@ -3,9 +3,13 @@ import type { EditorView } from "@codemirror/view";
 import { Header } from "./header";
 import { Toolbar, type BuildAction, type Minify, type Mode } from "./toolbar";
 import { Layout } from "./layout";
+import { Inspector, useInspectorTab } from "./inspector";
+import { ReadinessRail } from "./readiness-rail";
+import { deriveReadiness } from "./readiness";
 import { EditorHost } from "../editor/editor-host";
 import { BuildPanel, type DashboardPatch } from "../stats/dashboard";
 import { CheckPanel, summarize, type CheckCatalog, type CheckReport, type Finding } from "../check/check-panel";
+import { tally } from "../check/check-types";
 import { OptionsPanel } from "./options-panel";
 import { api } from "../lib/api";
 import { createDeployGate } from "../device/deploy-gate";
@@ -31,6 +35,11 @@ export function App() {
   const [buildRunning, setBuildRunning] = useState(false);
   const [previewing, setPreviewing] = useState(false);
   const [deployReady, setDeployReady] = useState(false);
+  /** null until the first build of this session; false when it failed. */
+  const [buildOk, setBuildOk] = useState<boolean | null>(null);
+  const [buildStale, setBuildStale] = useState(false);
+  const [checkFailed, setCheckFailed] = useState(false);
+  const [inspectorTab, setInspectorTab] = useInspectorTab();
   const [buildAction, setBuildAction] = useState<BuildAction>("both");
   const [skipTypeCheck, setSkipTypeCheck] = useState(false);
   const [deployChoice, setDeployChoice] = useState<{
@@ -118,6 +127,7 @@ export function App() {
       });
       setReport(data.report);
       setDialectFindings(null);
+      setCheckFailed(!data.report.ok);
       deployGate.setCheckOk(data.report.ok);
       syncDeployReady();
       if (quiet) return;
@@ -176,6 +186,7 @@ export function App() {
     if (!view) return;
     setStatus("building…");
     clearBuildErrors(view);
+    setBuildOk(null);
     deployGate.setBuildOk(false);
     syncDeployReady();
     const data = await api<{
@@ -188,9 +199,10 @@ export function App() {
     }>("/api/build", {
       method: "POST",
       body: JSON.stringify({ skipTypeCheck: skipTypes }),
-    }).catch((e) =>
-      reportBuildFailure(view, e),
-    );
+    }).catch((e) => {
+      setBuildOk(false);
+      return reportBuildFailure(view, e);
+    });
     setSizeDebug(data.sizes.debug ?? {});
     setSizeProd(data.sizes.prod ?? {});
     let history: DashboardPatch["history"] | undefined;
@@ -225,6 +237,9 @@ export function App() {
       const dialectErrors = dialect.some((f) => f.severity === "error");
       setDialectFindings(dialect);
       setReport(null);
+      setBuildOk(!dialectErrors);
+      setBuildStale(false);
+      setCheckFailed(dialectErrors);
       deployGate.setBuildOk(!dialectErrors);
       syncDeployReady();
       setStatus(
@@ -233,6 +248,8 @@ export function App() {
       );
       return;
     }
+    setBuildOk(true);
+    setBuildStale(false);
     deployGate.setBuildOk(true);
     syncDeployReady();
     setStatus("build ok");
@@ -253,6 +270,7 @@ export function App() {
   );
 
   const scheduleAuto = useCallback(() => {
+    setBuildStale(true);
     if (!autoOn.current) return;
     if (artifactsRef.current?.previewing()) return;
     if (autoTimer.current) clearTimeout(autoTimer.current);
@@ -291,6 +309,22 @@ export function App() {
     [withBusy, setStatus, checkScript, scriptHistory],
   );
 
+  const readiness = deriveReadiness({
+    buildOk,
+    buildStale,
+    sizeProd,
+    estimateBytes: dash.estimate?.bytes ?? null,
+    report,
+    dialectFindings,
+    isStatic,
+    hasDevice: deviceSection.hasDevice,
+    probeRequired: deviceSection.probeRequired,
+    probeSkipped: deviceSection.probeSkipped,
+    probeProgress: deviceSection.probeProgress,
+    deployReady,
+  });
+  const checkCounts = report?.counts;
+
   return (
     <>
       <Header
@@ -298,10 +332,7 @@ export function App() {
         configFail={configFail}
         identity={deviceSection.identity}
         onToggleRun={deviceSection.onToggleRun}
-        status={status}
-        statusError={statusError}
-        probeProgress={deviceSection.probeProgress}
-        deviceMeta={deviceSection.deviceMeta}
+        staticMode={isStatic}
         deviceSelector={deviceSection.selector}
       >
         <Toolbar
@@ -313,6 +344,13 @@ export function App() {
           skipTypeCheck={skipTypeCheck}
           deployChoice={deployChoice}
           autoBuildCheck={autoBuildCheck}
+          nextStep={
+            readiness.deployReady && !isStatic
+              ? "deploy"
+              : readiness.gates[0].state === "ok" && readiness.gates[1].state === "ok"
+                ? "none"
+                : "build"
+          }
           staticMode={isStatic}
           staticControls={
             isStatic ? (
@@ -354,6 +392,16 @@ export function App() {
         />
       </Header>
 
+      <ReadinessRail
+        readiness={readiness}
+        status={status}
+        statusError={statusError}
+        onGate={(id) => {
+          if (id === "probed") deviceSection.onProbe();
+          else setInspectorTab(id === "built" ? "build" : "check");
+        }}
+      />
+
       <Layout
         onResize={() => viewRef.current?.requestMeasure()}
         editor={
@@ -372,22 +420,37 @@ export function App() {
           />
         }
         side={
-          <>
-            <BuildPanel
-              sizeDebug={sizeDebug}
-              sizeProd={sizeProd}
-              patch={dash}
-            />
-            <CheckPanel
-              catalog={catalog}
-              report={report}
-              dialectFindings={dialectFindings}
-            />
-            <OptionsPanel onStatus={setStatus} />
-          </>
+          <Inspector
+            tab={inspectorTab}
+            onTab={setInspectorTab}
+            checkFailed={checkFailed}
+            checkBadge={
+              checkCounts && (checkCounts.errors || checkCounts.warnings)
+                ? {
+                    text: String(checkCounts.errors || checkCounts.warnings),
+                    fail: checkCounts.errors > 0,
+                  }
+                : null
+            }
+            checkScale={
+              report ? `${tally(report.checks).pass}/${report.checks.length}` : ""
+            }
+            build={
+              <BuildPanel sizeDebug={sizeDebug} sizeProd={sizeProd} patch={dash} />
+            }
+            check={
+              <CheckPanel
+                catalog={catalog}
+                report={report}
+                dialectFindings={dialectFindings}
+              />
+            }
+            options={<OptionsPanel onStatus={setStatus} />}
+          />
         }
-        footer={deviceSection.footer}
       />
+
+      {deviceSection.dock}
 
       <ScriptHistoryModal
         open={scriptHistory.historyOpen}

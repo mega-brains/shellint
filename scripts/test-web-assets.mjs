@@ -39,10 +39,10 @@ for (const f of REQUIRED) {
 const BUDGETS = [
   ["web/dist/app.js", 660_000],
   ["web/dist/app.js.br", 190_000],
-  // Rebaselined 2026-08-14 (M17.7): measured 41441 B, no CSS source touched —
-  // this repo's styles simply grew past the old budget over time. ~10% above
-  // that measurement, same convention as this file's header comment.
-  ["web/dist/styles.css", 45_600],
+  // Rebaselined 2026-08-15 (M18): the redesign *removed* CSS — the measure row
+  // replaced four bespoke data treatments and the tab strip replaced the
+  // accordion machinery, taking 41441 B down to ~35400 B. ~10% above that.
+  ["web/dist/styles.css", 39_000],
   ["web/dist/api-docs.json", 40_000],
 ];
 

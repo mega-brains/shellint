@@ -69,7 +69,6 @@ export function FindingsList(props: { findings: Finding[] }) {
     <ol class="findings-list" id="findingsList">
       {ordered.map((f, i) => {
         const where = findingLocation(f);
-        const isError = f.severity === "error";
         return (
           <li
             key={`${f.rule}:${f.line ?? i}:${f.message}`}
@@ -102,11 +101,7 @@ export function FindingsList(props: { findings: Finding[] }) {
             }}
           >
             <span class="finding-head">
-              <span
-                class={`badge ${isError ? "badge-fail" : "badge-warn"} finding-sev`}
-              >
-                {isError ? "ERROR" : "WARN"}
-              </span>
+              <span class="finding-dot" aria-hidden="true" />
               <span class="finding-rule">{f.rule}</span>
               {where ? (
                 f.line != null && f.file ? (
@@ -118,9 +113,6 @@ export function FindingsList(props: { findings: Finding[] }) {
                     title={`Go to ${where}`}
                     onClick={() => goToFinding(f.file!, f.line!)}
                   >
-                    <span class="finding-loc-sev" aria-hidden="true">
-                      {isError ? "✕" : "⚠"}
-                    </span>
                     <span class="finding-loc-text">{where}</span>
                     <span class="finding-loc-go" aria-hidden="true">
                       ↗
@@ -128,9 +120,6 @@ export function FindingsList(props: { findings: Finding[] }) {
                   </button>
                 ) : (
                   <span class="finding-loc">
-                    <span class="finding-loc-sev" aria-hidden="true">
-                      {isError ? "✕" : "⚠"}
-                    </span>
                     <span class="finding-loc-text">{where}</span>
                   </span>
                 )

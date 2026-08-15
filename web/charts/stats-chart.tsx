@@ -1,3 +1,10 @@
+import {
+  MeasureList,
+  MeasureRow,
+  WARN_FRACTION,
+  type Tone,
+} from "../ui/measure";
+
 /** Device caps for Shelly Gen2 resource gauges. */
 export const MAX_TIMERS = 5;
 export const MAX_ANON_NEST = 3;
@@ -55,70 +62,40 @@ function rowsFromStats(stats: CapStats | null | undefined): CapRow[] {
 }
 
 /**
- * Compact used/max progress bars for capped Shelly resources.
- * No chart library — plain Preact + CSS.
+ * Capped Shelly resources as measure rows — same grammar as artifact sizes and
+ * memory buckets, so "how close am I to a wall" reads the same everywhere.
+ * Colour only appears at 75% of the limit; over it, the row goes danger.
  */
-export function StatsBars(props: { stats: CapStats | null | undefined }) {
+export function CapMeasures(props: { stats: CapStats | null | undefined }) {
   const rows = rowsFromStats(props.stats);
   if (!rows.length) {
-    return (
-      <div
-        id="statsChart"
-        class="stats-chart"
-        aria-label="Resource usage versus Shelly device caps and size advisories"
-      >
-        <p class="stats-bars-empty">no stats yet — Build to analyze</p>
-      </div>
-    );
+    return <p class="group-empty" id="statsChart">no stats yet — Build to analyze</p>;
   }
-
   return (
-    <div
-      id="statsChart"
-      class="stats-chart"
-      aria-label="Resource usage versus Shelly device caps and size advisories"
-    >
-      <ul class="stats-bars">
-        {rows.map((row) => {
-          const used = Math.max(0, row.used);
-          const max = Math.max(1, row.max);
-          const pct = Math.min(100, (used / max) * 100);
-          const over = used >= max;
-          const cls = [
-            "stats-bar",
-            over ? "warn" : null,
-            row.soft ? "soft" : null,
-          ]
-            .filter(Boolean)
-            .join(" ");
-          return (
-            <li
-              key={row.label}
-              class={cls}
-              title={
-                row.soft
-                  ? `${row.label}: ${used} of ${max} before the size advisory warns`
-                  : `${row.label}: ${used} of the device cap of ${max}`
-              }
-            >
-              <span class="stats-bar-label">{row.label}</span>
-              <div
-                class="stats-bar-track"
-                role="progressbar"
-                aria-valuemin={0}
-                aria-valuemax={max}
-                aria-valuenow={used}
-                aria-label={`${row.label} ${used} of ${max}`}
-              >
-                <div class="stats-bar-fill" style={{ width: `${pct}%` }} />
-              </div>
-              <span class="stats-bar-value">
-                {row.unit ? `${used}/${max} ${row.unit}` : `${used}/${max}`}
-              </span>
-            </li>
-          );
-        })}
-      </ul>
-    </div>
+    <MeasureList id="statsChart" labelWidth={104} valueWidth={74}>
+      {rows.map((row) => {
+        const used = Math.max(0, row.used);
+        const max = Math.max(1, row.max);
+        const fraction = used / max;
+        const tone: Tone =
+          used >= max ? "danger" : fraction >= WARN_FRACTION ? "warn" : "accent";
+        return (
+          <MeasureRow
+            key={row.label}
+            label={row.label}
+            value={row.unit ? `${used}/${max} ${row.unit}` : `${used}/${max}`}
+            fraction={fraction}
+            tone={tone}
+            soft={row.soft}
+            ariaLabel={`${row.label} ${used} of ${max}`}
+            title={
+              row.soft
+                ? `${row.label}: ${used} of ${max} before the size advisory warns`
+                : `${row.label}: ${used} of the device cap of ${max}`
+            }
+          />
+        );
+      })}
+    </MeasureList>
   );
 }

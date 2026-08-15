@@ -4,6 +4,7 @@ import { EditorView } from "@codemirror/view";
 import { javascript } from "@codemirror/lang-javascript";
 import { EditorState } from "@codemirror/state";
 import { basicSetup } from "./cm-setup";
+import { devroomTheme } from "./cm-theme";
 import { findingGutter } from "./finding-gutter";
 import { dirtyGutter } from "./dirty-gutter";
 import { statLineHighlight } from "./line-highlight";
@@ -17,7 +18,15 @@ import {
   type ArtifactOption,
 } from "./artifact-logic";
 import { DiffModal, type DiffOption } from "../diff/diff-modal";
+import { ButtonDropdown, Button } from "../ui/button";
 import { api } from "../lib/api";
+
+/** `debug.js` → `debug.min`, `prod.raw.js` → `prod.raw` — chip-sized names. */
+function chipLabel(value: string): string {
+  if (value === "source") return "source";
+  const base = value.replace(/\.js$/, "");
+  return /\.(raw|adv)$/.test(base) ? base : `${base}.min`;
+}
 
 export { readOnlyCompartment };
 export type { ArtifactInfo } from "./artifact-logic";
@@ -56,6 +65,7 @@ export function EditorHost(props: EditorHostProps) {
   const [metaPreview, setMetaPreview] = useState(false);
   const [selectBusy, setSelectBusy] = useState(false);
   const [diffOpen, setDiffOpen] = useState(false);
+  const [diffOpenMenu, setDiffOpenMenu] = useState(false);
   const [diffSpec, setDiffSpec] = useState<{
     options: DiffOption[];
     left: string;
@@ -81,13 +91,10 @@ export function EditorHost(props: EditorHostProps) {
           diffHighlight,
           shellyHover,
           buildErrorGutter,
+          devroomTheme,
           EditorView.lineWrapping,
           EditorView.updateListener.of((u) => {
             if (u.docChanged) onDocChange.current();
-          }),
-          EditorView.theme({
-            "&": { height: "100%", width: "100%" },
-            ".cm-scroller": { overflow: "auto" },
           }),
         ],
       }),
@@ -127,34 +134,68 @@ export function EditorHost(props: EditorHostProps) {
     };
   }, []);
 
+  const chips = options.filter((o) => !o.value.startsWith("diff:"));
+  const diffs = options.filter((o) => o.value.startsWith("diff:"));
+
   return (
-    <div id="editor" class="editor">
-      {props.banner}
-      <div class="artifact-bar">
-        <span class="artifact-icon" aria-hidden="true">
-          ◫
-        </span>
-        <label class="visually-hidden" for="artifactSel">
-          view
-        </label>
-        <select
-          id="artifactSel"
-          title="Show the editable source, or preview a built dist artifact read-only"
-          value={current}
-          disabled={selectBusy}
-          onChange={(e) => {
-            const name = (e.target as HTMLSelectElement).value;
-            setSelectBusy(true);
-            setCurrent(name);
-            ctlRef.current?.select(name);
-          }}
-        >
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+    <div id="editor" class="editor panel">
+      <div class="artifact-strip">
+        {chips.map((o) => (
+          <Button
+            key={o.value}
+            class={`artifact-chip${current === o.value ? " active" : ""}`}
+            data-value={o.value}
+            aria-pressed={current === o.value ? "true" : "false"}
+            title={o.label}
+            disabled={selectBusy}
+            onClick={() => {
+              setSelectBusy(true);
+              setCurrent(o.value);
+              ctlRef.current?.select(o.value);
+            }}
+          >
+            {chipLabel(o.value)}
+          </Button>
+        ))}
+        {diffs.length ? (
+          <ButtonDropdown
+            rootId="diffSplit"
+            toggleId="btnDiffMenu"
+            menuId="diffMenu"
+            className="split artifact-diff"
+            open={diffOpenMenu}
+            onOpenChange={setDiffOpenMenu}
+            toggleTitle="Compare two built artifacts"
+            onPick={(item) => {
+              const value = item.dataset.value!;
+              setSelectBusy(true);
+              setCurrent(value);
+              ctlRef.current?.select(value);
+            }}
+            primary={
+              <Button
+                class={`artifact-chip${current.startsWith("diff:") ? " active" : ""}`}
+                title="Compare two built artifacts"
+                disabled={selectBusy}
+                onClick={() => setDiffOpenMenu((o) => !o)}
+              >
+                diff
+              </Button>
+            }
+            menu={
+              <ul class="menu" id="diffMenu" role="menu">
+                {diffs.map((o) => (
+                  <li role="none" key={o.value}>
+                    <Button role="menuitem" data-value={o.value} title={o.label}>
+                      {o.label.replace(/^diff · /, "")}
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+            }
+          />
+        ) : null}
+        <span class="strip-spacer" />
         <p
           class={`artifact-meta${metaPreview ? " preview" : ""}`}
           id="artifactMeta"
@@ -162,7 +203,10 @@ export function EditorHost(props: EditorHostProps) {
           {meta}
         </p>
       </div>
-      <div class="cm-host" ref={cmRef} />
+      <div class="editor-body">
+        {props.banner}
+        <div class="cm-host" ref={cmRef} />
+      </div>
       {diffSpec ? (
         <DiffModal
           open={diffOpen}

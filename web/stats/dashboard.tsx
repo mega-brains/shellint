@@ -1,21 +1,12 @@
-import { Collapsible } from "../ui/collapsible";
 import { flashClass, useChangeFlash } from "../ui/use-flash";
+import { Group, MeasureList, MeasureRow } from "../ui/measure";
 import { StatBadges } from "./stats-badges";
-import { StatsBars } from "../charts/stats-chart";
-import { MemBreakdown, MemBullet, MemPeek } from "../charts/mem-chart";
+import { CapMeasures } from "../charts/stats-chart";
+import { MemMeasures, MemWell } from "../charts/mem-chart";
 import { Sparkline } from "../charts/sparkline";
 import { api } from "../lib/api";
+import { hasAdvColumn, type Sizes } from "../lib/sizes";
 import {
-  formatSizeCell,
-  hasAdvColumn,
-  sizeExtent,
-  sizeTint,
-  type SizeTint,
-  type Sizes,
-} from "../lib/sizes";
-import {
-  formatEstimate,
-  formatMemCompare,
   formatMinFirmware,
   historyTimeLabel,
   memSparkPoints,
@@ -44,33 +35,81 @@ export type BuildPanelProps = {
   sizeDebug: Sizes;
   sizeProd: Sizes;
   patch: DashboardPatch;
+  /** `"prod.min"` — the artifact the next Deploy would upload, so exactly one
+   * bar in the artifacts group carries the accent. */
+  target?: string;
 };
 
-function SizeCell(props: { n: number | undefined; tint: SizeTint | null }) {
-  const flash = useChangeFlash(props.n);
+type Artifact = { key: string; label: string; bytes: number | undefined };
+
+function artifacts(debug: Sizes, prod: Sizes, showAdv: boolean): Artifact[] {
+  const out: Artifact[] = [
+    { key: "debug.raw", label: "debug raw", bytes: debug.raw },
+    { key: "debug.min", label: "debug min", bytes: debug.min },
+    { key: "prod.raw", label: "prod raw", bytes: prod.raw },
+    { key: "prod.min", label: "prod min", bytes: prod.min },
+  ];
+  if (showAdv) {
+    out.push({ key: "debug.adv", label: "debug adv", bytes: debug.adv });
+    out.push({ key: "prod.adv", label: "prod adv", bytes: prod.adv });
+  }
+  return out;
+}
+
+function ArtifactGroup(props: BuildPanelProps) {
+  const showAdv = hasAdvColumn(props.sizeDebug, props.sizeProd);
+  const rows = artifacts(props.sizeDebug, props.sizeProd, showAdv);
+  const largest = Math.max(1, ...rows.map((r) => r.bytes ?? 0));
+  const target = props.target ?? "prod.min";
   return (
-    <td class={flashClass(props.tint ? `size-${props.tint}` : undefined, flash)}>
-      {formatSizeCell(props.n)}
-    </td>
+    <Group title="artifacts" id="sizeBlock" caption={showAdv ? "raw / min / adv" : "bytes"}>
+      <MeasureList id="sizeMeasures">
+        {rows.map((r) => (
+          <ArtifactRow
+            key={r.key}
+            artifact={r}
+            largest={largest}
+            target={r.key === target}
+          />
+        ))}
+      </MeasureList>
+    </Group>
   );
 }
 
-function SizeRow(props: {
-  id: string;
-  label: string;
-  sizes: Sizes;
-  showAdv: boolean;
-  extent: { min: number; max: number } | null;
+/** Own component so each size gets its own change-flash. */
+function ArtifactRow(props: {
+  artifact: Artifact;
+  largest: number;
+  target: boolean;
 }) {
+  const { artifact, largest, target } = props;
+  const flash = useChangeFlash(artifact.bytes);
   return (
-    <tr id={props.id}>
-      <th scope="row">{props.label}</th>
-      <SizeCell n={props.sizes.raw} tint={sizeTint(props.sizes.raw, props.extent)} />
-      <SizeCell n={props.sizes.min} tint={sizeTint(props.sizes.min, props.extent)} />
-      {props.showAdv ? (
-        <SizeCell n={props.sizes.adv} tint={sizeTint(props.sizes.adv, props.extent)} />
-      ) : null}
-    </tr>
+    <li
+      class={flashClass("measure", flash)}
+      id={`size-${artifact.key.replace(".", "-")}`}
+      title={
+        target
+          ? `${artifact.label} — the artifact the next Deploy uploads`
+          : artifact.label
+      }
+    >
+      <span class="measure-label">{artifact.label}</span>
+      <div
+        class="measure-track"
+        role="img"
+        aria-label={`${artifact.label} ${artifact.bytes ?? "unknown"} bytes`}
+      >
+        <div
+          class={`measure-fill tone-${target ? "accent" : "neutral"}`}
+          style={{ width: `${(((artifact.bytes ?? 0) / largest) * 100).toFixed(1)}%` }}
+        />
+      </div>
+      <span class="measure-value">
+        {artifact.bytes != null ? `${artifact.bytes} B` : "—"}
+      </span>
+    </li>
   );
 }
 
@@ -95,153 +134,59 @@ function HistoryList(props: { rows: HistoryRow[] }) {
   );
 }
 
+/** The inspector's build tab: artifacts, counters, caps, memory, history. */
 export function BuildPanel(props: BuildPanelProps) {
   const history = props.patch.history ?? [];
   const stats = resolveStats(props.patch.stats, history);
-  const compare = formatMemCompare(props.patch.estimate, props.patch.memPeak);
-  const off = compare
-    ? Math.abs(Number(compare.match(/\(([+-]?\d+)%\)/)?.[1] ?? 0))
-    : 0;
-  const showAdv = hasAdvColumn(props.sizeDebug, props.sizeProd);
-  const extent = sizeExtent(props.sizeDebug, props.sizeProd, showAdv);
-  const estimateText = formatEstimate(props.patch.estimate);
   const firmwareText = formatMinFirmware(props.patch.minFirmware);
-  const estimateFlash = useChangeFlash(estimateText);
   const firmwareFlash = useChangeFlash(firmwareText);
 
   return (
-    <Collapsible
-      storageKey="shelly-devroom.buildPanel.collapsed"
-      defaultCollapsed={false}
-      panelId="buildPanel"
-      panelClass="build"
-      bodyId="buildBody"
-      headId="buildHead"
-      toggleId="buildToggle"
-      title="Show or hide build sizes, script stats and history"
-      ariaLabel="Build sizes"
-      headChildren={<h2>build</h2>}
-    >
-      <div class="sizes" id="buildBody">
-        <div class="size-block size-sizes">
-          <table class="size-table">
-            <thead>
-              <tr>
-                <th scope="col"></th>
-                <th scope="col">raw</th>
-                <th scope="col">min</th>
-                {showAdv ? <th scope="col">adv</th> : null}
-              </tr>
-            </thead>
-            <tbody>
-              <SizeRow
-                id="sizeDebug"
-                label="debug"
-                sizes={props.sizeDebug}
-                showAdv={showAdv}
-                extent={extent}
-              />
-              <SizeRow
-                id="sizeProd"
-                label="prod"
-                sizes={props.sizeProd}
-                showAdv={showAdv}
-                extent={extent}
-              />
-            </tbody>
-          </table>
-        </div>
-        <div class="size-block size-stats">
-          <h2>stats</h2>
-          <StatBadges stats={stats} variants={props.patch.variants} />
-          <StatsBars stats={stats} />
-          <p
-            id="minFirmware"
-            class={flashClass("stats-summary", firmwareFlash)}
-            title="Lowest Shelly firmware that implements every API this script uses"
-          >
-            {firmwareText}
-          </p>
-        </div>
-        <Collapsible
-          as="div"
-          storageKey="shelly-devroom.memBlock.collapsed"
-          defaultCollapsed={false}
-          panelId="memBlock"
-          panelClass="size-block size-mem"
-          bodyId="memBody"
-          headId="memHead"
-          toggleId="memToggle"
-          title="Show or hide the RAM estimate breakdown"
-          headChildren={
-            <>
-              <h2>memory</h2>
-              <MemPeek
-                estimate={props.patch.estimate}
-                memPeak={props.patch.memPeak}
-              />
-            </>
-          }
+    <div class="build" id="buildPanel">
+      <ArtifactGroup {...props} />
+
+      <Group title="counters" id="statsBlock" caption="source">
+        <StatBadges stats={stats} variants={props.patch.variants} />
+      </Group>
+
+      <Group title="caps" id="capsBlock" caption="used / limit">
+        <CapMeasures stats={stats} />
+        <p
+          id="minFirmware"
+          class={flashClass("group-note", firmwareFlash)}
+          title="Lowest Shelly firmware that implements every API this script uses"
         >
-          <div class="size-mem-body" id="memBody">
-            <p
-              id="memEstimate"
-              class={flashClass("mem-total", estimateFlash)}
-              title="Static RAM estimate from an Espruino JsVar cost model — an estimate, not a measurement"
-            >
-              {estimateText}
-            </p>
-            <MemBreakdown estimate={props.patch.estimate} />
-            <MemBullet
-              estimate={props.patch.estimate}
-              memPeak={props.patch.memPeak}
-            />
-            <p
-              id="memCompare"
-              class={`mem-compare${off > 50 ? " warn" : ""}`}
-            >
-              {compare}
-            </p>
-          </div>
-        </Collapsible>
-        <Collapsible
-          as="div"
-          storageKey="shelly-devroom.historyBlock.collapsed"
-          defaultCollapsed={true}
-          panelId="historyBlock"
-          panelClass="size-block size-history"
-          bodyId="historyBody"
-          headId="historyHead"
-          toggleId="historyToggle"
-          title="Show or hide the size and RAM trends and the per-build list"
-          headChildren={<h2>history</h2>}
-        >
-          <div class="size-history-body" id="historyBody">
-            <Sparkline
-              id="historySpark"
-              aria-label="Minified script size over recent builds"
-              series={[{ label: "prod min", points: sizeSparkPoints(history) }]}
-              options={{
-                height: 40,
-                formatY: (y) => `${y} B`,
-                formatX: sparkTimeLabel,
-              }}
-            />
-            <Sparkline
-              id="memSpark"
-              aria-label="Estimated RAM over recent builds"
-              series={[{ label: "est RAM", points: memSparkPoints(history) }]}
-              options={{
-                height: 32,
-                formatY: (y) => `${y} B`,
-                formatX: sparkTimeLabel,
-              }}
-            />
-            <HistoryList rows={history} />
-          </div>
-        </Collapsible>
-      </div>
-    </Collapsible>
+          {firmwareText}
+        </p>
+      </Group>
+
+      <Group
+        title="memory estimate"
+        id="memBlock"
+        caption={
+          props.patch.estimate ? `${props.patch.estimate.bytes} B` : "not built"
+        }
+      >
+        <MemMeasures estimate={props.patch.estimate} />
+        <MemWell estimate={props.patch.estimate} memPeak={props.patch.memPeak} />
+      </Group>
+
+      <Group title="history" id="historyBlock" caption="recent builds">
+        <Sparkline
+          id="historySpark"
+          aria-label="Minified script size over recent builds"
+          series={[{ label: "prod min", points: sizeSparkPoints(history) }]}
+          options={{ height: 40, formatY: (y) => `${y} B`, formatX: sparkTimeLabel }}
+        />
+        <Sparkline
+          id="memSpark"
+          aria-label="Estimated RAM over recent builds"
+          series={[{ label: "est RAM", points: memSparkPoints(history) }]}
+          options={{ height: 32, formatY: (y) => `${y} B`, formatX: sparkTimeLabel }}
+        />
+        <HistoryList rows={history} />
+      </Group>
+    </div>
   );
 }
 

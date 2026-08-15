@@ -6,7 +6,9 @@
  * arms — every gutter in the UI (finding-gutter, dirty-gutter,
  * build-error-gutter) is hand-rolled on StateField + RangeSet instead.
  * Spelling the array out here drops that dependency and the meta-package
- * with it. Search and autocompletion are deliberately kept.
+ * with it. Search and autocompletion are deliberately kept. Syntax
+ * highlighting is not listed either — `cm-theme.ts` owns it (M18), so there is
+ * no default style underneath fighting the token colours.
  */
 import {
   autocompletion,
@@ -17,11 +19,9 @@ import {
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
 import {
   bracketMatching,
-  defaultHighlightStyle,
   foldGutter,
   foldKeymap,
   indentOnInput,
-  syntaxHighlighting,
 } from "@codemirror/language";
 import { highlightSelectionMatches, searchKeymap } from "@codemirror/search";
 import { EditorState, type Extension } from "@codemirror/state";
@@ -47,7 +47,6 @@ export const basicSetup: Extension = [
   dropCursor(),
   EditorState.allowMultipleSelections.of(true),
   indentOnInput(),
-  syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
   bracketMatching(),
   closeBrackets(),
   autocompletion(),

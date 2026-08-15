@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "preact/hooks";
 import type { JSX } from "preact";
-import { Collapsible } from "../ui/collapsible";
+import { Group } from "../ui/measure";
 import { api } from "../lib/api";
 import { OPT_TIPS, OptTip, tipStyleFor } from "../ui/option-tip";
 import {
@@ -40,7 +40,7 @@ export type OptionsPanelProps = {
   onStatus?: (msg: string, isError?: boolean) => void;
 };
 
-/** Collapsible minify knobs → PATCH /api/config. Applies on next build. */
+/** Minify knobs → PATCH /api/config. Applies on next build. */
 export function OptionsPanel(props: OptionsPanelProps) {
   const [opts, setOpts] = useState<MinifyOptions>(DEFAULTS);
   const [loaded, setLoaded] = useState(false);
@@ -113,75 +113,57 @@ export function OptionsPanel(props: OptionsPanelProps) {
   const tip = tipKey ? OPT_TIPS[tipKey] : null;
 
   return (
-    <Collapsible
-      storageKey="shelly-devroom.optionsPanel.collapsed"
-      defaultCollapsed={true}
-      panelId="optionsPanel"
-      panelClass="options"
-      bodyId="optionsBody"
-      headId="optionsHead"
-      toggleId="optionsToggle"
-      title="Show or hide minify options (Terser, prod log map, tier-3)"
-      ariaLabel="Build options"
-      headChildren={
-        <>
-          <h2>options</h2>
-          <p class="panel-peek" id="optionsPeek" data-testid="options-peek">
-            {loaded ? peekText(opts) : "…"}
+    <div class="options" id="optionsPanel">
+      <Group
+        title="minify"
+        id="optionsBlock"
+        caption={<span id="optionsPeek" data-testid="options-peek">{loaded ? peekText(opts) : "…"}</span>}
+      >
+        <div class="options-body" id="optionsBody" data-testid="options-body">
+          <p class="group-note" id="optionsNote">
+            applies on next build
           </p>
-        </>
-      }
-    >
-      <div class="options-body" id="optionsBody" data-testid="options-body">
-        <p class="options-note" id="optionsNote">
-          applies on next build
-        </p>
-        <ul class="options-list" data-testid="options-list">
-          {OPTS.map((o) => (
-            <li key={o.key}>
-              <label
-                class="options-item"
-                for={o.id}
-                onMouseEnter={(e) =>
-                  openTip(o.key, e.currentTarget as HTMLElement)
-                }
-                onMouseLeave={closeTip}
-                onFocusCapture={(e) =>
-                  openTip(o.key, e.currentTarget as HTMLElement)
-                }
-                onBlurCapture={(e) => {
-                  const next = e.relatedTarget as Node | null;
-                  if (!next || !(e.currentTarget as HTMLElement).contains(next)) {
-                    closeTip();
-                  }
-                }}
-              >
-                <input
-                  type="checkbox"
-                  id={o.id}
-                  data-testid={`opt-${o.key}`}
-                  checked={opts[o.key]}
-                  disabled={!loaded}
-                  aria-describedby={tipKey === o.key ? "optTipLive" : undefined}
-                  onChange={(e) =>
-                    onToggle(o.key, (e.target as HTMLInputElement).checked)
-                  }
-                />
-                <span>{o.label}</span>
-              </label>
-            </li>
-          ))}
-        </ul>
-        {tip ? (
-          <OptTip
-            open
-            content={tip}
-            style={tipStyle}
-          />
-        ) : null}
-        {/* Stable id for aria-describedby while a tip is open. */}
-        {tip ? <span id="optTipLive" class="visually-hidden">{tip.blurb}</span> : null}
-      </div>
-    </Collapsible>
+          <ul class="options-list" data-testid="options-list">
+            {OPTS.map((o) => (
+              <li key={o.key}>
+                <label
+                  class="options-item"
+                  for={o.id}
+                  onMouseEnter={(e) => openTip(o.key, e.currentTarget as HTMLElement)}
+                  onMouseLeave={closeTip}
+                  onFocusCapture={(e) => openTip(o.key, e.currentTarget as HTMLElement)}
+                  onBlurCapture={(e) => {
+                    const next = e.relatedTarget as Node | null;
+                    if (!next || !(e.currentTarget as HTMLElement).contains(next)) {
+                      closeTip();
+                    }
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    id={o.id}
+                    data-testid={`opt-${o.key}`}
+                    checked={opts[o.key]}
+                    disabled={!loaded}
+                    aria-describedby={tipKey === o.key ? "optTipLive" : undefined}
+                    onChange={(e) =>
+                      onToggle(o.key, (e.target as HTMLInputElement).checked)
+                    }
+                  />
+                  <span>{o.label}</span>
+                </label>
+              </li>
+            ))}
+          </ul>
+          {tip ? <OptTip open content={tip} style={tipStyle} /> : null}
+          {/* Stable id for aria-describedby while a tip is open. */}
+          {tip ? (
+            <span id="optTipLive" class="visually-hidden">
+              {tip.blurb}
+            </span>
+          ) : null}
+        </div>
+      </Group>
+    </div>
   );
 }

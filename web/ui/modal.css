@@ -1,0 +1,95 @@
+/*
+ * One modal frame (M18), shared by history, the device manager, probe capture,
+ * probe eco and the diff view. This is the *only* elevated surface in the
+ * product — everything in-page is flat — and the backdrop is the canvas colour
+ * at 70%, deliberately without a blur.
+ */
+.script-history-modal,
+.device-manager-modal,
+.probe-eco-modal,
+.probe-capture-modal,
+.diff-modal {
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+}
+
+.script-history-modal::backdrop,
+.device-manager-modal::backdrop,
+.probe-eco-modal::backdrop,
+.probe-capture-modal::backdrop,
+.diff-modal::backdrop {
+  background: var(--scrim);
+}
+
+.script-history-modal[open],
+.device-manager-modal[open],
+.probe-eco-modal[open],
+.probe-capture-modal[open],
+.diff-modal[open] {
+  display: flex;
+  flex-direction: column;
+  animation: modal-in 180ms ease-out;
+}
+
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+
+/* Frame header: title, mono context, then the esc hint and the close control. */
+.script-history-head,
+.device-manager-head,
+.diff-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px 16px;
+}
+
+.script-history-head p,
+.device-manager-head p {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Rows inside a frame: one tile per row, never a bare table stripe. */
+.script-history-row,
+.device-manager-capture-list li {
+  display: grid;
+  grid-template-columns: 90px minmax(0, 1fr) 80px auto;
+  align-items: center;
+  gap: 12px;
+  padding: 9px 11px;
+  border: none;
+  border-radius: 6px;
+  background: var(--surface-2);
+}
+
+.modal-context {
+  font-family: var(--mono);
+  font-size: 11.5px;
+  color: var(--faint);
+}
+
+.modal-spacer { flex: 1 1 auto; }
+
+.modal-esc {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.modal-close {
+  padding: 2px 6px;
+  background: none;
+  font-size: 13px;
+  line-height: 1;
+  color: var(--muted);
+}

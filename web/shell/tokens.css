@@ -1,0 +1,87 @@
+/*
+ * Design tokens (M18). Dark is the default; light comes from
+ * prefers-color-scheme, or from the header toggle's `data-theme` override
+ * (web/shell/theme.ts).
+ * Values are the redesign handoff's table — do not "round" them.
+ */
+:root {
+  --bg: #14171c;
+  --surface: #1b1f26;
+  --surface-2: #232833;
+  --surface-3: #171b21;
+  --ink: #e8ecf2;
+  --muted: #9aa4b4;
+  --faint: #6b7686;
+  --accent: #35c8e0;
+  --accent-ink: #08222a;
+  --ok: #4bd39a;
+  --warn: #e3b341;
+  --danger: #f2685c;
+  /* Non-target bars, gutter numbers, tier-row fill. */
+  --neutral-bar: #4a5462;
+  --code-ink: #c6ced9;
+  --code-keyword: #c58cf0;
+  --code-string: #e3b341;
+  --gutter-ink: #4a5462;
+  --tier-fill: #1f242c;
+  --run-fill: #12312a;
+  --scrim: rgba(20, 23, 28, 0.7);
+  --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.5);
+  /* OS-bundled faces only (macOS / Windows / Linux) — nothing is downloaded. */
+  --mono: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
+  --sans: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+}
+
+/*
+ * Light values live twice on purpose: the media rule paints the OS choice
+ * before the bundle runs, the attribute rule carries the header toggle's
+ * override (web/shell/theme.ts). `:not([data-theme])` keeps them apart.
+ */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme]) {
+    --bg: #f2f4f7;
+    --surface: #ffffff;
+    --surface-2: #eaeef3;
+    --surface-3: #f7f9fb;
+    --ink: #171a1f;
+    --muted: #5b6472;
+    --faint: #8b95a3;
+    --accent: #0a7f96;
+    --accent-ink: #ffffff;
+    --ok: #16855c;
+    --warn: #9a6b00;
+    --danger: #c0392b;
+    --neutral-bar: #c3ccd6;
+    --code-ink: #2c3440;
+    --code-keyword: #7a3ec8;
+    --code-string: #9a6b00;
+    --gutter-ink: #a8b1bd;
+    --tier-fill: #f0f3f7;
+    --run-fill: #e2f2ea;
+    --scrim: rgba(242, 244, 247, 0.7);
+  }
+}
+
+:root[data-theme="light"] {
+  --bg: #f2f4f7;
+  --surface: #ffffff;
+  --surface-2: #eaeef3;
+  --surface-3: #f7f9fb;
+  --ink: #171a1f;
+  --muted: #5b6472;
+  --faint: #8b95a3;
+  --accent: #0a7f96;
+  --accent-ink: #ffffff;
+  --ok: #16855c;
+  --warn: #9a6b00;
+  --danger: #c0392b;
+  --neutral-bar: #c3ccd6;
+  --code-ink: #2c3440;
+  --code-keyword: #7a3ec8;
+  --code-string: #9a6b00;
+  --gutter-ink: #a8b1bd;
+  --tier-fill: #f0f3f7;
+  --run-fill: #e2f2ea;
+  --scrim: rgba(242, 244, 247, 0.7);
+}
+

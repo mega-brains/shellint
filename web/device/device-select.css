@@ -1,146 +1,115 @@
-/* Header device/slot pickers + the add-device manager modal. */
+/* Header device/slot pickers, and the add-device manager modal body. */
 
-/* Sits where the old config line did, right of the title. The controls are
-   deliberately compact: their names are useful context, but the editor and
-   toolbar should retain the header's visual weight. */
-.device-picker-row {
-  display: flex;
-  align-items: center;
-  gap: 0.25rem;
-  min-width: 0;
-  flex: 0 1 auto;
-}
-
+/*
+ * The pickers stay native `<select>`s inside a chip shell: `<option>` text
+ * cannot carry the mock's two-tone "mono IP + muted name", so the IP is its own
+ * element beside the select (and keeps the open-device-UI link), while the
+ * select carries the friendly name. Keyboard and screen-reader behaviour of a
+ * real select is worth more than the second colour.
+ */
 .device-select,
 .slot-select {
-  font-family: var(--sans-narrow);
-  font-size: 0.78rem;
-  line-height: 1.1;
-  /* Room on the right for the caret drawn by the background image. */
-  padding: 0.25rem 1.35rem 0.25rem 0.45rem;
-  border: 1px solid var(--line);
-  border-radius: 2px;
-  background-color: var(--panel);
-  color: var(--ink);
+  padding: 6px 22px 6px 10px;
+  border: none;
+  border-radius: 6px;
+  background-color: var(--surface-2);
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1;
   cursor: pointer;
-  box-shadow: inset 0 -2px 0 rgba(15, 107, 92, 0.18);
-  /* Strip the OS field chrome so it reads as a button, then draw our caret. */
+  /* Strip the OS field chrome so it reads as a chip, then draw our own caret. */
   appearance: none;
   background-image: linear-gradient(45deg, transparent 50%, currentColor 50%),
     linear-gradient(135deg, currentColor 50%, transparent 50%);
-  background-position: right 0.6rem center, right 0.4rem center;
-  background-size: 0.22rem 0.22rem, 0.22rem 0.22rem;
+  background-position: right 10px center, right 6px center;
+  background-size: 4px 4px, 4px 4px;
   background-repeat: no-repeat;
-  /* Compact enough for the header, with the selected name elided when needed. */
-  width: 8.75rem;
+  max-width: 11rem;
   flex: 0 1 auto;
   min-width: 0;
-  max-width: 8.75rem;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
 .slot-select {
-  width: 6.25rem;
-  max-width: 6.25rem;
+  max-width: 9rem;
+  font-family: var(--mono);
+  font-size: 11.5px;
 }
 
 .device-select:hover,
-.slot-select:hover {
-  border-color: var(--accent);
-  box-shadow: inset 0 -2px 0 var(--accent);
-}
+.slot-select:hover { color: var(--ink); }
 
 .device-select:focus-visible,
 .slot-select:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
-  box-shadow: inset 0 -2px 0 var(--accent);
 }
 
-.picker-fail { color: var(--danger); }
-
-.device-manager-modal {
-  width: min(380px, 92vw);
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--panel);
+/* Options are painted by the OS: give it a matching surface to work with. */
+.device-select option,
+.slot-select option {
+  background: var(--surface);
   color: var(--ink);
 }
 
-.device-manager-modal::backdrop { background: rgba(28, 27, 25, 0.45); }
+/* ------------------------------------------------------- manager modal */
 
-.device-manager-modal[open] {
-  display: flex;
-  flex-direction: column;
-}
-
-.device-manager-head {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: 0.75rem;
-  padding: 0.6rem 0.9rem;
-  border-bottom: 1px solid var(--line);
-}
-
-.device-manager-head p { margin: 0; font-weight: 600; }
+.device-manager-modal { width: min(440px, 92vw); }
 
 .device-manager-body {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
-  padding: 0.8rem 0.9rem;
+  gap: 10px;
+  padding: 0 16px 16px;
 }
 
 .device-manager-field {
   display: flex;
   flex-direction: column;
-  gap: 0.2rem;
-  font-size: 0.8rem;
+  gap: 4px;
+  font-size: 12px;
   color: var(--muted);
 }
 
 .device-manager-field input {
-  font: inherit;
-  padding: 0.3rem 0.4rem;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  background: var(--bg);
+  padding: 7px 10px;
+  border: none;
+  border-radius: 6px;
+  background: var(--surface-2);
   color: var(--ink);
+  font-size: 12.5px;
 }
 
 .device-manager-hint {
   margin: 0;
-  font-size: 0.72rem;
-  color: var(--muted);
+  font-size: 11.5px;
+  color: var(--faint);
 }
 
 .device-manager-error {
   margin: 0;
-  font-size: 0.8rem;
-  color: var(--bad, #b23);
+  font-size: 12px;
+  color: var(--danger);
 }
 
 .device-manager-actions {
   display: flex;
   justify-content: flex-end;
-  padding: 0.6rem 0.9rem;
-  border-top: 1px solid var(--line);
+  gap: 8px;
+  padding: 0 16px 16px;
 }
 
-.device-manager-captures {
-  padding: 0 0.9rem 0.8rem;
-  border-top: 1px solid var(--line);
-}
+.device-manager-captures { padding: 0 16px 16px; }
 
 .device-manager-captures-head {
-  margin: 0.6rem 0 0.3rem;
-  font-size: 0.78rem;
+  margin: 0 0 6px;
+  font-size: 10.5px;
   font-weight: 600;
-  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--faint);
 }
 
 .device-manager-capture-list {
@@ -149,35 +118,36 @@
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 0.3rem;
-  font-size: 0.76rem;
+  gap: 4px;
+  font-size: 11.5px;
+  color: var(--muted);
 }
 
-/* Eco-mode confirmation in front of a probe run — wider than the add-device
-   form because it is mostly prose. */
-.probe-eco-modal { width: min(460px, 94vw); }
+/* Eco-mode confirmation in front of a probe run — mostly prose, so wider. */
+.probe-eco-modal { width: min(520px, 94vw); }
 
 .probe-eco-text {
   margin: 0;
-  font-size: 0.8rem;
-  line-height: 1.45;
+  padding: 0 16px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  color: var(--muted);
 }
 
 .probe-eco-option {
   display: flex;
   align-items: flex-start;
-  gap: 0.45rem;
-  font-size: 0.8rem;
+  gap: 8px;
+  padding: 0 16px;
+  font-size: 12.5px;
 }
 
-.probe-eco-option input { margin-top: 0.2rem; }
+.probe-eco-option input { margin-top: 3px; accent-color: var(--accent); }
 
 .probe-eco-option span {
   display: flex;
   flex-direction: column;
-  gap: 0.1rem;
+  gap: 2px;
 }
 
-.probe-eco-option small { color: var(--muted); font-size: 0.72rem; }
-
-.probe-eco-modal .device-manager-actions { gap: 0.5rem; }
+.probe-eco-option small { color: var(--faint); font-size: 11.5px; }

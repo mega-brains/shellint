@@ -1,6 +1,5 @@
-/* Line charts and the debug-log panel — split out of panels.css for the line cap. */
+/* Hand-rolled inline-SVG charts, and the debug-log panel. */
 
-/* Inline-SVG line charts: size-over-time and live debug-log metrics. */
 .spark {
   display: block;
   width: 100%;
@@ -14,23 +13,23 @@
   vector-effect: non-scaling-stroke;
 }
 
-.spark-line-1 { stroke: #8a6d1f; }
-.spark-line-2 { stroke: #4a6d8a; }
+.spark-line-1 { stroke: var(--warn); }
+.spark-line-2 { stroke: var(--muted); }
 .spark-line-3 { stroke: var(--danger); }
 
 .spark-label,
 .spark-axis {
   font-family: var(--mono);
-  font-size: 0.62rem;
-  fill: var(--muted);
-  color: var(--muted);
+  font-size: 10px;
+  fill: var(--faint);
+  color: var(--faint);
 }
 
 /* x-first, y-min, y-max, x-last — spread out, or they read as one number. */
 .spark-axis {
   display: flex;
   justify-content: space-between;
-  gap: 0.4rem;
+  gap: 6px;
 }
 
 .spark-axis .spark-label {
@@ -40,13 +39,16 @@
   white-space: nowrap;
 }
 
-/* Hover readout. The host is the positioning context for the tooltip. */
+/* Hover readout. The host is the positioning context for the tooltip, and the
+   clip: the chart's own overflow is visible so points on the edge survive. */
 .spark-host {
   position: relative;
+  min-width: 0;
+  overflow: hidden;
 }
 
 .spark-guide {
-  stroke: var(--muted);
+  stroke: var(--faint);
   stroke-width: 1;
   stroke-dasharray: 2 2;
   vector-effect: non-scaling-stroke;
@@ -55,16 +57,16 @@
 
 .spark-tip {
   position: absolute;
-  top: 0.2rem;
+  top: 2px;
   z-index: 3;
   display: flex;
   flex-direction: column;
-  padding: 0.15rem 0.35rem;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  background: rgba(255, 252, 247, 0.96);
+  padding: 3px 6px;
+  border-radius: 5px;
+  background: var(--surface-2);
+  color: var(--ink);
   font-family: var(--mono);
-  font-size: 0.66rem;
+  font-size: 10.5px;
   line-height: 1.35;
   white-space: nowrap;
   pointer-events: none;
@@ -74,16 +76,14 @@
 .spark-tip-x { color: var(--muted); }
 
 .spark-empty {
-  margin: 0.25rem 0 0;
+  margin: 4px 0 0;
   font-family: var(--mono);
-  font-size: 0.75rem;
-  color: var(--muted);
+  font-size: 11px;
+  color: var(--faint);
 }
 
-/* Telemetry histories sit inside a grid cell, so they stay gauge-sized. */
-.mini-bars-host {
-  margin-top: 0.15rem;
-}
+/* Telemetry histories sit inside a tile, so they stay tile-sized. */
+.mini-bars-host { margin-top: 1px; }
 
 .mini-bars {
   display: block;
@@ -91,210 +91,178 @@
 }
 
 /* Only live samples use accent — never paint missing slots teal. */
-.mini-bar:not(.missing) {
-  fill: var(--accent);
-}
+.mini-bar:not(.missing) { fill: var(--accent); }
 
-/* Failed/missing poll slots: full-height muted fill + diagonal hatch strokes. */
-.mini-bar-missing {
-  opacity: 0.5;
-}
+/* Failed/missing poll slots: muted fill + diagonal hatch strokes. */
+.mini-bar-missing { opacity: 0.5; }
 
 .mini-bar.missing {
-  fill: #c4bfb3;
-  opacity: 0.1;
+  fill: var(--faint);
+  opacity: 0.12;
 }
 
 .mini-bar-hatch-line {
-  stroke: #6f6b62;
+  stroke: var(--faint);
   stroke-width: 1.25;
   vector-effect: non-scaling-stroke;
 }
 
 /* Invisible per-sample hit area: the bars themselves are too thin to hover. */
-.mini-bar-hit {
-  fill: transparent;
+.mini-bar-hit { fill: transparent; }
+
+.mini-bar-hit:hover { fill: color-mix(in srgb, var(--accent) 18%, transparent); }
+
+.mini-bars-note {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--faint);
 }
 
-.mini-bar-hit:hover {
-  fill: rgba(15, 107, 92, 0.14);
-}
-
-/* While hovering, the stats line reads out the sample under the cursor. */
+/* While hovering, the note reads out the sample under the cursor. */
 .mini-bars-note.hover {
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 
-.mini-bars-note {
-  margin: 0;
-  font-family: var(--mono);
-  font-size: 0.6rem;
-  color: var(--muted);
+/* ---------------------------------------------------------------- logs */
+
+.dock-body.logs {
+  gap: 0;
+  padding: 0;
+  height: 100%;
 }
 
-/* Controls are taller than the heading text they sit beside. */
-#logsHead { align-items: center; }
-
-/* Stream controls sit in the panel head, so they stay usable while collapsed. */
 .logs-controls {
   display: flex;
-  /* One line: the filter field shrinks rather than pushing "follow" down. */
   flex-wrap: nowrap;
   align-items: center;
-  gap: 0.4rem;
-  margin-left: 0.25rem;
+  gap: 8px;
+  flex: 0 0 auto;
   min-width: 0;
+  height: 44px;
+  padding: 0 12px;
+  background: var(--surface-3);
 }
 
-.logs-controls button,
-.logs-follow { flex: 0 0 auto; }
+.logs-controls button { flex: 0 0 auto; }
 
-.logs-controls button {
-  padding: 0.2rem 0.5rem;
-  font-size: 0.78rem;
+.logs-clear {
+  background: none;
+  color: var(--muted);
 }
 
 .logs-filter {
-  flex: 0 1 12rem;
-  min-width: 4rem;
-  padding: 0.12rem 0.35rem;
+  flex: 0 1 200px;
+  min-width: 5rem;
+  padding: 5px 11px;
+  border: none;
+  border-radius: 6px;
+  background: var(--surface-2);
+  color: var(--ink);
   font-family: var(--mono);
-  font-size: 0.72rem;
+  font-size: 11.5px;
 }
 
-.logs-follow {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.25rem;
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  color: var(--muted);
-  cursor: pointer;
-}
-
-.logs-follow input { margin: 0; }
-
-.logs-note {
-  margin: 0.3rem 0 0.25rem;
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  color: var(--muted);
-}
-
-.logs-note.warn { color: var(--danger); }
-
-/* Note and chart keep their natural height; the list absorbs the rest. */
-.logs-note,
-.logs-chart { flex: 0 0 auto; }
-
-.logs-chart.collapsed #logsSpark { display: none; }
-
-.logs-chart-peek {
-  margin-left: auto;
-  font-family: var(--mono);
-  font-size: 0.7rem;
-  color: var(--muted);
-}
-
-.logs-chart:not(.collapsed) .logs-chart-peek { display: none; }
-
+.logs-follow,
 .logs-chart-separate {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  margin-left: 0.5rem;
-  font-family: var(--mono);
-  font-size: 0.7rem;
+  gap: 5px;
+  flex: 0 0 auto;
+  font-size: 11.5px;
   color: var(--muted);
   cursor: pointer;
 }
 
-.logs-chart-separate input { margin: 0; }
-.logs-chart.collapsed .logs-chart-separate { display: none; }
+.logs-follow input,
+.logs-chart-separate input { margin: 0; accent-color: var(--accent); }
+
+.logs-spacer { flex: 1 1 auto; }
+
+.logs-peek {
+  margin: 0;
+  flex: 0 0 auto;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.logs-peek.error { color: var(--danger); }
+
+.logs-note {
+  margin: 0;
+  flex: 0 0 auto;
+  padding: 6px 14px 0;
+  font-family: var(--mono);
+  font-size: 11px;
+  color: var(--faint);
+}
+
+.logs-note.warn { color: var(--warn); }
+
+.logs-chart {
+  flex: 0 0 auto;
+  padding: 0 14px;
+}
+
+.logs-chart.collapsed #logsSpark { display: none; }
+
+.group-toggle {
+  padding: 6px 0;
+  background: none;
+  font-size: 10.5px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: var(--faint);
+}
+
+.logs-chart .group-head { align-items: center; }
+
+/* Series names are data, not a caption — leave their casing alone. */
+#logsChartPeek {
+  text-transform: none;
+  letter-spacing: 0;
+  font-family: var(--mono);
+  font-size: 11px;
+}
 
 /* One sparkline per series, each with its own y-scale. */
 .spark-grid {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
-}
-
-/* Secondary to "start stream", so it is outlined rather than filled. */
-.logs-clear {
-  border: 1px solid var(--line);
-  background: none;
-  color: var(--muted);
-}
-
-.logs-clear:hover,
-.logs-clear:focus-visible {
-  border-color: var(--accent);
-  color: var(--accent);
-  filter: none;
-}
-
-/* Footer commands share header's compact outlined chrome. Icon-only metric
-   toggles stay intentionally lighter so they do not read as primary actions. */
-.footer .logs-controls button,
-.footer .device-menu-btn {
-  padding: 0.25rem 0.5rem;
-  border-color: var(--line);
-  border-radius: 2px;
-  background: var(--panel);
-  color: var(--ink);
-  font-size: 0.78rem;
-  line-height: 1.1;
-  box-shadow: inset 0 -2px 0 rgba(15, 107, 92, 0.18);
-}
-
-.footer .logs-controls button:hover:not(:disabled),
-.footer .device-menu-btn:hover:not(:disabled),
-.footer .device-menu-btn[aria-expanded="true"] {
-  border-color: var(--accent);
-  box-shadow: inset 0 -2px 0 var(--accent);
-  filter: none;
-}
-
-.footer .logs-controls button:focus-visible,
-.footer .device-menu-btn:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-@media (min-width: 1001px) {
-  .footer .logs-controls button,
-  .footer .device-menu-btn {
-    padding: 0.35rem 0.65rem;
-    font-size: 0.82rem;
-  }
+  gap: 8px;
 }
 
 .logs-list {
-  margin: 0.3rem 0 0;
-  padding: 0;
+  margin: 0;
+  padding: 10px 14px 14px;
   list-style: none;
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  /* Grows into whatever the footer was given; the cap is the fallback for
-     browsers without :has(), and for a footer that is not flexible. */
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
   flex: 1 1 auto;
-  min-height: 5rem;
-  max-height: 9rem;
+  min-height: 0;
   overflow: auto;
-  color: var(--ink);
+  background: var(--surface-3);
+  font-family: var(--mono);
+  font-size: 12px;
 }
 
 .logs-list li {
-  padding: 0.1rem 0;
-  border-bottom: 1px solid rgba(212, 207, 196, 0.6);
+  display: flex;
+  gap: 8px;
   white-space: pre-wrap;
 }
 
-main:has(#logsPanel:not(.collapsed)) .logs-list { max-height: none; }
+.log-ts { flex: 0 0 auto; color: var(--gutter-ink); }
+.log-msg { min-width: 0; color: var(--code-ink); }
 
-.logs-list li:last-child { border-bottom: none; }
-.logs-list li.level-0,
-.logs-list li.level-1 { color: var(--danger); }
-.logs-list li.metric { color: var(--accent); }
-.logs-list li.empty { color: var(--muted); font-style: italic; }
+.logs-list li.level-0 .log-msg,
+.logs-list li.level-1 .log-msg { color: var(--danger); }
+.logs-list li.metric .log-msg { color: var(--accent); }
+.logs-list li.empty { color: var(--faint); font-style: italic; }

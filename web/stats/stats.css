@@ -1,204 +1,78 @@
-/* Script counters as tiles, plus the memory-estimate visuals. */
+/* Script counters as tiles, plus the counter compare tip. */
 
 .stat-badges {
   display: grid;
-  /* Wide enough that the longest label ("console.log") still fits unclipped. */
-  grid-template-columns: repeat(auto-fit, minmax(5.6rem, 1fr));
-  gap: 0.3rem;
-  margin: 0.35rem 0 0.5rem;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 6px;
 }
 
 .stat-badge {
   display: flex;
   flex-direction: column;
   min-width: 0;
-  padding: 0.25rem 0.4rem;
-  border: 1px solid var(--line);
-  border-radius: 3px;
-  background: rgba(255, 252, 247, 0.6);
-}
-
-/* Badges with known source lines act as buttons that highlight them. */
-button.stat-badge {
-  font: inherit;
+  padding: 8px 9px;
+  border: none;
+  border-radius: 6px;
+  background: var(--surface-2);
   text-align: left;
-  cursor: pointer;
 }
 
-button.stat-badge:hover { border-color: var(--accent); }
+/* Badges with known source lines act as buttons that highlight those lines. */
+button.stat-badge { font: inherit; cursor: pointer; }
 
 button.stat-badge:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
-.stat-badge.active {
-  border-color: var(--accent);
-  background: rgba(15, 107, 92, 0.12);
-}
+.stat-badge.active { box-shadow: inset 0 0 0 1px var(--accent); }
 
 .stat-badge-value {
   font-family: var(--mono);
-  font-size: 1.05rem;
-  line-height: 1.15;
+  font-size: 15px;
+  line-height: 1.1;
   color: var(--ink);
   font-variant-numeric: tabular-nums;
 }
 
+.stat-badge.active .stat-badge-value { color: var(--accent); }
+
 .stat-badge-label {
-  font-size: 0.7rem;
-  letter-spacing: 0.03em;
-  color: var(--muted);
+  margin-top: 2px;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  font-size: 10.5px;
+  color: var(--muted);
 }
 
 .stat-badge-hint {
   font-family: var(--mono);
-  font-size: 0.68rem;
-  color: var(--muted);
+  font-size: 10px;
+  color: var(--faint);
 }
-
-.mem-total {
-  margin: 0.25rem 0 0.35rem;
-  font-family: var(--mono);
-  font-size: 0.95rem;
-}
-
-.size-mem-body { margin-top: 0.35rem; }
-.size-mem.collapsed .size-mem-body { display: none; }
-
-/* Collapsed header: the estimate, and its share of the measured peak. */
-.mem-peek {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-  margin-left: auto;
-  font-family: var(--mono);
-  font-size: 0.72rem;
-  color: var(--muted);
-}
-
-.size-mem:not(.collapsed) .mem-peek { display: none; }
-
-.mem-peek-track {
-  display: inline-block;
-  width: 3.2rem;
-  height: 0.25rem;
-  border-radius: 2px;
-  background: rgba(212, 207, 196, 0.55);
-  overflow: hidden;
-}
-
-.mem-peek-fill {
-  display: block;
-  height: 100%;
-  background: var(--accent);
-}
-
-.mem-bars {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 0.1rem;
-}
-
-.mem-bar {
-  display: grid;
-  grid-template-columns: minmax(0, 4.5rem) minmax(2rem, 1fr) auto;
-  align-items: center;
-  gap: 0.4rem;
-  font-family: var(--mono);
-  font-size: 0.66rem;
-  color: var(--muted);
-}
-
-.mem-bar-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.mem-bar-value {
-  color: var(--ink);
-  font-variant-numeric: tabular-nums;
-}
-
-.mem-bar-track {
-  height: 0.3rem;
-  background: rgba(212, 207, 196, 0.55);
-  border-radius: 2px;
-  overflow: hidden;
-}
-
-.mem-bar-fill {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 2px;
-}
-
-/* Bullet bar: fill is the estimate, tick is the measured device peak. */
-.mem-bullet-track {
-  position: relative;
-  height: 0.55rem;
-  margin: 0.5rem 0 0.2rem;
-  background: rgba(212, 207, 196, 0.55);
-  border-radius: 3px;
-}
-
-.mem-bullet-fill {
-  height: 100%;
-  background: var(--accent);
-  border-radius: 3px;
-  opacity: 0.8;
-}
-
-.mem-bullet-tick {
-  position: absolute;
-  top: -0.15rem;
-  bottom: -0.15rem;
-  width: 2px;
-  background: var(--ink);
-  transform: translateX(-1px);
-}
-
-.mem-bullet-legend,
-.mem-compare {
-  margin: 0;
-  font-family: var(--mono);
-  font-size: 0.66rem;
-  color: var(--muted);
-}
-
-.mem-compare.warn { color: var(--danger); }
 
 /* Instant compare tip for #statBadges (reuses .opt-tip chrome). */
 .stat-tip {
-  /* Width comes from tipStyleFor inline style (clamped left of #side). */
+  /* Width comes from tipStyleFor's inline style (clamped left of #side). */
   max-width: min(16rem, calc(100vw - 16px));
 }
 
-.stat-tip-solo {
-  margin: 0;
-}
+.stat-tip-solo { margin: 0; }
 
 .stat-tip-solo-value {
   margin: 0;
   font-family: var(--mono);
-  font-size: 0.875rem;
+  font-size: 13px;
   color: var(--ink);
 }
 
-.stat-tip-solo-value strong {
-  font-weight: 600;
-}
+.stat-tip-solo-value strong { font-weight: 600; }
 
 .stat-tip-hint {
-  margin: 0.35rem 0 0;
-  font-size: 0.8125rem;
-  line-height: 1.35;
+  margin: 6px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
   color: var(--muted);
 }
 
@@ -206,13 +80,13 @@ button.stat-badge:focus-visible {
   width: 100%;
   border-collapse: collapse;
   font-family: var(--mono);
-  font-size: 0.8125rem;
+  font-size: 12px;
   line-height: 1.4;
 }
 
 .stat-tip-table th,
 .stat-tip-table td {
-  padding: 0.12rem 0.25rem;
+  padding: 2px 4px;
   border: none;
   white-space: nowrap;
   font-variant-numeric: tabular-nums;
@@ -222,7 +96,7 @@ button.stat-badge:focus-visible {
   font-weight: 500;
   color: var(--muted);
   text-align: left;
-  padding-right: 0.75rem;
+  padding-right: 12px;
 }
 
 .stat-tip-table td {
@@ -230,10 +104,5 @@ button.stat-badge:focus-visible {
   color: var(--ink);
 }
 
-.stat-tip-table td.stat-tip-cell.up {
-  color: #6d2414;
-}
-
-.stat-tip-table td.stat-tip-cell.down {
-  color: #0b4f44;
-}
+.stat-tip-table td.stat-tip-cell.up { color: var(--danger); }
+.stat-tip-table td.stat-tip-cell.down { color: var(--ok); }

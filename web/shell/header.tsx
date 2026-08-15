@@ -1,7 +1,7 @@
 import type { ComponentChildren } from "preact";
-import { useEffect, useState } from "preact/hooks";
 import type { DeviceIdentity } from "../device/device-panel";
 import { Button } from "../ui/button";
+import { useTheme } from "./theme";
 
 const STATE_GLYPH = { running: "▶", stopped: "■", offline: "✕" } as const;
 type RunState = keyof typeof STATE_GLYPH;
@@ -18,129 +18,115 @@ export type HeaderProps = {
   identity?: DeviceIdentity | null;
   onToggleRun?: (running: boolean) => void;
   children: ComponentChildren;
-  status: string;
-  statusError?: boolean;
-  probeProgress?: { done: number; total: number } | null;
-  deviceMeta: string;
-  /** Device + slot pickers (web/device/device-select.tsx, web/device/slot-select.tsx), rendered next to title. */
+  /** Static/offline build — no device, so no pickers and no run-state chip. */
+  staticMode?: boolean;
+  /** Device + slot pickers (web/device/device-picker.tsx). */
   deviceSelector?: ComponentChildren;
 };
 
+/**
+ * One 52px row: wordmark · device chip · slot chip · run-state chip · toolbar.
+ * Nothing overlaps anything (the old header rode the device IP over the H1's
+ * ascenders), and no transient text lives here — that is the rail's job.
+ */
 export function Header(props: HeaderProps) {
-  const [statusHidden, setStatusHidden] = useState(false);
-  useEffect(() => setStatusHidden(false), [props.status]);
-
   const id = props.identity;
-
-  const warn =
-    id?.state === "offline" || id?.state === "stopped" ? "warn" : "";
-
-  const pct =
-    props.probeProgress && props.probeProgress.total > 0
-      ? Math.min(
-          100,
-          Math.round(
-            (props.probeProgress.done / props.probeProgress.total) * 100,
-          ),
-        )
-      : 0;
-
   return (
     <header class="top">
-      <div class="top-row">
-        <div class="title-stack">
-          <p class="device-ip" id="deviceIp">
-            {props.deviceIp ? (
-              <>
-                <a
-                  class="device-link"
-                  href={`http://${props.deviceIp}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  title={`Open the device web UI at http://${props.deviceIp} in a new tab`}
-                >
-                  {props.deviceIp}
-                </a>
-                {id?.deviceName ? ` (${id.deviceName})` : ""}
-              </>
-            ) : null}
-          </p>
-          <h1>Shelly DevRoom</h1>
-        </div>
-        <div class={`sub device-picker-row ${warn}`} id="configLine">
-          {props.configFail ? (
-            <span class="picker-fail">{props.configFail}</span>
-          ) : (
-            props.deviceSelector
-          )}
-          {id && id.state !== "unknown" && !props.configFail ? (
-            <RunIcon
-              state={id.state}
-              onToggle={
-                props.onToggleRun &&
-                (() => props.onToggleRun!(id.state !== "running"))
-              }
-            />
+      <div class="wordmark">
+        <span class="wordmark-dot" aria-hidden="true" />
+        <h1>DevRoom</h1>
+      </div>
+
+      {props.staticMode ? (
+        <span class="chip" id="staticNote">
+          offline playground · no device
+        </span>
+      ) : props.configFail ? (
+        <span class="chip picker-fail" id="configLine">
+          {props.configFail}
+        </span>
+      ) : (
+        <div class="picker-row" id="configLine">
+          {props.deviceIp ? (
+            <a
+              class="chip-mono device-link"
+              id="deviceIp"
+              href={`http://${props.deviceIp}`}
+              target="_blank"
+              rel="noreferrer"
+              title={`Open the device web UI at http://${props.deviceIp} in a new tab`}
+            >
+              {props.deviceIp}
+            </a>
           ) : null}
+          {props.deviceSelector}
         </div>
-        {props.children}
-      </div>
-      <p class="device-meta" id="deviceMeta">
-        {props.deviceMeta}
-      </p>
-      <div
-        class="gauge probe-progress"
-        id="probeProgress"
-        hidden={props.probeProgress == null}
-      >
-        <div
-          class="gauge-fill"
-          id="probeProgressFill"
-          style={{ width: `${pct}%` }}
+      )}
+
+      {id && id.state !== "unknown" && !props.configFail && !props.staticMode ? (
+        <RunChip
+          state={id.state}
+          onToggle={
+            props.onToggleRun &&
+            (() => props.onToggleRun!(id.state !== "running"))
+          }
         />
-      </div>
-      <p
-        class={`status${props.statusError ? " error" : ""}`}
-        id="statusLine"
-        role="status"
-        hidden={statusHidden}
-      >
-        {props.status}
-        <Button
-          class="status-close"
-          onClick={() => setStatusHidden(true)}
-          aria-label="Dismiss status"
-          title="Dismiss status"
-        >
-          ×
-        </Button>
-      </p>
+      ) : null}
+
+      <div class="top-spacer" />
+      <ThemeToggle />
+      {props.children}
     </header>
   );
 }
 
-function RunIcon(props: { state: RunState; onToggle?: () => void }) {
+/** Dark ↔ light override of the OS preference; glyph shows the target. */
+function ThemeToggle() {
+  const [theme, toggle] = useTheme();
+  const next = theme === "dark" ? "light" : "dark";
+  return (
+    <Button
+      class="chip chip-icon"
+      id="themeToggle"
+      onClick={toggle}
+      title={`Switch to the ${next} theme`}
+      aria-label={`Switch to the ${next} theme`}
+    >
+      <span aria-hidden="true">{theme === "dark" ? "☀" : "☾"}</span>
+    </Button>
+  );
+}
+
+const RUN_LABEL: Record<RunState, string> = {
+  running: "running",
+  stopped: "stopped",
+  offline: "offline",
+};
+
+function RunChip(props: { state: RunState; onToggle?: () => void }) {
   const actionable = props.state !== "offline" && props.onToggle;
   const common = {
-    class: `run-state run-${props.state}`,
+    class: `chip chip-run run-state run-${props.state}`,
     title: ACTION[props.state],
     "aria-label": `${props.state} — ${ACTION[props.state].toLowerCase()}`,
   };
-  if (actionable) {
-    const preview: RunState =
-      props.state === "running" ? "stopped" : "running";
+  if (!actionable) {
     return (
-      <Button {...common} onClick={props.onToggle}>
-        <span class="run-glyph run-glyph-current">{STATE_GLYPH[props.state]}</span>
-        <span class="run-glyph run-glyph-action" aria-hidden="true">
-          {STATE_GLYPH[preview]}
-        </span>
-      </Button>
+      <span {...common} role="img">
+        <span class="run-glyph">{STATE_GLYPH[props.state]}</span>
+        <span class="run-label">{RUN_LABEL[props.state]}</span>
+      </span>
     );
   }
+  const preview: RunState = props.state === "running" ? "stopped" : "running";
   return (
-    <span {...common} role="img">
-      {STATE_GLYPH[props.state]}
-    </span>
+    <Button {...common} onClick={props.onToggle}>
+      <span class="run-glyph run-glyph-current">{STATE_GLYPH[props.state]}</span>
+      <span class="run-glyph run-glyph-action" aria-hidden="true">
+        {STATE_GLYPH[preview]}
+      </span>
+      <span class="run-label">{RUN_LABEL[props.state]}</span>
+    </Button>
   );
 }

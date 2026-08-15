@@ -2,26 +2,37 @@ import { expect, test } from "@playwright/test";
 import { openApp } from "./helpers/open-app";
 
 test.describe("panels smoke", () => {
-  test("collapsible build panel toggles aria-expanded", async ({ page }) => {
+  test("inspector tabs are mutually exclusive and persist", async ({ page }) => {
     await openApp(page);
-    const panel = page.locator("#buildPanel");
-    const head = page.locator("#buildHead");
-    await expect(head).toHaveAttribute("aria-expanded", "true");
-    await expect(panel).not.toHaveClass(/collapsed/);
-    await head.click();
-    await expect(head).toHaveAttribute("aria-expanded", "false");
-    await expect(panel).toHaveClass(/collapsed/);
-    await head.click();
-    await expect(head).toHaveAttribute("aria-expanded", "true");
+    await expect(page.locator("#pane-build")).toBeVisible();
+    await expect(page.locator("#pane-check")).toBeHidden();
+
+    await page.getByTestId("tab-check").click();
+    await expect(page.getByTestId("tab-check")).toHaveAttribute("aria-selected", "true");
+    await expect(page.locator("#pane-check")).toBeVisible();
+    await expect(page.locator("#pane-build")).toBeHidden();
+
+    // The choice is remembered, unlike the old accordions. (A reload cannot be
+    // asserted here: openApp clears localStorage on every navigation.)
+    const stored = await page.evaluate(() =>
+      localStorage.getItem("shelly-devroom.inspectorTab"),
+    );
+    expect(stored).toBe("check");
+  });
+
+  test("a readiness gate pill switches the inspector tab", async ({ page }) => {
+    await openApp(page);
+    await page.getByTestId("gate-checked").click();
+    await expect(page.locator("#pane-check")).toBeVisible();
+    await page.getByTestId("gate-built").click();
+    await expect(page.locator("#pane-build")).toBeVisible();
   });
 
   test("options panel PATCHes minify config", async ({ page }) => {
     await openApp(page);
-    const panel = page.locator("#optionsPanel");
-    await expect(panel).toBeVisible();
-    await expect(panel).toHaveClass(/collapsed/);
-    await page.locator("#optionsHead").click();
-    await expect(panel).not.toHaveClass(/collapsed/);
+    await expect(page.locator("#pane-options")).toBeHidden();
+    await page.getByTestId("tab-options").click();
+    await expect(page.locator("#pane-options")).toBeVisible();
     await expect(page.getByTestId("opt-compress")).toBeVisible();
 
     // devroom.json owns the defaults, so assert the flip rather than a value.
@@ -51,8 +62,8 @@ test.describe("panels smoke", () => {
     page,
   }) => {
     await openApp(page);
-    await page.locator("#optionsHead").click();
-    await expect(page.locator("#optionsPanel")).not.toHaveClass(/collapsed/);
+    await page.getByTestId("tab-options").click();
+    await expect(page.locator("#pane-options")).toBeVisible();
 
     // The last option sits lowest, so its tip is the one that can run off the
     // bottom — the portal host is pointer-events:none, so overflow is unreachable.
@@ -75,14 +86,51 @@ test.describe("panels smoke", () => {
     await openApp(page);
     await expect(page.locator("#dMem")).toContainText("KB", { timeout: 10_000 });
     await expect(page.locator("#dCpu")).toHaveText("18%");
-    await expect(page.locator("#devicePeek")).toContainText("cpu");
+    await expect(page.locator("#dockPeek")).toContainText("cpu");
 
     await page.locator("#logsHead").click();
-    await expect(page.locator("#logsPanel")).not.toHaveClass(/collapsed/);
+    await expect(page.locator("#logsPanel")).toBeVisible();
     await page.locator("#btnLogs").click();
     await expect(page.locator("#logsList li")).toHaveCount(3, { timeout: 10_000 });
     await expect(page.locator("#logsList")).toContainText("boot complete");
     await expect(page.locator("#logsPeek")).toContainText("lines");
+  });
+
+  test("dock splitter resizes the dock and persists", async ({ page }) => {
+    await openApp(page);
+    const dock = page.locator("#dock");
+    const handle = page.locator("#dockSplitter");
+    await page.locator("#dockToggle").click();
+    // Wait out the 180ms open transition — the handle moves while it runs.
+    await expect(handle).toBeVisible();
+    await page.waitForTimeout(400);
+
+    const before = (await dock.boundingBox())!.height;
+    const hb = (await handle.boundingBox())!;
+    await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(hb.x + hb.width / 2, hb.y - 120, { steps: 8 });
+    await page.mouse.up();
+    await page.waitForTimeout(350);
+
+    const after = (await dock.boundingBox())!.height;
+    expect(after).toBeGreaterThan(before + 100);
+
+    // The dock takes the height from the workspace instead of overlapping it.
+    const ws = (await page.locator("#workspace").boundingBox())!;
+    expect(ws.y + ws.height).toBeLessThanOrEqual((await dock.boundingBox())!.y + 1);
+
+    // Persisted for the next session (openApp clears storage on every
+    // navigation, so assert the write rather than a reload).
+    const stored = await page.evaluate(() =>
+      localStorage.getItem("shelly-devroom.dock.height"),
+    );
+    expect(Math.abs(Number(stored) - after)).toBeLessThan(3);
+
+    // Double-click resets to the 300px default.
+    await handle.dblclick();
+    await page.waitForTimeout(350);
+    expect((await dock.boundingBox())!.height).toBeCloseTo(300, 0);
   });
 
   test("device overflow menu shows Reboot device", async ({ page }) => {

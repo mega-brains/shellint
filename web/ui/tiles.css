@@ -1,0 +1,105 @@
+/*
+ * Metric tiles + their tracks (split out of panels.css to stay under the
+ * 500-line per-file cap). Imported straight after panels.css — the cascade
+ * order is unchanged.
+ */
+
+/* ---------------------------------------------------------------- tiles */
+
+.tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.tile {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  min-width: 0;
+  padding: 10px 11px;
+  border-radius: 8px;
+  background: var(--surface-2);
+}
+
+.tile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+}
+
+.tile-label {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+/* Always the same weight whichever view the tile is on: the tile shows state. */
+.tile-swap {
+  padding: 0 2px;
+  background: none;
+  font-size: 10px;
+  line-height: 1;
+  color: var(--faint);
+}
+
+.tile-value {
+  font-family: var(--mono);
+  font-size: 19px;
+  line-height: 1.1;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums;
+}
+
+.tile-value.ok { color: var(--ok); }
+.tile-value.warn { color: var(--warn); }
+.tile-value.danger { color: var(--danger); }
+
+.track {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--surface-3);
+  overflow: hidden;
+}
+
+.track-fill {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--accent);
+  transition: width 120ms ease-out;
+}
+
+.track.warn .track-fill { background: var(--warn); }
+.track.ok .track-fill { background: var(--ok); }
+.track.danger .track-fill { background: var(--danger); }
+.track.idle { opacity: 0.45; }
+
+.tile-sub {
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--faint);
+}
+
+/*
+ * One-second "this build moved it" pulse, applied by web/ui/use-flash.ts to any
+ * build-panel value that changed. Duration is mirrored by FLASH_MS there —
+ * keep the two in sync.
+ */
+@keyframes flash-change {
+  from { background-color: var(--flash-bg); }
+  to { background-color: transparent; }
+}
+
+.flash-change {
+  --flash-bg: color-mix(in srgb, var(--accent) 26%, transparent);
+  border-radius: 4px;
+  animation: flash-change 1s ease-out;
+}

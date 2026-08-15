@@ -4,9 +4,9 @@ import { mockBuildApis, mockDeviceApis } from "./helpers/mock-api";
 const VOLATILE = [
   "#statusLine",
   "#dLatency",
-  "#latencySpark",
-  "#tempSpark",
-  "#rssiSpark",
+  "#hLatency",
+  "#hTemp",
+  "#hRssi",
   "#hMem",
   "#hCpu",
   "#hRam",
@@ -14,12 +14,15 @@ const VOLATILE = [
   "#historySpark",
   "#memSpark",
   "#logsSpark",
-  "#probeProgress",
+  // Rail summary + gate pills carry the same live tallies.
+  "#railSummary",
+  "#checkScale",
   // Live /api/config minify flags (smoke can toggle; peek text drifts).
   "#optionsPeek",
   // Pass/warn/skip tallies from a real /api/check run — the skipped count moves
   // with whatever device profile + probe cache is mirrored into types/.
   "#checkPeek",
+  "#gate-checked",
   // Sits at (x≈18, y≈5) — right where a fresh page's un-moved cursor defaults
   // to — and is a dotted underline plus a 4-direction text-shadow halo on
   // small monospace text, which is the exact combination CDP/Chromium render
@@ -36,9 +39,9 @@ const VOLATILE = [
 /**
  * macOS shows either overlay scrollbars (0px) or classic ones (15px) depending
  * on the machine's "Show scroll bars" setting / attached mouse. `#side` reserves
- * that width via `scrollbar-gutter: stable`, and its `.stats-bars` auto-fit grid
- * flips between one and two columns right around the difference — so baselines
- * recorded on one machine fail on the other. Styling `::-webkit-scrollbar` opts
+ * that width via `scrollbar-gutter: stable`, and its measure rows reflow
+ * around the difference — so baselines recorded on one machine fail on the
+ * other. Styling `::-webkit-scrollbar` opts
  * Chrome out of overlay behaviour, pinning the gutter to 0 everywhere.
  */
 const PIN_SCROLLBARS = `
@@ -63,9 +66,9 @@ async function openSettled(page: Page) {
   // Device poll paints mocked gauges before we snapshot.
   await expect(page.locator("#dCpu")).toHaveText("18%", { timeout: 10_000 });
   await expect(page.locator("#checkRules")).not.toBeEmpty({ timeout: 15_000 });
-  // Quiet check on boot fills the permanent indicator — wait so snapshots
-  // do not race catalog-pending vs report-complete paint.
-  await expect(page.locator("#checkPeek")).not.toContainText("not run yet", {
+  // Quiet check on boot fills the readiness rail — wait so snapshots do not
+  // race catalog-pending vs report-complete paint.
+  await expect(page.getByTestId("gate-checked")).not.toContainText("not checked", {
     timeout: 30_000,
   });
   // Options peek loads async from /api/config; wait so layout is settled
@@ -90,15 +93,11 @@ test.describe("design baselines", () => {
     });
   });
 
-  test.skip("check panel with catalog", async ({ page }) => {
+  test.skip("check tab", async ({ page }) => {
     await openSettled(page);
-    await page.locator("#checkHead").click();
-    await expect(page.locator("#checkPanel")).not.toHaveClass(/collapsed/);
+    await page.getByTestId("tab-check").click();
+    await expect(page.locator("#pane-check")).toBeVisible();
     await expect(page.locator("#checkRules")).not.toBeEmpty();
-    // Expanding check scrolls #side; pin bottom so the shot is stable.
-    await page.locator("#side").evaluate((el) => {
-      el.scrollTop = el.scrollHeight;
-    });
     await expect(page.locator("#side")).toHaveScreenshot("check-panel.png", {
       mask: masks(page),
     });
@@ -139,17 +138,17 @@ test.describe("design baselines", () => {
     expect(reachable).toBe(true);
   });
 
-  test("device + logs footer expanded", async ({ page }) => {
+  test("dock expanded, device then logs", async ({ page }) => {
     await openSettled(page);
-    await page.locator("#deviceHead").click();
-    await expect(page.locator("#devicePanel")).not.toHaveClass(/collapsed/);
+    await page.locator("#dockToggle").click();
+    await expect(page.locator("#dock")).toHaveClass(/open/);
+    await expect(page.locator("#deviceGrid")).toBeVisible();
     await page.locator("#logsHead").click();
-    await expect(page.locator("#logsPanel")).not.toHaveClass(/collapsed/);
+    await expect(page.locator("#logsPanel")).toBeVisible();
     await page.locator("#btnLogs").click();
     await expect(page.locator("#logsList li")).toHaveCount(3, { timeout: 10_000 });
-    await expect(page.locator("main .footer")).toHaveScreenshot(
-      "footer-device-logs.png",
-      { mask: masks(page) },
-    );
+    await expect(page.locator("#dock")).toHaveScreenshot("footer-device-logs.png", {
+      mask: masks(page),
+    });
   });
 });

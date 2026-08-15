@@ -41,6 +41,9 @@ export type ToolbarProps = {
   skipTypeCheck: boolean;
   deployChoice: { mode: Mode; minify: Minify };
   autoBuildCheck: boolean;
+  /** Accent budget: exactly one filled button, whichever step the rail says is
+   * next — Build + Check while the build/check is stale, Deploy once ready. */
+  nextStep: "build" | "deploy" | "none";
   /** Static/offline build (M17): device-touching controls (Deploy, Probe) and
    * the server-backed script history (history/checkpoint) don't apply — see
    * web/shell/device-section.tsx. */
@@ -196,7 +199,12 @@ export function Toolbar(props: ToolbarProps) {
         primary={
           <Button
             id="btnBuild"
-            class={props.buildRunning ? "running" : undefined}
+            class={[
+              props.buildRunning ? "running" : null,
+              props.nextStep === "build" ? "btn-primary" : null,
+            ]
+              .filter(Boolean)
+              .join(" ") || undefined}
             title={buildTitle}
             disabled={props.busy}
             onClick={props.onBuild}
@@ -298,11 +306,16 @@ export function Toolbar(props: ToolbarProps) {
         primary={
           <Button
             id="btnDeploy"
+            class={props.nextStep === "deploy" ? "btn-primary" : undefined}
             title={deployTitle}
             disabled={deployDisabled}
             onClick={props.onDeploy}
           >
-            {`Deploy ${mode} · ${shortMinify(minify)}${props.deployTarget ? ` → ${props.deployTarget}` : ""}`}
+            Deploy
+            {/* Dropped below 1100px (panels-extra.css) — the title keeps it. */}
+            <span class="btn-detail" id="btnDeployDetail">
+              {` ${mode} · ${shortMinify(minify)}${props.deployTarget ? ` → ${props.deployTarget}` : ""}`}
+            </span>
           </Button>
         }
         menu={

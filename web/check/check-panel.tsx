@@ -1,12 +1,10 @@
 import { useRef } from "preact/hooks";
-import { Collapsible } from "../ui/collapsible";
+import { Group } from "../ui/measure";
 import { CopyFindingsButton, FindingsList } from "./check-findings";
 import { CheckRules } from "./check-rules";
 import {
-  countBadges,
   pendingRows,
   tally,
-  type Badge,
   type CheckCatalog,
   type CheckReport,
   type CheckRow,
@@ -27,23 +25,7 @@ export type CheckPanelProps = {
   dialectFindings: Finding[] | null;
 };
 
-function PeekBadges(props: { badges: Badge[]; failed: boolean }) {
-  return (
-    <p class={`panel-peek${props.failed ? " error" : ""}`} id="checkPeek">
-      {props.badges.map((badge, i) => (
-        <span key={`${badge.cls}:${badge.text}`}>
-          {i > 0 ? " · " : null}
-          <span class={`badge ${badge.cls}`} aria-label={badge.label}>
-            {badge.text}
-          </span>
-        </span>
-      ))}
-    </p>
-  );
-}
-
 type View = {
-  badges: Badge[];
   failed: boolean;
   note: string;
   findings: Finding[];
@@ -60,14 +42,6 @@ function deriveView(props: CheckPanelProps, keptRows: CheckRow[]): View {
       ? `device profile ${props.report.profile.source}`
       : "no device profile";
     return {
-      badges: [
-        ...countBadges(props.report.counts),
-        {
-          cls: "badge-pass",
-          text: `✓ ${counts.pass}/${props.report.checks.length}`,
-          label: `${counts.pass} of ${props.report.checks.length} checks pass`,
-        },
-      ],
       failed: props.report.counts.errors > 0,
       note: [
         scope,
@@ -84,10 +58,6 @@ function deriveView(props: CheckPanelProps, keptRows: CheckRow[]): View {
     const findings = props.dialectFindings;
     const errors = findings.filter((f) => f.severity === "error").length;
     return {
-      badges: [
-        { cls: "badge-idle", text: "build guard" },
-        ...countBadges({ errors, warnings: findings.length - errors }),
-      ],
       failed: errors > 0,
       note: "from the last build — press Check for the full run",
       findings,
@@ -98,12 +68,6 @@ function deriveView(props: CheckPanelProps, keptRows: CheckRow[]): View {
   if (props.catalog) {
     const rows = pendingRows(props.catalog);
     return {
-      badges: [
-        {
-          cls: "badge-idle",
-          text: `${rows.length} checks · not run yet`,
-        },
-      ],
       failed: false,
       note: "press Check to run all of them against the saved script",
       findings: [],
@@ -111,7 +75,6 @@ function deriveView(props: CheckPanelProps, keptRows: CheckRow[]): View {
     };
   }
   return {
-    badges: [{ cls: "badge-idle", text: "not run yet" }],
     failed: false,
     note: "—",
     findings: [],
@@ -127,34 +90,32 @@ export function CheckPanel(props: CheckPanelProps) {
   }
   const view = deriveView(props, keptRows.current);
 
+  const sites = view.findings.length;
+  const rules = new Set(view.findings.map((f) => f.rule)).size;
+
   return (
-    <Collapsible
-      storageKey="shelly-devroom.checkPanel.collapsed"
-      defaultCollapsed={true}
-      panelId="checkPanel"
-      panelClass="checks"
-      bodyId="checkBody"
-      headId="checkHead"
-      toggleId="checkToggle"
-      title="Show or hide every compliance check, what it enforces and its verdict"
-      ariaLabel="Compliance checks"
-      headChildren={
-        <>
-          <h2>check</h2>
-          <PeekBadges badges={view.badges} failed={view.failed} />
-        </>
-      }
-    >
-      <div class="checks-body" id="checkBody">
+    <div class="checks" id="checkPanel">
+      <Group
+        title="findings"
+        id="findingsBlock"
+        caption={
+          sites
+            ? `${rules} rule${rules === 1 ? "" : "s"} · ${sites} site${sites === 1 ? "" : "s"}`
+            : "none"
+        }
+      >
         <div class="checks-note-row">
-          <p class="checks-note" id="checkNote">
+          <p class="checks-note group-note" id="checkNote">
             {view.note}
           </p>
           <CopyFindingsButton findings={view.findings} />
         </div>
         <FindingsList findings={view.findings} />
+      </Group>
+
+      <Group title="rule tiers" id="tiersBlock" caption="pass / warn / skipped">
         <CheckRules catalog={props.catalog} rows={view.rows} />
-      </div>
-    </Collapsible>
+      </Group>
+    </div>
   );
 }

@@ -6,7 +6,10 @@ export type SplitterOptions = {
   cssVar: string;
   minPanel: number;
   minEditor: number;
-  /** "x" trades width with the panel on the right, "y" height with the top one. */
+  /**
+   * "x" trades width with the panel on the right of the handle, "y" height
+   * with the panel below it — both measured from the root's far edge.
+   */
   axis?: "x" | "y";
   /** Toggled on the root while an explicit size is set, for the CSS to key on. */
   sizedClass?: string;
@@ -94,7 +97,7 @@ export function useSplitter(
     const onPointerMove = (e: PointerEvent) => {
       if (!handle!.hasPointerCapture(e.pointerId)) return;
       const box = root!.getBoundingClientRect();
-      apply(clamp(vertical ? e.clientY - box.top : box.right - e.clientX));
+      apply(clamp(vertical ? box.bottom - e.clientY : box.right - e.clientX));
     };
 
     const endDrag = (e: PointerEvent) => {
@@ -112,8 +115,8 @@ export function useSplitter(
     const onKeyDown = (e: KeyboardEvent) => {
       const step = e.shiftKey ? 48 : 16;
       const size = panelSize();
-      const grow = vertical ? "ArrowDown" : "ArrowLeft";
-      const shrink = vertical ? "ArrowUp" : "ArrowRight";
+      const grow = vertical ? "ArrowUp" : "ArrowLeft";
+      const shrink = vertical ? "ArrowDown" : "ArrowRight";
       if (e.key === grow) set(size + step);
       else if (e.key === shrink) set(size - step);
       else if (e.key === "Home" || e.key === "End") set(null);

@@ -24,6 +24,10 @@ const SKIP_DIRS = new Set([
   // scripts/build-static.mjs's build output (M17.7) — same reasoning as dist/
   // and web/dist/ below: generated, not authored.
   "site",
+  // Design handoffs: annotated mockup documents plus the runtime they need
+  // (`support.js`), delivered as-is by the designer. Reference material, not
+  // app source — nothing imports it and it is never bundled.
+  "design",
 ]);
 // Device script authored by the user in the editor — not app source, can't
 // use imports (compiles module:none/noLib) so it can't be split like the rest.

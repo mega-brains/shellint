@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "preact/hooks";
-import { Collapsible } from "../ui/collapsible";
 import { Button } from "../ui/button";
 import { Sparkline } from "../charts/sparkline";
 import type { SparkPoint, SparkSeries } from "../charts/spark";
@@ -250,177 +249,136 @@ export function LogsPanel(props: LogsPanelProps) {
   });
 
   return (
-    <Collapsible
-      storageKey="shelly-devroom.logsPanel.collapsed"
-      defaultCollapsed={true}
-      ignoreSelector=".logs-controls"
-      panelId="logsPanel"
-      panelClass="device"
-      bodyId="logsBody"
-      headId="logsHead"
-      toggleId="logsToggle"
-      title="Show or hide the device debug log and the charts parsed from it"
-      ariaLabel="Device debug log"
-      headChildren={
-        <>
-          <h2>logs</h2>
-          <div class="logs-controls">
-            <Button
-              id="btnLogs"
-              disabled={busy}
-              title="Enable sys.debug.websocket on the device and stream ws://<ip>/debug/log"
-              onClick={(e) => {
-                e.stopPropagation();
-                void (streaming ? stop() : start());
-              }}
-            >
-              {streaming ? "stop stream" : "start stream"}
-            </Button>
-            <Button
-              class="logs-clear"
-              id="btnLogsClear"
-              title="Clear the lines held in the browser — the device buffer is untouched"
-              onClick={() => {
-                setLines([]);
-                setSeriesMap(new Map());
-                setNoteWarn(false);
-                setNote(
-                  'chart numeric values with print("#m <series> <value>")',
-                );
-                setPeek(streaming ? "0 lines · 0 series" : "cleared");
-                setPeekError(false);
-              }}
-            >
-              clear
-            </Button>
-            <input
-              type="search"
-              id="logsFilter"
-              class="logs-filter"
-              placeholder="filter lines…"
-              aria-label="Show only log lines containing this text"
-              title="Show only log lines containing this text (case-insensitive)"
-              value={filter}
-              onInput={(e) =>
-                setFilter((e.target as HTMLInputElement).value)
-              }
-            />
-            <label class="logs-follow" title="Keep scrolling to the newest line">
-              <input
-                type="checkbox"
-                id="logsFollow"
-                checked={follow}
-                onChange={(e) => {
-                  const on = (e.target as HTMLInputElement).checked;
-                  setFollow(on);
-                  writeFlag(
-                    "shelly-devroom.logsPanel.follow",
-                    on,
-                    "on",
-                    "off",
-                  );
-                }}
-              />
-              follow
-            </label>
-          </div>
-          <p class={`panel-peek${peekError ? " error" : ""}`} id="logsPeek">
-            {peek}
-          </p>
-        </>
-      }
-    >
-      <div class="device-body" id="logsBody">
-        <p class={`logs-note${noteWarn ? " warn" : ""}`} id="logsNote">
-          {note}
-        </p>
-        <div
-          class={`logs-chart${chartCollapsed ? " collapsed" : ""}`}
-          id="logsChart"
+    <div class="dock-body logs" id="logsPanel">
+      <div class="logs-controls" id="logsControls">
+        <Button
+          id="btnLogs"
+          disabled={busy}
+          title="Enable sys.debug.websocket on the device and stream ws://<ip>/debug/log"
+          onClick={() => void (streaming ? stop() : start())}
         >
-          <div
-            class="panel-head"
-            id="logsChartHead"
-            role="button"
-            tabindex={0}
+          {streaming ? "stop stream" : "start stream"}
+        </Button>
+        <Button
+          class="logs-clear"
+          id="btnLogsClear"
+          title="Clear the lines held in the browser — the device buffer is untouched"
+          onClick={() => {
+            setLines([]);
+            setSeriesMap(new Map());
+            setNoteWarn(false);
+            setNote('chart numeric values with print("#m <series> <value>")');
+            setPeek(streaming ? "0 lines · 0 series" : "cleared");
+            setPeekError(false);
+          }}
+        >
+          clear
+        </Button>
+        <input
+          type="search"
+          id="logsFilter"
+          class="logs-filter"
+          placeholder="filter lines…"
+          aria-label="Show only log lines containing this text"
+          title="Show only log lines containing this text (case-insensitive)"
+          value={filter}
+          onInput={(e) => setFilter((e.target as HTMLInputElement).value)}
+        />
+        <label class="logs-follow" title="Keep scrolling to the newest line">
+          <input
+            type="checkbox"
+            id="logsFollow"
+            checked={follow}
+            onChange={(e) => {
+              const on = (e.target as HTMLInputElement).checked;
+              setFollow(on);
+              writeFlag("shelly-devroom.logsPanel.follow", on, "on", "off");
+            }}
+          />
+          follow
+        </label>
+        <span class="logs-spacer" />
+        <p class={`logs-peek${peekError ? " error" : ""}`} id="logsPeek">
+          {peek}
+        </p>
+      </div>
+
+      <div class={`logs-chart${chartCollapsed ? " collapsed" : ""}`} id="logsChart">
+        <div class="group-head" id="logsChartHead">
+          <button
+            type="button"
+            class="group-toggle"
+            id="logsChartToggle"
             aria-expanded={chartCollapsed ? "false" : "true"}
             aria-controls="logsSpark"
             title="Show or hide the chart of #m metric values"
-            onClick={(e) => {
-              if ((e.target as HTMLElement).closest(".logs-chart-separate")) {
-                return;
-              }
+            onClick={() => {
               const next = !chartCollapsed;
               setChartCollapsed(next);
               writeCollapsed("shelly-devroom.logsChart.collapsed", next);
             }}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" || e.key === " ") {
-                e.preventDefault();
-                (e.currentTarget as HTMLElement).click();
-              }
-            }}
           >
-            <span class="panel-toggle" id="logsChartToggle" aria-hidden="true">
-              {chartCollapsed ? "▸" : "▾"}
-            </span>
-            <h2>metrics</h2>
-            <span class="logs-chart-peek" id="logsChartPeek">
-              {chartPeek}
-            </span>
-            <label
-              class="logs-chart-separate"
-              title="Draw each #m series as its own chart, with its own y-scale"
-            >
-              <input
-                type="checkbox"
-                id="logsChartSeparate"
-                checked={separate}
-                onClick={(e) => e.stopPropagation()}
-                onChange={(e) => {
-                  const on = (e.target as HTMLInputElement).checked;
-                  setSeparate(on);
-                  writeFlag(
-                    "shelly-devroom.logsChart.separate",
-                    on,
-                    "1",
-                    "0",
-                  );
-                }}
-              />
-              separate
-            </label>
-          </div>
-          {separate && chart.length > 1 ? (
-            <div id="logsSpark" class="spark-grid" aria-label="Numeric series parsed from the debug log">
-              {chart.map((s) => (
-                <Sparkline key={s.label} series={[s]} options={sparkOpts} />
-              ))}
-            </div>
-          ) : (
-            <Sparkline
-              id="logsSpark"
-              aria-label="Numeric series parsed from the debug log"
-              series={chart}
-              options={sparkOpts}
+            <span aria-hidden="true">{chartCollapsed ? "▸" : "▾"}</span> metrics
+          </button>
+          <span class="group-caption" id="logsChartPeek">
+            {chartPeek}
+          </span>
+          <label
+            class="logs-chart-separate"
+            title="Draw each #m series as its own chart, with its own y-scale"
+          >
+            <input
+              type="checkbox"
+              id="logsChartSeparate"
+              checked={separate}
+              onChange={(e) => {
+                const on = (e.target as HTMLInputElement).checked;
+                setSeparate(on);
+                writeFlag("shelly-devroom.logsChart.separate", on, "1", "0");
+              }}
             />
-          )}
+            separate
+          </label>
         </div>
-        <ol class="logs-list" id="logsList" ref={listRef}>
-          {visible.length === 0 && lines.length > 0 ? (
-            <li class="empty">{`no line matches “${filter.trim()}”`}</li>
-          ) : (
-            visible.map((line) => (
-              <li
-                key={line.seq}
-                class={`level-${line.level}${line.text.includes("#m ") ? " metric" : ""}`}
-              >
-                {`${fmtClock(line.ts)} ${line.text}`}
-              </li>
-            ))
-          )}
-        </ol>
+        {separate && chart.length > 1 ? (
+          <div
+            id="logsSpark"
+            class="spark-grid"
+            aria-label="Numeric series parsed from the debug log"
+          >
+            {chart.map((s) => (
+              <Sparkline key={s.label} series={[s]} options={sparkOpts} />
+            ))}
+          </div>
+        ) : (
+          <Sparkline
+            id="logsSpark"
+            aria-label="Numeric series parsed from the debug log"
+            series={chart}
+            options={sparkOpts}
+          />
+        )}
       </div>
-    </Collapsible>
+
+      <p class={`logs-note${noteWarn ? " warn" : ""}`} id="logsNote">
+        {note}
+      </p>
+
+      <ol class="logs-list" id="logsList" ref={listRef}>
+        {visible.length === 0 && lines.length > 0 ? (
+          <li class="empty">{`no line matches \u201c${filter.trim()}\u201d`}</li>
+        ) : (
+          visible.map((line) => (
+            <li
+              key={line.seq}
+              class={`level-${line.level}${line.text.includes("#m ") ? " metric" : ""}`}
+            >
+              <span class="log-ts">{fmtClock(line.ts)}</span>
+              <span class="log-msg">{line.text}</span>
+            </li>
+          ))
+        )}
+      </ol>
+    </div>
   );
 }
