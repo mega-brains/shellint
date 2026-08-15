@@ -96,6 +96,30 @@ test.describe("panels smoke", () => {
     await expect(page.locator("#logsPeek")).toContainText("lines");
   });
 
+  test("header children never overlap or spill at narrow widths", async ({ page }) => {
+    await openApp(page);
+    for (const width of [1440, 1100, 900, 780, 640]) {
+      await page.setViewportSize({ width, height: 700 });
+      await page.waitForTimeout(150);
+      const boxes = await page.evaluate(() =>
+        [...document.querySelectorAll("header.top > *")]
+          .filter((el) => (el as HTMLElement).offsetParent !== null)
+          .map((el) => {
+            const r = el.getBoundingClientRect();
+            return { id: el.id || el.className, left: r.left, right: r.right };
+          }),
+      );
+      let prev = 0;
+      for (const b of boxes) {
+        expect(b.left, `${b.id} at ${width}px overlaps its neighbour`).toBeGreaterThanOrEqual(
+          prev - 0.5,
+        );
+        prev = b.right;
+      }
+      expect(prev, `header spills past ${width}px`).toBeLessThanOrEqual(width + 0.5);
+    }
+  });
+
   test("dock splitter resizes the dock and persists", async ({ page }) => {
     await openApp(page);
     const dock = page.locator("#dock");

@@ -30,6 +30,8 @@
   /* OS-bundled faces only (macOS / Windows / Linux) — nothing is downloaded. */
   --mono: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
   --sans: ui-sans-serif, system-ui, "Segoe UI", sans-serif;
+  /* Header/rail face below 900px — still OS-bundled, nothing downloaded. */
+  --sans-narrow: "Arial Narrow", "Liberation Sans Narrow", var(--sans);
 }
 
 /*
