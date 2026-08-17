@@ -1,10 +1,10 @@
 /**
  * `ts.transpileModule` wrapper — the browser-worker replacement for the
- * `tsc -p tsconfig.shelly.json` spawn in scripts/build-shelly.mjs. A Worker
- * cannot read tsconfig.shelly.json off disk, so its compiler options are
+ * `tsc -p tsconfig.shelly.base.json` spawn in scripts/build-shelly.mjs. A Worker
+ * cannot read tsconfig.shelly.base.json off disk, so its compiler options are
  * inlined below rather than parsed at runtime. That inlining is a duplicated
  * source of truth, so scripts/test-transpile-parity.mjs asserts this object
- * stays equivalent to what tsconfig.shelly.json itself parses to — a future
+ * stays equivalent to what tsconfig.shelly.base.json itself parses to — a future
  * tsconfig edit fails that test loudly instead of silently drifting the two
  * apart. `ts.transpileModule` with these options is byte-identical to
  * `tsc -p` (locked by that same test, M17.2).
@@ -12,7 +12,7 @@
 import ts from "typescript";
 
 /**
- * Mirrors tsconfig.shelly.json's `compilerOptions` verbatim (see that file
+ * Mirrors tsconfig.shelly.base.json's `compilerOptions` verbatim (see that file
  * for why each one is set) minus `rootDir`/`outDir`/`configFilePath`, which
  * only steer a Program's disk IO and are inert for `transpileModule` (it has
  * no Program and never touches disk).

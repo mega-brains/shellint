@@ -1,5 +1,5 @@
 import { runtime } from "#devroom/runtime";
-import { DIST_DIR, SCRIPT_PATH } from "../core/paths.ts";
+import { DIST_DIR, SCRIPT_LABEL, SCRIPT_PATH } from "../core/paths.ts";
 import { lintScriptFile } from "./lint-source.ts";
 import { lintSemanticsFile } from "./lint-semantics.ts";
 import { lintAdvisoriesFile } from "./lint-advisories.ts";
@@ -90,7 +90,7 @@ async function artifactFindings(): Promise<{ findings: Finding[]; artifacts: str
     findings.push({
       severity: "warn",
       rule: "artifacts-stale",
-      message: `${stale.join(", ")} older than scripts/main.ts — dialect findings may be out of date`,
+      message: `${stale.join(", ")} older than ${SCRIPT_LABEL} — dialect findings may be out of date`,
     });
   }
   return { findings, artifacts };
@@ -187,8 +187,8 @@ export async function runCheck(opts: CheckOptions = {}): Promise<CheckReport> {
   );
   findings.push(...profileNotes);
   reportProgress(opts, CHECK_PROGRESS_STEPS[2]);
-  if (profile) findings.push(...lintConnected(source, profile));
-  findings.push(...(await lintProbe(source)));
+  if (profile) findings.push(...lintConnected(source, profile, SCRIPT_LABEL));
+  findings.push(...(await lintProbe(source, SCRIPT_LABEL)));
   reportProgress(opts, CHECK_PROGRESS_STEPS[3]);
 
   const { findings: artifactNotes, artifacts } = await artifactFindings();

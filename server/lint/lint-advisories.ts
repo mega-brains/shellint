@@ -1,6 +1,6 @@
 import { runtime } from "#devroom/runtime";
 import ts from "typescript";
-import { DIST_DIR, SCRIPT_PATH } from "../core/paths.ts";
+import { DIST_DIR, SCRIPT_LABEL, SCRIPT_PATH } from "../core/paths.ts";
 import { analyzeSource } from "../script/script-stats.ts";
 import { createDeviceProgram, typeCheckInputs } from "./lint-types.ts";
 import { lintComplexity } from "./lint-complexity.ts";
@@ -206,7 +206,7 @@ function unusedGlobals(sf: ts.SourceFile, sink: Sink) {
 
 export function lintAdvisories(
   source: string,
-  fileName = "scripts/main.ts",
+  fileName = SCRIPT_LABEL,
   _distDir = DIST_DIR,
 ): Finding[] {
   const sf = parseSource(source, fileName);
@@ -281,7 +281,7 @@ export async function lintAdvisoriesFile(path = SCRIPT_PATH): Promise<Finding[]>
   if (!(await runtime.fs.exists(path))) {
     throw new Error(`script not found: ${path}`);
   }
-  const fileName = "scripts/main.ts";
+  const fileName = SCRIPT_LABEL;
   const { source, files, declarations } = await typeCheckInputs(path);
   const findings = lintAdvisories(source, fileName);
   if (parseMeta(source)) findings.push(...await checkMinifiedMeta(DIST_DIR));

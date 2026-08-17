@@ -19,11 +19,12 @@ import {
   rmSync,
 } from "node:fs";
 import { tmpdir } from "node:os";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import { transformVariant } from "../shared/device-pipeline.mjs";
 import { DEFAULT_MINIFY, MINIFY_KEYS } from "../shared/minify-options.mjs";
 import { deviceGlobalDefs } from "./build-shelly.mjs";
+import { distDir, scriptTsconfig } from "./fixture-workspace.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -47,14 +48,12 @@ function loadMinifyConfig() {
   return minify;
 }
 
-for (const f of [
-  "dist/debug.raw.js",
-  "dist/debug.js",
-  "dist/prod.raw.js",
-  "dist/prod.js",
-]) {
-  if (!existsSync(join(ROOT, f))) {
-    fail(`missing ${f} — run \`npm run build:shelly\` first`);
+const DIST = distDir();
+const DIST_LABEL = relative(ROOT, DIST) || "dist";
+
+for (const f of ["debug.raw.js", "debug.js", "prod.raw.js", "prod.js"]) {
+  if (!existsSync(join(DIST, f))) {
+    fail(`missing ${DIST_LABEL}/${f} — run \`npm run build:shelly\` first`);
   }
 }
 
@@ -66,7 +65,7 @@ try {
     [
       join(ROOT, "node_modules", "typescript", "bin", "tsc"),
       "-p",
-      join(ROOT, "tsconfig.shelly.json"),
+      scriptTsconfig(),
       "--outDir",
       outDir,
     ],
@@ -102,17 +101,17 @@ const prod = await transformVariant(
 );
 
 const checks = [
-  ["dist/debug.raw.js", debug.raw],
-  ["dist/debug.js", debug.min],
-  ["dist/prod.raw.js", prod.raw],
-  ["dist/prod.js", prod.min],
+  ["debug.raw.js", debug.raw],
+  ["debug.js", debug.min],
+  ["prod.raw.js", prod.raw],
+  ["prod.js", prod.min],
 ];
 
 for (const [file, produced] of checks) {
-  const committed = readFileSync(join(ROOT, file), "utf8");
+  const committed = readFileSync(join(DIST, file), "utf8");
   if (committed !== produced) {
     fail(
-      `shared/device-pipeline.mjs output diverges from ${file} (committed ${committed.length} B, produced ${produced.length} B)`,
+      `shared/device-pipeline.mjs output diverges from ${DIST_LABEL}/${file} (committed ${committed.length} B, produced ${produced.length} B)`,
     );
   }
 }

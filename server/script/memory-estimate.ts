@@ -1,7 +1,7 @@
 import runtime from "#devroom/runtime";
 import ts from "typescript";
 import { calleeName, parseSource } from "../lint/lint-util.ts";
-import { SCRIPT_PATH } from "../core/paths.ts";
+import { SCRIPT_LABEL, SCRIPT_PATH } from "../core/paths.ts";
 
 export type MemoryEstimate = {
   bytes: number;
@@ -116,7 +116,7 @@ const emptyEstimate = (): MemoryEstimate => ({
  */
 export function estimateMemory(
   source: string,
-  fileName = "scripts/main.ts",
+  fileName = SCRIPT_LABEL,
 ): MemoryEstimate {
   const sf = parseSource(source, fileName);
   const est = emptyEstimate();
@@ -191,5 +191,5 @@ export function estimateMemory(
 
 export async function estimateMemoryFile(path = SCRIPT_PATH): Promise<MemoryEstimate> {
   if (!(await runtime.fs.exists(path))) return emptyEstimate();
-  return estimateMemory(await runtime.fs.readText(path), "scripts/main.ts");
+  return estimateMemory(await runtime.fs.readText(path), SCRIPT_LABEL);
 }

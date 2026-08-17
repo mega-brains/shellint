@@ -8,11 +8,10 @@
  * Usage: node scripts/test-dialect-artifacts.mjs  (expects a prior `npm run build:shelly`)
  */
 import { existsSync } from "node:fs";
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import { checkBuildArtifacts } from "../server/lint/dialect-check.ts";
+import { distDir } from "./fixture-workspace.mjs";
 
-const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
 function fail(msg) {
   console.error(`FAIL: ${msg}`);
@@ -29,7 +28,7 @@ for (const mode of ["debug", "prod"]) {
 
   if (!byFile.has(raw)) fail(`checkBuildArtifacts did not report ${raw}`);
   if (!byFile.has(min)) fail(`checkBuildArtifacts did not report ${min}`);
-  if (existsSync(join(ROOT, "dist", adv)) && !byFile.has(adv)) {
+  if (existsSync(join(distDir(), adv)) && !byFile.has(adv)) {
     fail(`checkBuildArtifacts did not report ${adv} though dist/${adv} exists`);
   }
 

@@ -38,6 +38,14 @@ run = "npm run build:txiki:executable"
 description = "Build Shelly dual artifacts + web UI bundle (parallel)"
 depends = ["build:shelly", "build:web"]
 
+[tasks."build:shelly:fixture"]
+description = "Build the device fixture (fixtures/device/main.ts) into its own scratch dist — the gate's device build"
+run = "npm run build:shelly:fixture"
+
+[tasks."build:gate"]
+description = "Fixture device build + web UI bundle — the build step of beforeCommit, independent of scripts/main.ts"
+depends = ["build:shelly:fixture", "build:web"]
+
 [tasks."build:static"]
 description = "Build the static/offline GitHub Pages bundle into site/ (M17)"
 run = "npm run build:static"
@@ -71,8 +79,12 @@ description = "Typecheck Shelly script + server + web"
 depends = ["typecheck"]
 
 [tasks."typecheck:shelly"]
-description = "Typecheck Shelly script"
+description = "Typecheck the device fixture (fixtures/device/main.ts) under the device compiler options"
 run = "npm run typecheck:shelly"
+
+[tasks."typecheck:script"]
+description = "Typecheck your live scripts/main.ts — deliberately outside the gate"
+run = "npm run typecheck:script"
 
 [tasks."typecheck:server"]
 description = "Typecheck server"
@@ -113,8 +125,8 @@ run = "npm run test:txiki"
 
 [tasks.b]
 alias="beforeCommit"
-description = "Pre-commit gate: line limit + typecheck + build run in parallel, then static build, test, then e2e on Node and on the txiki executable"
-depends = ["check:lines", "typecheck", "build"]
+description = "Pre-commit gate: line limit + typecheck + fixture build run in parallel, then static build, test, then e2e on Node and on the txiki executable"
+depends = ["check:lines", "typecheck", "build:gate"]
 run = """
 npm run build:static
 npm run test && npm run test:e2e && npm run test:e2e:txiki

@@ -1,6 +1,6 @@
 import { runtime } from "#devroom/runtime";
 import ts from "typescript";
-import { SCRIPT_PATH } from "../core/paths.ts";
+import { SCRIPT_LABEL, SCRIPT_PATH } from "../core/paths.ts";
 import {
   calleeName,
   createSink,
@@ -214,7 +214,7 @@ type TimerVar = { live: boolean };
 
 export function lintSemantics(
   source: string,
-  fileName = "scripts/main.ts",
+  fileName = SCRIPT_LABEL,
 ): Finding[] {
   const sf = parseSource(source, fileName);
   const sink = createSink(sf, fileName);
@@ -383,5 +383,5 @@ export async function lintSemanticsFile(path = SCRIPT_PATH): Promise<Finding[]> 
   if (!(await runtime.fs.exists(path))) {
     throw new Error(`script not found: ${path}`);
   }
-  return lintSemantics(await runtime.fs.readText(path), "scripts/main.ts");
+  return lintSemantics(await runtime.fs.readText(path), SCRIPT_LABEL);
 }

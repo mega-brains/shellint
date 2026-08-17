@@ -4,6 +4,8 @@
 node_modules/
 dist/
 .tsc-out/
+# Fixture workspaces for the gate/e2e device builds (scripts/fixture-workspace.mjs)
+.tmp/
 web/dist/
 site/
 .devroom/

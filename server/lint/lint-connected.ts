@@ -11,6 +11,7 @@ import {
   type Capability,
 } from "./capabilities.ts";
 import type { DeviceProfile } from "../device/device-profile.ts";
+import { SCRIPT_LABEL } from "../core/paths.ts";
 import {
   calleeName,
   createSink,
@@ -148,7 +149,7 @@ function checkRpcMethod(
 export function lintConnected(
   source: string,
   profile: DeviceProfile,
-  fileName = "scripts/main.ts",
+  fileName = SCRIPT_LABEL,
 ): Finding[] {
   const sf = parseSource(source, fileName);
   const sink = createSink(sf, fileName);

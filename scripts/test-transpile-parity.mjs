@@ -1,12 +1,12 @@
 /**
  * Locks the POC finding behind M17.2: `ts.transpileModule` run with
- * `tsconfig.shelly.json`'s compiler options must emit byte-identical output
- * to `tsc -p tsconfig.shelly.json`. The future browser build swaps the `tsc`
+ * `tsconfig.shelly.base.json`'s compiler options must emit byte-identical output
+ * to `tsc -p tsconfig.shelly.base.json`. The future browser build swaps the `tsc`
  * child-process spawn for an in-process `transpileModule` call, so a
  * TypeScript upgrade must never silently break that.
  * Also asserts web/static/transpile.ts's `DEVICE_COMPILER_OPTIONS` — the
- * inlined duplicate a Worker needs because it cannot read tsconfig.shelly.json
- * off disk (M17.3) — stays equivalent to what tsconfig.shelly.json itself
+ * inlined duplicate a Worker needs because it cannot read tsconfig.shelly.base.json
+ * off disk (M17.3) — stays equivalent to what tsconfig.shelly.base.json itself
  * parses to, so a future tsconfig edit can't silently drift the browser build
  * away from the server build.
  * Usage: node --import tsx scripts/test-transpile-parity.mjs
@@ -21,7 +21,7 @@ import { DEVICE_COMPILER_OPTIONS } from "../web/static/transpile.ts";
 
 const root = path.resolve(import.meta.dirname, "..");
 const TSC_BIN = path.join(root, "node_modules", "typescript", "bin", "tsc");
-const CONFIG_PATH = path.join(root, "tsconfig.shelly.json");
+const CONFIG_PATH = path.join(root, "tsconfig.shelly.base.json");
 
 function fail(msg) {
   console.error(`FAIL: ${msg}`);
@@ -36,11 +36,18 @@ function diffHint(a, b) {
 }
 
 // Single source of truth for the device compiler options: read + resolve
-// tsconfig.shelly.json itself rather than a hand-copied duplicate, so a
+// tsconfig.shelly.base.json itself rather than a hand-copied duplicate, so a
 // future edit to that file is picked up here automatically.
 const configFile = ts.readConfigFile(CONFIG_PATH, ts.sys.readFile);
 if (configFile.error) fail(ts.flattenDiagnosticMessageText(configFile.error.messageText, "\n"));
-const parsed = ts.parseJsonConfigFileContent(configFile.config, ts.sys, root);
+// The base config carries compiler options only (`include: []`), which would
+// make parseJsonConfigFileContent report "no inputs" — the fixture stands in
+// as the entry so the options resolve exactly as they do in a real build.
+const parsed = ts.parseJsonConfigFileContent(
+  { ...configFile.config, include: ["fixtures/device/main.ts", "types/**/*.d.ts"] },
+  ts.sys,
+  root,
+);
 if (parsed.errors.length) {
   fail(parsed.errors.map((e) => ts.flattenDiagnosticMessageText(e.messageText, "\n")).join("\n"));
 }
@@ -84,14 +91,14 @@ function assertParity(name, sourceFileAbs, rootDirAbs, outDirAbs, options) {
 const outDir = mkdtempSync(path.join(tmpdir(), "devroom-transpile-parity-"));
 try {
   assertParity(
-    "scripts/main.ts",
-    path.join(root, "scripts", "main.ts"),
-    path.join(root, "scripts"),
+    "fixtures/device/main.ts",
+    path.join(root, "fixtures", "device", "main.ts"),
+    path.join(root, "fixtures", "device"),
     outDir,
     transpileOptions,
   );
   // A second, unrelated corpus file so the guarantee isn't accidentally
-  // specific to main.ts's particular mix of syntax — config-heavy.ts is the
+  // specific to the fixture's particular mix of syntax — config-heavy.ts is the
   // bench file with the widest keyword spread (if/for/let/switch/new/typeof).
   assertParity(
     "bench/config-heavy.ts",
@@ -108,11 +115,11 @@ try {
   assert.deepStrictEqual(DEVICE_COMPILER_OPTIONS, transpileOptions);
 } catch (err) {
   fail(
-    `web/static/transpile.ts's DEVICE_COMPILER_OPTIONS diverged from tsconfig.shelly.json's parsed compilerOptions:\n${err.message}`,
+    `web/static/transpile.ts's DEVICE_COMPILER_OPTIONS diverged from tsconfig.shelly.base.json's parsed compilerOptions:\n${err.message}`,
   );
 }
 console.log(
-  "  web/static/transpile.ts's DEVICE_COMPILER_OPTIONS matches tsconfig.shelly.json",
+  "  web/static/transpile.ts's DEVICE_COMPILER_OPTIONS matches tsconfig.shelly.base.json",
 );
 
-console.log("OK: ts.transpileModule(tsconfig.shelly.json options) is byte-identical to tsc -p");
+console.log("OK: ts.transpileModule(tsconfig.shelly.base.json options) is byte-identical to tsc -p");

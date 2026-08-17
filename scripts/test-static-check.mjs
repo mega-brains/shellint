@@ -25,6 +25,8 @@ import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import * as esbuild from "esbuild";
 import { staticEsbuildConfig } from "./static-esbuild.mjs";
+import { distDir, scriptPath } from "./fixture-workspace.mjs";
+import { SCRIPT_LABEL } from "../server/core/paths.ts";
 import { CHECK_CATALOG } from "../server/lint/check-catalog.ts";
 import {
   CHECK_PROGRESS_STEPS,
@@ -33,7 +35,7 @@ import {
 } from "../server/lint/check.ts";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
-const DIST_DIR = path.join(ROOT, "dist");
+const DIST_DIR = distDir();
 
 function fail(msg) {
   console.error(`FAIL: ${msg}`);
@@ -187,10 +189,16 @@ function assertEquivalent(serverReport, staticReport) {
   // that isn't allowed to differ — catches a subtler divergence (e.g. a line
   // number) that a bare count match would miss.
   const nonExempt = (f) => !EXPECT_SKIPPED_STATIC.has(f.rule) && !INPUT_GROUP_RULES.has(f.rule);
+  // The static build always names the script "scripts/main.ts" (a browser has
+  // no repo path); the server names whatever DEVROOM_SCRIPT points at. Same
+  // file, two labels — compared under one name so the fixture workspace
+  // doesn't read as a divergence.
+  const label = (f) =>
+    f.file === SCRIPT_LABEL || f.file === "scripts/main.ts" ? "<script>" : (f.file ?? "");
   const normalize = (findings) =>
     findings
       .filter(nonExempt)
-      .map((f) => `${f.severity}|${f.rule}|${f.file ?? ""}|${f.line ?? ""}|${f.message}`)
+      .map((f) => `${f.severity}|${f.rule}|${label(f)}|${f.line ?? ""}|${f.message}`)
       .sort();
   assert.deepStrictEqual(
     normalize(staticReport.findings),
@@ -203,7 +211,7 @@ function assertEquivalent(serverReport, staticReport) {
   return skippedInStatic.sort();
 }
 
-const source = readFileSync(path.join(ROOT, "scripts", "main.ts"), "utf8");
+const source = readFileSync(scriptPath(), "utf8");
 const artifacts = readDistArtifacts();
 
 const serverReport = await runCheck({ connected: false });

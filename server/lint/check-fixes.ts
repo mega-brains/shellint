@@ -1,3 +1,4 @@
+import { SCRIPT_LABEL } from "../core/paths.ts";
 import type { Finding, FindingFix } from "./lint-util.ts";
 
 export type CheckFixPreview = {
@@ -15,7 +16,7 @@ export function previewCheckFixes(
   findings: Finding[],
 ): CheckFixPreview | null {
   const candidates: Candidate[] = findings.flatMap((finding) =>
-    finding.file === "scripts/main.ts" && finding.fix
+    finding.file === SCRIPT_LABEL && finding.fix
       ? [{ ...finding.fix, rule: finding.rule }]
       : [],
   );

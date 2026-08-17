@@ -1,6 +1,6 @@
 import type { Hono } from "hono";
 import runtime from "#devroom/runtime";
-import { SCRIPT_PATH } from "../core/paths.ts";
+import { SCRIPT_LABEL, SCRIPT_PATH } from "../core/paths.ts";
 import {
   snapshotBeforeWrite,
   checkpointNow,
@@ -12,10 +12,10 @@ import {
 export function registerScriptRoutes(app: Hono) {
   app.get("/api/script", async (c) => {
     if (!(await runtime.fs.exists(SCRIPT_PATH))) {
-      return c.json({ ok: false, error: "scripts/main.ts not found" }, 404);
+      return c.json({ ok: false, error: `${SCRIPT_LABEL} not found` }, 404);
     }
     const source = await runtime.fs.readText(SCRIPT_PATH);
-    return c.json({ ok: true, path: "scripts/main.ts", source });
+    return c.json({ ok: true, path: SCRIPT_LABEL, source });
   });
 
   app.put("/api/script", async (c) => {
@@ -41,7 +41,7 @@ export function registerScriptRoutes(app: Hono) {
 
   app.post("/api/script/checkpoint", async (c) => {
     if (!(await runtime.fs.exists(SCRIPT_PATH))) {
-      return c.json({ ok: false, error: "scripts/main.ts not found" }, 404);
+      return c.json({ ok: false, error: `${SCRIPT_LABEL} not found` }, 404);
     }
     const source = await runtime.fs.readText(SCRIPT_PATH);
     const row = await checkpointNow(source);

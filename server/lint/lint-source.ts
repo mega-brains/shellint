@@ -1,6 +1,6 @@
 import { runtime } from "#devroom/runtime";
 import ts from "typescript";
-import { SCRIPT_PATH } from "../core/paths.ts";
+import { SCRIPT_LABEL, SCRIPT_PATH } from "../core/paths.ts";
 import { checkUseBeforeDefine } from "./lint-hoisting.ts";
 import {
   calleeName,
@@ -51,7 +51,7 @@ type RegistrationSite = { conditional: boolean };
 
 export function lintSource(
   source: string,
-  fileName = "scripts/main.ts",
+  fileName = SCRIPT_LABEL,
 ): Finding[] {
   const sf = ts.createSourceFile(
     fileName,
@@ -357,5 +357,5 @@ export async function lintScriptFile(path = SCRIPT_PATH): Promise<Finding[]> {
   if (!(await runtime.fs.exists(path))) {
     throw new Error(`script not found: ${path}`);
   }
-  return lintSource(await runtime.fs.readText(path), "scripts/main.ts");
+  return lintSource(await runtime.fs.readText(path), SCRIPT_LABEL);
 }

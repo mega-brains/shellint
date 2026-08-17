@@ -1,5 +1,6 @@
 import ts from "typescript";
 import { createSink, type Finding } from "./lint-util.ts";
+import { SCRIPT_LABEL } from "../core/paths.ts";
 
 /**
  * Tier 5 — cognitive complexity, in the sense SonarSource defines it: how hard
@@ -132,7 +133,7 @@ function describe(fn: ts.FunctionLikeDeclaration, sf: ts.SourceFile): string {
  */
 export function lintComplexity(
   sf: ts.SourceFile,
-  fileName = "scripts/main.ts",
+  fileName = SCRIPT_LABEL,
 ): Finding[] {
   const sink = createSink(sf, fileName);
 

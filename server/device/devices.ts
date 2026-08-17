@@ -358,7 +358,7 @@ async function atomicCopy(src: string, dest: string): Promise<void> {
 /**
  * Rewrites `types/device-profile.json` / `types/generated-probe.json` /
  * `types/generated.d.ts` to mirror `deviceId`'s cached capability data —
- * the compile path (`tsconfig.shelly.json`, `build-shelly.mjs`) reads those
+ * the compile path (`tsconfig.shelly.base.json`, `build-shelly.mjs`) reads those
  * fixed paths unparameterized, so switching devices means swapping what they
  * point at rather than threading a device id through the whole pipeline.
  * Mirrors are written temp-then-rename; if that fails, the previous mirror

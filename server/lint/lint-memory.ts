@@ -1,5 +1,6 @@
 import ts from "typescript";
 import { createSink, type Finding, type Sink } from "./lint-util.ts";
+import { SCRIPT_LABEL } from "../core/paths.ts";
 
 /**
  * Tier 5 — the two allocation shapes that cost the most on an ESP32 heap and
@@ -197,7 +198,7 @@ function checkHoistable(
 
 export function lintMemory(
   sf: ts.SourceFile,
-  fileName = "scripts/main.ts",
+  fileName = SCRIPT_LABEL,
 ): Finding[] {
   const sink = createSink(sf, fileName);
   const strings = stringVars(sf);

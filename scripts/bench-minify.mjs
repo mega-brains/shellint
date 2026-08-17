@@ -104,7 +104,7 @@ function compile(input, outDir) {
   writeFileSync(
     cfgPath,
     JSON.stringify({
-      extends: "./tsconfig.shelly.json",
+      extends: "./tsconfig.shelly.base.json",
       compilerOptions: { rootDir: input.rootDir, outDir: path.relative(root, outDir) },
       include: [path.relative(root, input.file), "types/**/*.d.ts"],
     }),

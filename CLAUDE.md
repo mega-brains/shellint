@@ -19,6 +19,20 @@ build, test, then the e2e suite twice — once against the Node server, once
 against the txiki single-file executable, `e2e/playwright.txiki.config.ts`,
 which runs it on port 8797 via `DEVROOM_PORT` with one worker).
 
+**No gate step touches `scripts/main.ts`** — that file is the user's live
+editor buffer, so its size, lint findings and even whether it compiles are
+outside the repo's control. Every gate step instead compiles
+[`fixtures/device/main.ts`](./fixtures/device/main.ts), copied per runner into
+`.tmp/<name>/` by `scripts/fixture-workspace.mjs` and pointed at through
+`DEVROOM_SCRIPT` / `DEVROOM_DIST` (honoured by `server/core/paths.ts`,
+`scripts/build-shelly.mjs` and both Playwright configs, whose servers run on
+their own ports — 8789 for Node, 8797 for txiki — and never reuse a dev server
+on 8787, since that one serves the live script). `npm run typecheck:script`
+(`mise run typecheck:script`) type-checks the live script on demand; `npm run
+build:shelly` and the UI's Build button still build it as before. The fixture
+must stay lint-clean on all five tiers — `test-smoke.mjs` asserts it — and
+changing it changes the e2e design baselines.
+
 `scripts/test.mjs` runs the two builds in parallel, then **imports** each test
 module into its own process instead of spawning one `node --import tsx` per
 file — that startup is ~750 ms each and was most of the suite's runtime.
@@ -69,7 +83,9 @@ mise run check:lines      # source files ≤ 500 lines
 mise run test             # DCE/minify asserts + web + server smoke
                           # accepts a name filter and `--isolated` (see below)
 mise run bench            # minify-option benchmark over bench/*.ts
-mise run beforeCommit     # check:lines → typecheck → build → test → e2e (node + txiki exe)
+mise run beforeCommit     # check:lines → typecheck → build:gate → test → e2e (node + txiki exe)
+mise run build:gate       # fixture device build + web bundle (what the gate builds)
+mise run typecheck:script # typecheck your live scripts/main.ts (outside the gate)
 mise run start            # DevRoom server (alias: mise run dev)
 mise run build:txiki      # bundle txiki server and CLI entries
 mise run start:txiki      # start the txiki server bundle
@@ -87,7 +103,11 @@ mise run clean
 Also available via `npm run …` (`build:shelly`, `build:web`, `dev`, `beforeCommit`, …).
 Set `DEVROOM_TJS_BIN` when `tjs` is not on `PATH`. txiki needs bundles under
 `.txiki/`; npm installation, TypeScript, and Playwright stay on Node.
-Build config: `tsconfig.shelly.json` / `tsconfig.server.json` / `tsconfig.web.json`. Entry: `scripts/main.ts`. Pipeline:
+Build config: `tsconfig.shelly.base.json` (device compiler options; extended by
+`tsconfig.shelly.script.json` for `scripts/main.ts`, `tsconfig.shelly.fixture.json`
+for the gate's fixture, and by the config `build-shelly.mjs` generates for a
+`DEVROOM_SCRIPT` workspace) / `tsconfig.server.json` / `tsconfig.web.json`.
+Entry: `scripts/main.ts`. Pipeline:
 `scripts/build-shelly.mjs`.
 
 ## What this project is

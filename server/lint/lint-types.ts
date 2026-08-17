@@ -11,10 +11,10 @@
 import { runtime } from "#devroom/runtime";
 import ts from "typescript";
 import { DEVICE_COMPILER_OPTIONS } from "../../web/static/transpile.ts";
-import { ROOT, SCRIPT_PATH } from "../core/paths.ts";
+import { ROOT, SCRIPT_LABEL, SCRIPT_PATH } from "../core/paths.ts";
 import type { Finding } from "./lint-util.ts";
 
-export const SCRIPT_FILE = "scripts/main.ts";
+export const SCRIPT_FILE = SCRIPT_LABEL;
 
 export async function typeDeclarationFiles(): Promise<string[]> {
   const dir = runtime.path.join(ROOT, "types");
@@ -131,7 +131,7 @@ export function lintSyntax(source: string): Finding[] {
 
 /**
  * Every `tsc` error the device build would report, under exactly the options
- * `tsconfig.shelly.json` uses (`DEVICE_COMPILER_OPTIONS`), so a Check error and
+ * `tsconfig.shelly.base.json` uses (`DEVICE_COMPILER_OPTIONS`), so a Check error and
  * a Build failure never disagree.
  *
  * Returns nothing when no `types/*.d.ts` were readable: with the device stdlib

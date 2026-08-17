@@ -19,7 +19,10 @@ test.describe("editor smoke", () => {
     await openApp(page);
     const text = await page.locator("#editor .cm-content").innerText();
     expect(text.length).toBeGreaterThan(40);
-    expect(text).toMatch(/Victron|BINDKEY|MAC_ADDRESS|Shelly|Timer|print/);
+    // Markers of fixtures/device/main.ts — the script every e2e server is
+    // pointed at (DEVROOM_SCRIPT, see playwright.config.ts). Never the user's
+    // scripts/main.ts, whose contents the suite must not depend on.
+    expect(text).toMatch(/DevRoom test fixture|LOG_PREFIX|Shelly\.call|Timer\.set/);
   });
 
   test("Save PUTs /api/script", async ({ page }) => {

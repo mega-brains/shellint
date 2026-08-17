@@ -43,8 +43,11 @@ import {
 import { DEFAULT_MINIFY, MINIFY_KEYS } from "../shared/minify-options.mjs";
 import { transpileDevice } from "../web/static/transpile.ts";
 import { staticEsbuildConfig } from "./static-esbuild.mjs";
+import { distDir, scriptPath } from "./fixture-workspace.mjs";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
+const DIST = distDir();
+const DIST_LABEL = path.relative(ROOT, DIST) || "dist";
 
 function fail(msg) {
   console.error(`FAIL: ${msg}`);
@@ -80,18 +83,13 @@ function loadDeviceProfile() {
 }
 
 async function checkByteIdentity() {
-  for (const f of [
-    "dist/debug.raw.js",
-    "dist/debug.js",
-    "dist/prod.raw.js",
-    "dist/prod.js",
-  ]) {
-    if (!existsSync(path.join(ROOT, f))) {
-      fail(`missing ${f} — run \`npm run build:shelly\` first`);
+  for (const f of ["debug.raw.js", "debug.js", "prod.raw.js", "prod.js"]) {
+    if (!existsSync(path.join(DIST, f))) {
+      fail(`missing ${DIST_LABEL}/${f} — run \`npm run build:shelly\` first`);
     }
   }
 
-  const mainSource = readFileSync(path.join(ROOT, "scripts", "main.ts"), "utf8");
+  const mainSource = readFileSync(scriptPath(), "utf8");
   // "main.ts" — the same fileName shape pipeline.worker.ts hands transpileDevice
   // (a browser has no notion of the repo's on-disk path).
   const tscJs = transpileDevice(mainSource, "main.ts");
@@ -123,16 +121,16 @@ async function checkByteIdentity() {
   );
 
   const checks = [
-    ["dist/debug.raw.js", debug.raw],
-    ["dist/debug.js", debug.min],
-    ["dist/prod.raw.js", prod.raw],
-    ["dist/prod.js", prod.min],
+    ["debug.raw.js", debug.raw],
+    ["debug.js", debug.min],
+    ["prod.raw.js", prod.raw],
+    ["prod.js", prod.min],
   ];
   for (const [file, produced] of checks) {
-    const committed = readFileSync(path.join(ROOT, file), "utf8");
+    const committed = readFileSync(path.join(DIST, file), "utf8");
     if (committed !== produced) {
       fail(
-        `web/static/transpile.ts + shared/device-pipeline.mjs diverge from ${file} ` +
+        `web/static/transpile.ts + shared/device-pipeline.mjs diverge from ${DIST_LABEL}/${file} ` +
           `(committed ${byteLen(committed)} B, produced ${byteLen(produced)} B)`,
       );
     }
@@ -142,7 +140,7 @@ async function checkByteIdentity() {
   if (shortenDebug || shortenProd) {
     const map = {};
     for (const [text, id] of sharedIds) map[id] = text;
-    const logMapPath = path.join(ROOT, "dist", "prod.logmap.json");
+    const logMapPath = path.join(DIST, "prod.logmap.json");
     if (!existsSync(logMapPath)) {
       fail("expected dist/prod.logmap.json — devroom.json's minify config shortens logs");
     }

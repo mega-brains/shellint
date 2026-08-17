@@ -19,8 +19,15 @@ import { spawn, spawnSync } from "node:child_process";
 import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
+import { useFixtureWorkspace } from "./fixture-workspace.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
+
+// Before anything else — including the builds below and every `await import`
+// further down, since server/core/paths.ts reads the env at module load: the
+// suite compiles fixtures/device/main.ts in a scratch workspace, never the
+// user's scripts/main.ts, and writes its artifacts outside dist/.
+const { dist: DIST } = useFixtureWorkspace("test");
 
 const argv = process.argv.slice(2);
 const isolated = argv.includes("--isolated");
@@ -123,25 +130,19 @@ if (filters.length) {
   process.exit(0);
 }
 
-for (const f of [
-  "dist/debug.js",
-  "dist/prod.js",
-  "dist/debug.raw.js",
-  "dist/prod.raw.js",
-]) {
-  if (!existsSync(join(ROOT, f))) fail(`missing ${f}`);
+for (const f of ["debug.js", "prod.js", "debug.raw.js", "prod.raw.js"]) {
+  if (!existsSync(join(DIST, f))) fail(`missing ${f} in ${DIST}`);
 }
 
-const same = (a, b) =>
-  readFileSync(join(ROOT, a)).equals(readFileSync(join(ROOT, b)));
+const same = (a, b) => readFileSync(join(DIST, a)).equals(readFileSync(join(DIST, b)));
 
-if (same("dist/debug.js", "dist/prod.js")) {
+if (same("debug.js", "prod.js")) {
   fail("debug and prod min outputs identical (meta.env DCE broken?)");
 }
-if (same("dist/debug.raw.js", "dist/prod.raw.js")) {
+if (same("debug.raw.js", "prod.raw.js")) {
   fail("debug and prod raw outputs identical (meta.env DCE broken?)");
 }
-if (same("dist/debug.raw.js", "dist/debug.js")) {
+if (same("debug.raw.js", "debug.js")) {
   fail("debug raw and min identical (minify noop?)");
 }
 
@@ -165,7 +166,7 @@ if (same("dist/debug.raw.js", "dist/debug.js")) {
   writeFileSync(
     config,
     JSON.stringify({
-      extends: "./tsconfig.shelly.json",
+      extends: "./tsconfig.shelly.base.json",
       compilerOptions: { noEmit: true },
       include: ["scripts/banned-globals.fixture.ts", "types/**/*.d.ts"],
     }),

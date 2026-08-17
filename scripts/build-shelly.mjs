@@ -40,12 +40,31 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 
 const CONFIG_PATH = path.join(root, "devroom.json");
-const TSCONFIG = path.join(root, "tsconfig.shelly.json");
-const MAIN_TS = path.join(root, "scripts", "main.ts");
-const TSC_OUT_DIR = path.join(root, ".tsc-out");
-const TSC_OUT_JS = path.join(TSC_OUT_DIR, "main.js");
-const DIST_DIR = path.join(root, "dist");
-const DEVICE_PROFILE_PATH = path.join(root, "types", "device-profile.json");
+const DEVICE_PROFILE_ENV = "types/device-profile.json";
+
+/** Absolute-or-root-relative env override — see server/core/paths.ts. */
+function fromEnv(name, fallback) {
+  const raw = process.env[name]?.trim();
+  if (!raw) return fallback;
+  return path.isAbsolute(raw) ? raw : path.join(root, raw);
+}
+
+// The gate builds the fixture (fixtures/device/main.ts, copied into a scratch
+// workspace) instead of the user's live scripts/main.ts, and writes its
+// artifacts elsewhere so a test run can never leave dist/ holding bytes the
+// next Deploy would ship. See scripts/fixture-workspace.mjs.
+const MAIN_TS = fromEnv("DEVROOM_SCRIPT", path.join(root, "scripts", "main.ts"));
+const DIST_DIR = fromEnv("DEVROOM_DIST", path.join(root, "dist"));
+const IS_DEFAULT_SCRIPT = MAIN_TS === path.join(root, "scripts", "main.ts");
+const TSC_OUT_DIR = IS_DEFAULT_SCRIPT
+  ? path.join(root, ".tsc-out")
+  : path.join(DIST_DIR, ".tsc-out");
+const TSC_OUT_JS = path.join(
+  TSC_OUT_DIR,
+  `${path.basename(MAIN_TS, path.extname(MAIN_TS))}.js`,
+);
+const TSCONFIG = path.join(root, "tsconfig.shelly.script.json");
+const DEVICE_PROFILE_PATH = path.join(root, DEVICE_PROFILE_ENV);
 
 function loadConfig() {
   if (!existsSync(CONFIG_PATH)) {
@@ -96,6 +115,31 @@ export function deviceGlobalDefs(profilePath = DEVICE_PROFILE_PATH) {
     return {};
   }
   return deviceGlobalDefsFrom(profile);
+}
+
+/**
+ * tsconfig for a script outside scripts/ (the fixture workspace). Generated
+ * rather than committed so the entry, its rootDir and the emit dir always
+ * agree with DEVROOM_SCRIPT/DEVROOM_DIST; compiler options still come from the
+ * one committed base, so fixture and live script compile identically.
+ */
+function writeGeneratedTsconfig() {
+  const file = path.join(TSC_OUT_DIR, "tsconfig.json");
+  writeFileSync(
+    file,
+    JSON.stringify(
+      {
+        extends: path.join(root, "tsconfig.shelly.base.json"),
+        compilerOptions: { rootDir: path.dirname(MAIN_TS), outDir: TSC_OUT_DIR },
+        include: [MAIN_TS, path.join(root, "types", "*.d.ts")],
+        exclude: [path.join(root, "types", "generated.d.ts")],
+      },
+      null,
+      2,
+    ),
+    "utf8",
+  );
+  return file;
 }
 
 /** Rewritten so a map from an earlier build can never outlive the strings it describes. */
@@ -174,12 +218,14 @@ async function main() {
   rmSync(TSC_OUT_DIR, { recursive: true, force: true });
   mkdirSync(TSC_OUT_DIR, { recursive: true });
 
+  const tsconfigPath = IS_DEFAULT_SCRIPT ? TSCONFIG : writeGeneratedTsconfig();
+
   const tsc = spawnSync(
     process.execPath,
     [
       tscBin,
       "-p",
-      TSCONFIG,
+      tsconfigPath,
       ...(process.argv.includes("--no-typecheck") ? ["--noCheck"] : []),
     ],
     { cwd: root, encoding: "utf8" },
@@ -244,15 +290,16 @@ async function main() {
   console.log(
     JSON.stringify({ debug: sizes(debug), prod: sizes(prod) }, null, 2),
   );
+  const d = path.relative(root, DIST_DIR) || "dist";
   const advText = (v) =>
     v.advBytes != null
-      ? `dist/${v.name}.adv.js ${v.advBytes} B`
+      ? `${d}/${v.name}.adv.js ${v.advBytes} B`
       : `tier 3 skipped (${v.advSkipped})`;
   console.log(
-    `dist/debug.raw.js ${debug.rawBytes} B  dist/debug.js ${debug.minBytes} B  ${advText(debug)}`,
+    `${d}/debug.raw.js ${debug.rawBytes} B  ${d}/debug.js ${debug.minBytes} B  ${advText(debug)}`,
   );
   console.log(
-    `dist/prod.raw.js  ${prod.rawBytes} B  dist/prod.js  ${prod.minBytes} B  ${advText(prod)}`,
+    `${d}/prod.raw.js  ${prod.rawBytes} B  ${d}/prod.js  ${prod.minBytes} B  ${advText(prod)}`,
   );
 
   if (minifyOpts.internStrings === true) {

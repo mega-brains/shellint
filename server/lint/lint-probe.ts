@@ -30,7 +30,7 @@ import {
   readProbeReport,
 } from "../probe/probe-typings.ts";
 import { activeDeviceIdentity, type ActiveIdentity } from "../device/devices.ts";
-import { PROBE_PATH } from "../core/paths.ts";
+import { PROBE_PATH, SCRIPT_LABEL } from "../core/paths.ts";
 import type { ProbeEntry, ProbeReport } from "../probe/probe.ts";
 
 const RULE = "probe-absent-api";
@@ -123,7 +123,7 @@ function isValueReference(id: ts.Identifier): boolean {
 
 export async function lintProbe(
   source: string,
-  fileName = "scripts/main.ts",
+  fileName = SCRIPT_LABEL,
   probePath = PROBE_PATH,
   active?: ActiveIdentity | null,
 ): Promise<Finding[]> {

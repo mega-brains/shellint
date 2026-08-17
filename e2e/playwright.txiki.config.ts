@@ -42,14 +42,19 @@ export default defineConfig({
   use: { ...base.use, baseURL: BASE },
   webServer: [
     {
-      // Same build prerequisites as the Node config (a dist/ older than
-      // scripts/main.ts trips `artifacts-stale` and moves the check panel),
-      // plus the compile step that produces the executable under test.
+      // Same build prerequisites as the Node config (a dist/ older than the
+      // script trips `artifacts-stale` and moves the check panel), plus the
+      // compile step that produces the executable under test. Its own fixture
+      // workspace, so it can run back to back with the Node suite.
       command:
-        "npm run build:shelly && npm run build:web && npm run build:txiki:executable && ./.txiki/shelly-devroom",
+        "node scripts/build-fixture.mjs e2e-txiki && npm run build:web && npm run build:txiki:executable && ./.txiki/shelly-devroom",
       cwd: ROOT,
       url: BASE,
-      env: { DEVROOM_PORT: String(PORT) },
+      env: {
+        DEVROOM_PORT: String(PORT),
+        DEVROOM_SCRIPT: ".tmp/e2e-txiki/main.ts",
+        DEVROOM_DIST: ".tmp/e2e-txiki/dist",
+      },
       reuseExistingServer: false,
       timeout: 300_000,
     },

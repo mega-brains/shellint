@@ -16,6 +16,7 @@ import { CHECK_CATALOG } from "../server/lint/check-catalog.ts";
 import { acquireHost, removeScratch } from "../server/probe/probe.ts";
 import { MINIFY_KEYS } from "../shared/minify-options.mjs";
 import { createApp } from "../server/app.ts";
+import { FIXTURE_SCRIPT } from "./fixture-workspace.mjs";
 
 const dialect = await checkBuildArtifacts();
 const bad = dialect.flatMap((r) => r.findings.filter((f) => f.severity === "error"));
@@ -206,8 +207,10 @@ if (parseMeta('// @meta {"vc":{"a":{}}}').roles[0] !== "a") {
   throw new Error("parseMeta should read vc roles");
 }
 
-if (lintSemantics(readFileSync("scripts/main.ts", "utf8")).length) {
-  throw new Error("sample scripts/main.ts should pass Tier 3");
+// The fixture, never the user's live scripts/main.ts — the gate must not
+// depend on a file the user is mid-edit in (scripts/fixture-workspace.mjs).
+if (lintSemantics(readFileSync(FIXTURE_SCRIPT, "utf8")).length) {
+  throw new Error("fixtures/device/main.ts should pass Tier 3");
 }
 
 // Tier 4 — capability profile of a Gen2 Plus1PM on fw 1.7.5 (the dev device)
@@ -263,18 +266,16 @@ hasCon('// @meta {"vc":{"t":{}}}\nvar h = 1;', "require-capability-meta-vc");
 hasNotCon('// @meta {"vc":{"t":{}}}\nvar h = 1;', "require-capability-meta-vc", gen3);
 hasNotCon('Script.storage.setItem("k", "v");', "require-capability-storage");
 hasCon("LNM.getStatus();", "warn-preview-api");
-// Not asserted against scripts/main.ts itself: that file is the user's live
-// editor buffer (currently a Victron BLE/AES/Virtual script), not a fixture —
-// Tier 4 coverage above already exercises every rule against a synthetic
-// profile matched to what it checks.
+// Not asserted against the fixture either: Tier 4 coverage above already
+// exercises every rule against a synthetic profile matched to what it checks.
 
 // tsc down-levels these; only the post-compile guard should complain
 hasNot("var f = function () { return 1; };", "no-arrow-functions");
 hasNot("var f = () => 1;", "no-arrow-functions");
 hasNot("var s = `hi`;", "no-template-literals");
 
-if (lintSource(readFileSync("scripts/main.ts", "utf8")).length) {
-  throw new Error("sample scripts/main.ts should lint clean");
+if (lintSource(readFileSync(FIXTURE_SCRIPT, "utf8")).length) {
+  throw new Error("fixtures/device/main.ts should lint clean");
 }
 
 // Probe must never write to or delete a slot that already existed on the device

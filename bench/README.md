@@ -33,9 +33,10 @@ They compile under the **device** tsconfig rules — `target: ES5`,
 standard library available: no `Promise`, `Set`, `Symbol`, `RegExp`,
 `Array.prototype.map`/`forEach`, `String.prototype.padStart`/`concat`.
 `scripts/bench-minify.mjs` compiles each file through a generated tsconfig
-that `extends` `tsconfig.shelly.json`, so a file that drifts out of the
+that `extends` `tsconfig.shelly.base.json`, so a file that drifts out of the
 dialect fails the bench run loudly.
 
-They are excluded from `tsconfig.shelly.json`'s `include` (which names
-`scripts/main.ts` only) and from `check:lines` — a benchmark input needs bulk
+They are outside every device tsconfig's `include` (`tsconfig.shelly.script.json`
+names `scripts/main.ts`, `tsconfig.shelly.fixture.json` names the gate's
+fixture) and outside `check:lines` — a benchmark input needs bulk
 to be representative, and the 500-line limit exists for app source.
