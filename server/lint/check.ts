@@ -2,7 +2,8 @@ import { runtime } from "#devroom/runtime";
 import { DIST_DIR, SCRIPT_PATH } from "../core/paths.ts";
 import { lintScriptFile } from "./lint-source.ts";
 import { lintSemanticsFile } from "./lint-semantics.ts";
-import { lintAdvisoriesFile, typeDeclarationFiles } from "./lint-advisories.ts";
+import { lintAdvisoriesFile } from "./lint-advisories.ts";
+import { lintSyntax, typeCheckInputs, typeErrorFindings } from "./lint-types.ts";
 import { lintConnected } from "./lint-connected.ts";
 import { lintProbe } from "./lint-probe.ts";
 import {
@@ -53,7 +54,7 @@ export type CheckProgress = { done: number; total: number };
 const ARTIFACTS = ["debug.raw.js", "prod.raw.js"];
 
 export const CHECK_PROGRESS_TOTAL = CHECK_CATALOG.length;
-export const CHECK_PROGRESS_STEPS = [0, 42, 44, 57, 64] as const;
+export const CHECK_PROGRESS_STEPS = [0, 44, 46, 59, 66] as const;
 
 function reportProgress(opts: CheckOptions, done: number): void {
   opts.onProgress?.({ done, total: CHECK_PROGRESS_TOTAL });
@@ -130,6 +131,30 @@ async function resolveProfile(
 }
 
 /**
+ * A source that does not parse makes every other rule meaningless, so Check
+ * reports the syntax errors alone and marks the rest `skipped` rather than
+ * letting them "pass" over a recovered AST.
+ */
+function syntaxOnlyReport(findings: Finding[], hasTypes: boolean): CheckReport {
+  return {
+    ok: false,
+    findings,
+    counts: { errors: findings.length, warnings: 0 },
+    checks: summarizeChecks(findings, {
+      parses: false,
+      profile: false,
+      artifacts: [],
+      probe: false,
+      types: hasTypes,
+    }),
+    artifacts: [],
+    stats: null,
+    profile: null,
+    fixes: null,
+  };
+}
+
+/**
  * Static Shelly/Espruino compliance for the saved script.
  * Source lint (Tier 1–3 + Tier 5 advisories) always runs; the dialect guard
  * runs over whatever build artifacts exist, so Check works with no device and
@@ -137,12 +162,24 @@ async function resolveProfile(
  */
 export async function runCheck(opts: CheckOptions = {}): Promise<CheckReport> {
   reportProgress(opts, CHECK_PROGRESS_STEPS[0]);
+  if (!(await fs.exists(SCRIPT_PATH))) {
+    throw new Error(`script not found: ${SCRIPT_PATH}`);
+  }
+  const { source, files, declarations } = await typeCheckInputs(SCRIPT_PATH);
+  const hasTypes = declarations.length > 0;
+
+  const syntax = lintSyntax(source);
+  if (syntax.length) {
+    reportProgress(opts, CHECK_PROGRESS_TOTAL);
+    return syntaxOnlyReport(syntax, hasTypes);
+  }
+
   const findings: Finding[] = [
+    ...typeErrorFindings(SCRIPT_PATH, files, hasTypes),
     ...(await lintScriptFile()),
     ...(await lintSemanticsFile()),
     ...(await lintAdvisoriesFile()),
   ];
-  const source = await fs.readText(SCRIPT_PATH);
   reportProgress(opts, CHECK_PROGRESS_STEPS[1]);
 
   const { profile, findings: profileNotes } = await resolveProfile(
@@ -150,10 +187,8 @@ export async function runCheck(opts: CheckOptions = {}): Promise<CheckReport> {
   );
   findings.push(...profileNotes);
   reportProgress(opts, CHECK_PROGRESS_STEPS[2]);
-  if (await fs.exists(SCRIPT_PATH)) {
-    if (profile) findings.push(...lintConnected(source, profile));
-    findings.push(...(await lintProbe(source)));
-  }
+  if (profile) findings.push(...lintConnected(source, profile));
+  findings.push(...(await lintProbe(source)));
   reportProgress(opts, CHECK_PROGRESS_STEPS[3]);
 
   const { findings: artifactNotes, artifacts } = await artifactFindings();
@@ -179,10 +214,11 @@ export async function runCheck(opts: CheckOptions = {}): Promise<CheckReport> {
     findings,
     counts: { errors, warnings: findings.length - errors },
     checks: summarizeChecks(findings, {
+      parses: true,
       profile: profile !== null,
       artifacts,
       probe: (await readProbeReport()) !== null,
-      types: (await typeDeclarationFiles()).length > 0,
+      types: hasTypes,
     }),
     artifacts,
     stats,

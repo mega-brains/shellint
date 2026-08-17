@@ -49,6 +49,17 @@ const PIN_SCROLLBARS = `
 *::-webkit-scrollbar-thumb, *::-webkit-scrollbar-track { background: transparent; }
 `;
 
+/**
+ * The checked gate's label carries live tallies ("checked 3 warn · 52/66"), so
+ * its pill width — and every rail item after it — moves with whatever the
+ * device answered. Masking hides the text but not the reflow it causes, so pin
+ * the pill to a fixed box and let the mask cover it.
+ */
+const PIN_CHECKED_GATE = `
+#gate-checked { width: 190px; overflow: hidden; }
+#gate-checked .gate-text { white-space: nowrap; }
+`;
+
 async function openSettled(page: Page) {
   await mockDeviceApis(page);
   await mockBuildApis(page);
@@ -57,7 +68,7 @@ async function openSettled(page: Page) {
   });
   await page.clock.install({ time: new Date("2023-11-14T22:13:20.000Z") });
   await page.goto("/");
-  await page.addStyleTag({ content: PIN_SCROLLBARS });
+  await page.addStyleTag({ content: PIN_SCROLLBARS + PIN_CHECKED_GATE });
   await expect(page.locator("#editor .cm-content")).toBeVisible();
   await expect(page.locator("#statusLine")).toContainText("loaded", {
     timeout: 30_000,

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import type { EditorView } from "@codemirror/view";
 import { Header } from "./header";
 import { Toolbar, type BuildAction, type Minify, type Mode } from "./toolbar";
+import { runBuildSequence, type BuildRunOptions } from "./build-action";
 import { Layout } from "./layout";
 import { Inspector, useInspectorTab } from "./inspector";
 import { ReadinessRail } from "./readiness-rail";
@@ -276,20 +277,19 @@ export function App() {
   }, [deployGate, setStatus, syncDeployReady]);
 
   const runBuildAction = useCallback(
-    async ({
-      action = buildAction,
-      skipTypes = skipTypeCheck,
-      showCheckProgress = true,
-    }: {
-      action?: BuildAction;
-      skipTypes?: boolean;
-      showCheckProgress?: boolean;
-    } = {}) => {
+    async (opts: BuildRunOptions = {}) => {
+      const {
+        action = buildAction,
+        skipTypes = skipTypeCheck,
+        showCheckProgress = true,
+      } = opts;
       setBuildRunning(true);
       try {
-        if (action === "check") return await checkScript({ showProgress: showCheckProgress });
-        await buildScript(skipTypes);
-        if (action === "both") await checkScript({ showProgress: showCheckProgress });
+        await runBuildSequence(
+          action,
+          () => buildScript(skipTypes),
+          () => checkScript({ showProgress: showCheckProgress }),
+        );
       } finally {
         setBuildRunning(false);
       }

@@ -20,7 +20,7 @@ export type CheckGroupId =
 export type CheckGroup = { id: CheckGroupId; label: string; about: string };
 
 /** What a check needs beyond the saved source before it can run at all. */
-export type CheckNeeds = "profile" | "artifacts" | "probe" | "types";
+export type CheckNeeds = "profile" | "artifacts" | "probe" | "types" | "parse";
 
 export type CheckSpec = {
   rule: string;
@@ -95,6 +95,19 @@ const CAPABILITY_CHECKS: CheckSpec[] = Object.values(CAPABILITIES).map((cap) => 
 });
 
 export const CHECK_CATALOG: CheckSpec[] = [
+  {
+    rule: "syntax-error",
+    group: "inputs",
+    about:
+      "scripts/main.ts must parse as TypeScript — every other check runs on a recovered, meaningless AST otherwise",
+  },
+  {
+    rule: "type-error",
+    group: "inputs",
+    needs: "types",
+    about:
+      "scripts/main.ts must type-check against types/*.d.ts under the device compiler options — the same errors Build fails on",
+  },
   {
     rule: "artifacts-missing",
     group: "inputs",
@@ -316,8 +329,8 @@ export const CHECK_CATALOG: CheckSpec[] = [
   {
     rule: "dead-code",
     group: "advisories",
-    needs: "types",
-    about: "unused declarations still cost bytes and JsVars on device",
+    about:
+      "unused declarations still cost bytes and JsVars on device — the scope pass needs no types, only its `tsc` half (unused locals inside functions) does",
   },
   {
     rule: "excessive-console-log",
@@ -389,6 +402,12 @@ export const CHECK_CATALOG: CheckSpec[] = [
 ];
 
 export type CheckContext = {
+  /**
+   * The source parsed. When it did not, no other rule ran at all: TypeScript's
+   * parser recovers from a syntax error, so they would have reported on a
+   * meaningless AST.
+   */
+  parses: boolean;
   /** A device profile (live or cached) was available to tier 4. */
   profile: boolean;
   /** Build artifacts the post-compile guard could read. */
@@ -426,6 +445,9 @@ export function summarizeChecks(
   const rows: CheckRow[] = CHECK_CATALOG.map((spec) => {
     const hits = byRule.get(spec.rule) ?? [];
     byRule.delete(spec.rule);
+    if (!ctx.parses && spec.rule !== "syntax-error") {
+      return { ...spec, needs: "parse", status: "skipped", count: 0 };
+    }
     const status: CheckStatus = hits.some((f) => f.severity === "error")
       ? "fail"
       : hits.length

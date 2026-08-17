@@ -16,30 +16,53 @@ function executable(path) {
   }
 }
 
-function pathCandidates(name) {
-  const suffixes = process.platform === "win32" ? [".exe", ".cmd", ".bat", ""] : [""];
-  const dirs = (process.env.PATH ?? "").split(delimiter).filter(Boolean);
-  return dirs.flatMap((dir) => suffixes.map((suffix) => join(dir, name + suffix)));
+// Windows: only `.exe`, deliberately. `.cmd`/`.bat` wrappers cannot be
+// launched by `spawnSync` without `shell: true` (Node ≥18.20 rejects them with
+// EINVAL), so listing them here would only trade a clear "not executable" for
+// an opaque spawn failure. txiki.js ships `tjs.exe`.
+const EXE_SUFFIXES = process.platform === "win32" ? [".exe", ""] : [""];
+
+function withSuffixes(path) {
+  return EXE_SUFFIXES.map((suffix) => path + suffix);
 }
 
-export function resolveTjsBin() {
-  const override = process.env.DEVROOM_TJS_BIN?.trim();
+function pathCandidates(name) {
+  const dirs = (process.env.PATH ?? "").split(delimiter).filter(Boolean);
+  return dirs.flatMap((dir) => withSuffixes(join(dir, name)));
+}
+
+export function resolveTjsBin(envVar = "DEVROOM_TJS_BIN") {
+  const override = process.env[envVar]?.trim();
   if (override) {
+    // A path-shaped override still needs the platform suffix: the checked-in
+    // default (`../../txiki.js/build/tjs`) names the POSIX binary, and the
+    // Windows build of the same tree is `tjs.exe`.
     const candidates = isAbsolute(override)
-      ? [override]
+      ? withSuffixes(override)
       : override.includes("/") || override.includes("\\")
-        ? [resolve(ROOT, override)]
+        ? withSuffixes(resolve(ROOT, override))
         : pathCandidates(override);
     const found = candidates.find(executable);
     if (found) return found;
-    throw new Error(`DEVROOM_TJS_BIN is not executable: ${override}`);
+    throw new Error(`${envVar} is not executable: ${override}`);
   }
+
+  if (envVar !== "DEVROOM_TJS_BIN") return resolveTjsBin();
 
   const found = pathCandidates("tjs").find(executable);
   if (found) return found;
   throw new Error(
     "txiki.js executable missing; set DEVROOM_TJS_BIN or add tjs to PATH",
   );
+}
+
+// Size-optimized tjs builds may drop the esbuild-backed `bundle` subcommand.
+// DEVROOM_TJS_BUNDLE_BIN lets bundling use a full-featured build while
+// DEVROOM_TJS_BIN stays the slim one that ships as the final executable.
+export function resolveTjsBundleBin() {
+  return process.env.DEVROOM_TJS_BUNDLE_BIN
+    ? resolveTjsBin("DEVROOM_TJS_BUNDLE_BIN")
+    : resolveTjsBin();
 }
 
 function validateTjsVersion(bin) {
@@ -58,8 +81,8 @@ function validateTjsVersion(bin) {
   checkedVersionKey = key;
 }
 
-export function runTjs(args, options = {}) {
-  const bin = resolveTjsBin();
+export function runTjs(args, { bin: binOverride, ...options } = {}) {
+  const bin = binOverride ?? resolveTjsBin();
   validateTjsVersion(bin);
   const result = spawnSync(bin, args, {
     cwd: ROOT,

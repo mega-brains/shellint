@@ -1,7 +1,8 @@
 import { runtime } from "#devroom/runtime";
 import ts from "typescript";
-import { DIST_DIR, ROOT, SCRIPT_PATH } from "../core/paths.ts";
+import { DIST_DIR, SCRIPT_PATH } from "../core/paths.ts";
 import { analyzeSource } from "../script/script-stats.ts";
+import { createDeviceProgram, typeCheckInputs } from "./lint-types.ts";
 import { lintComplexity } from "./lint-complexity.ts";
 import { lintMemory } from "./lint-memory.ts";
 import {
@@ -85,67 +86,25 @@ export function parseMeta(source: string): MetaBlock {
   }
 }
 
-export async function typeDeclarationFiles(): Promise<string[]> {
-  const dir = runtime.path.join(ROOT, "types");
-  if (!(await runtime.fs.exists(dir))) return [];
-  return (await runtime.fs.readDir(dir))
-    .filter((entry) => entry.isFile && entry.name.endsWith(".d.ts"))
-    .map((entry) => runtime.path.join(dir, entry.name));
-}
-
 /**
  * 5.4 — every unused declaration costs bytes and JsVars. Delegated to `tsc`
  * rather than a hand-rolled scope pass, and downgraded to a warning.
+ *
+ * `hasDeclarations` is false when no `types/*.d.ts` were readable (the static
+ * build's VFS seeds none): the rule then reports nothing, so its `needs:
+ * "types"` catalog tag can report `skipped` instead of a partial verdict.
  */
 export function deadCodeFindings(
   path: string,
   fileName: string,
   files: ReadonlyMap<string, string>,
+  hasDeclarations = true,
 ): Finding[] {
-  const normalize = (name: string) => runtime.path.resolve(name);
-  const sources = new Map(
-    [...files].map(([name, source]) => [normalize(name), source]),
-  );
-  const options: ts.CompilerOptions = {
-    noEmit: true,
+  if (!hasDeclarations) return [];
+  const { program, source } = createDeviceProgram(path, files, {
     noUnusedLocals: true,
     noUnusedParameters: true,
-    target: ts.ScriptTarget.ES5,
-    noLib: true,
-    skipLibCheck: true,
-    types: [],
-  };
-  const canonical = (name: string) =>
-    runtime.process.platform === "win32" ? normalize(name).toLowerCase() : normalize(name);
-  const host: ts.CompilerHost = {
-    getSourceFile(name, languageVersion) {
-      const source = sources.get(normalize(name));
-      return source === undefined
-        ? undefined
-        : ts.createSourceFile(name, source, languageVersion, true, ts.ScriptKind.TS);
-    },
-    getDefaultLibFileName: () => "lib.d.ts",
-    writeFile: () => undefined,
-    getCurrentDirectory: () => ROOT,
-    getDirectories: () => [],
-    fileExists: (name) => sources.has(normalize(name)),
-    readFile: (name) => sources.get(normalize(name)),
-    getCanonicalFileName: canonical,
-    useCaseSensitiveFileNames: () => runtime.process.platform !== "win32",
-    getNewLine: () => "\n",
-    directoryExists(name) {
-      const prefix = `${normalize(name)}${runtime.path.sep}`;
-      return [...sources.keys()].some((candidate) => candidate.startsWith(prefix));
-    },
-    realpath: normalize,
-  };
-  const sourcePath = normalize(path);
-  const rootNames = [
-    sourcePath,
-    ...[...sources.keys()].filter((name) => name !== sourcePath),
-  ];
-  const program = ts.createProgram({ rootNames, options, host });
-  const source = program.getSourceFile(sourcePath);
+  });
   if (!source) return [];
 
   const findings: Finding[] = [];
@@ -323,16 +282,9 @@ export async function lintAdvisoriesFile(path = SCRIPT_PATH): Promise<Finding[]>
     throw new Error(`script not found: ${path}`);
   }
   const fileName = "scripts/main.ts";
-  const source = await runtime.fs.readText(path);
-  const declarations = await typeDeclarationFiles();
-  const declarationSources = await Promise.all(
-    declarations.map(
-      async (declaration) => [declaration, await runtime.fs.readText(declaration)] as const,
-    ),
-  );
-  const files = new Map<string, string>([[path, source], ...declarationSources]);
+  const { source, files, declarations } = await typeCheckInputs(path);
   const findings = lintAdvisories(source, fileName);
   if (parseMeta(source)) findings.push(...await checkMinifiedMeta(DIST_DIR));
-  findings.push(...deadCodeFindings(path, fileName, files));
+  findings.push(...deadCodeFindings(path, fileName, files, declarations.length > 0));
   return findings;
 }

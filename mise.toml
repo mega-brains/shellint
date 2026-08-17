@@ -3,7 +3,11 @@ node = "22"
 
 [env]
 DEVROOM_TJS_VERSION = "26.6.0"
-DEVROOM_TJS_BIN = "../../txiki.js/build/tjs"
+# DEVROOM_TJS_BIN ships as the final executable; build-smallest-compressed
+# has no `tjs bundle` (esbuild) support, so DEVROOM_TJS_BUNDLE_BIN carries
+# the full build for that one step.
+DEVROOM_TJS_BIN = "../../txiki.js/build-smallest-compressed/tjs"
+DEVROOM_TJS_BUNDLE_BIN = "../../txiki.js/build/tjs"
 
 [tasks.install]
 description = "Install npm dependencies"
@@ -99,17 +103,21 @@ run = "npm run test"
 description = "Playwright e2e (Chromium) against local DevRoom UI"
 run = "npm run test:e2e"
 
+[tasks."test:e2e:txiki"]
+description = "Playwright e2e against the txiki single-file executable"
+run = "npm run test:e2e:txiki"
+
 [tasks."test:txiki"]
 description = "Typecheck and verify txiki parity"
 run = "npm run test:txiki"
 
 [tasks.b]
 alias="beforeCommit"
-description = "Pre-commit gate: line limit + typecheck + build run in parallel, then static build, test, then e2e"
+description = "Pre-commit gate: line limit + typecheck + build run in parallel, then static build, test, then e2e on Node and on the txiki executable"
 depends = ["check:lines", "typecheck", "build"]
 run = """
 npm run build:static
-/usr/bin/time npm run test && npm run test:e2e
+npm run test && npm run test:e2e && npm run test:e2e:txiki
 """
 
 [tasks.probe]
@@ -130,4 +138,4 @@ run = "npm run profile:txiki"
 
 [tasks.clean]
 description = "Remove Shelly + web build artifacts"
-run = "rm -rf dist web/dist .tsc-out"
+run = "npm run clean"

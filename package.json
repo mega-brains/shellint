@@ -41,10 +41,12 @@
     "lint": "npm run typecheck",
     "bench": "node scripts/bench-minify.mjs",
     "check:lines": "node scripts/check-line-limit.mjs",
+    "clean": "node scripts/clean.mjs",
     "test": "node --import tsx scripts/test.mjs",
     "test:e2e": "playwright test -c e2e/playwright.config.ts",
+    "test:e2e:txiki": "playwright test -c e2e/playwright.txiki.config.ts",
     "test:txiki": "npm run typecheck:txiki && npm run build:web && node scripts/test-txiki-runtime.mjs",
-    "beforeCommit": "npm run check:lines && npm run typecheck && npm run build && npm run build:static && npm run test && npm run test:e2e"
+    "beforeCommit": "npm run check:lines && npm run typecheck && npm run build && npm run build:static && npm run test && npm run test:e2e && npm run test:e2e:txiki"
   },
   "engines": {
     "node": ">=20"

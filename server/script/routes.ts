@@ -162,10 +162,25 @@ export function registerScriptBuildRoutes(app: Hono) {
   app.post("/api/check/stream", async (c) => {
     const connected = await checkConnected(c);
     const encoder = new TextEncoder();
+    // A browser that navigates away mid-check leaves the stream closed under
+    // us, and `enqueue` on a closed controller throws from inside a `.then`,
+    // i.e. as an unhandled rejection that takes the whole server down. The
+    // check itself keeps running to completion; its events are just dropped.
+    let open = true;
     const stream = new ReadableStream<Uint8Array>({
       start(controller) {
         const send = (event: CheckStreamEvent) => {
-          controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+          if (!open) return;
+          try {
+            controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+          } catch {
+            open = false;
+          }
+        };
+        const close = () => {
+          if (!open) return;
+          open = false;
+          controller.close();
         };
         const onProgress = ({ done, total }: CheckProgress) => {
           send({ type: "progress", done, total });
@@ -173,13 +188,16 @@ export function registerScriptBuildRoutes(app: Hono) {
         void runCheck({ connected, onProgress }).then(
           (report) => {
             send({ type: "report", report });
-            controller.close();
+            close();
           },
           (e) => {
             send({ type: "error", error: checkError(e) });
-            controller.close();
+            close();
           },
         );
+      },
+      cancel() {
+        open = false;
       },
     });
     return c.body(stream, 200, {

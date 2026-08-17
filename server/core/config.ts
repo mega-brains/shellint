@@ -39,11 +39,25 @@ function parseMinify(raw: unknown): MinifyConfig {
   return out;
 }
 
+/**
+ * `DEVROOM_PORT` wins over devroom.json, so a second instance (the txiki
+ * single-file executable under e2e, e2e/playwright.txiki.config.ts) can run
+ * beside a dev server without editing a committed file.
+ */
+function envPort(): number | null {
+  const raw = runtime.process.env.DEVROOM_PORT?.trim();
+  if (!raw) return null;
+  const port = Number(raw);
+  return Number.isInteger(port) && port > 0 && port < 65_536 ? port : null;
+}
+
 export async function loadConfig(): Promise<DevroomConfig> {
   const path = runtime.path.join(ROOT, "devroom.json");
+  const override = envPort();
   if (!(await runtime.fs.exists(path))) {
     return {
       ...DEFAULTS,
+      ...(override == null ? {} : { port: override }),
       minify: { ...DEFAULT_MINIFY },
     };
   }
@@ -53,7 +67,7 @@ export async function loadConfig(): Promise<DevroomConfig> {
     deviceIp: typeof raw.deviceIp === "string" ? raw.deviceIp : DEFAULTS.deviceIp,
     scriptId: typeof raw.scriptId === "number" ? raw.scriptId : DEFAULTS.scriptId,
     host: typeof raw.host === "string" ? raw.host : DEFAULTS.host,
-    port: typeof raw.port === "number" ? raw.port : DEFAULTS.port,
+    port: override ?? (typeof raw.port === "number" ? raw.port : DEFAULTS.port),
     compiler: typeof raw.compiler === "string" ? raw.compiler : DEFAULTS.compiler,
     minify: parseMinify(raw.minify),
   };

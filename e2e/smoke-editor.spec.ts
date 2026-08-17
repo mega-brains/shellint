@@ -46,7 +46,13 @@ test.describe("editor smoke", () => {
       timeout: 45_000,
     });
     await expect(page.locator("#checkRules")).not.toBeEmpty();
-    await expect(page.getByTestId("gate-checked")).not.toContainText("not checked");
+    // #checkNote/#checkRules are filled by the catalog at boot, so they say
+    // nothing about the run. The gate is the first thing the report itself
+    // paints — and a connected check talks to the real device, so give it the
+    // same budget as the note above rather than the default 5s.
+    await expect(page.getByTestId("gate-checked")).not.toContainText("not checked", {
+      timeout: 45_000,
+    });
   });
 
   test("artifact chips can leave source mode", async ({ page }) => {

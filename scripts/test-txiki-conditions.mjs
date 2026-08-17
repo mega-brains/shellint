@@ -2,7 +2,7 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { runTjs } from "./txiki-test-util.mjs";
+import { resolveTjsBundleBin, runTjs } from "./txiki-test-util.mjs";
 
 function runNode(entry) {
   const result = spawnSync(process.execPath, [entry], {
@@ -41,7 +41,7 @@ try {
     throw new Error(`default condition selected ${nodeRuntime}, expected node`);
   }
 
-  runTjs(["bundle", "--conditions=txiki", entry, bundle]);
+  runTjs(["bundle", "--conditions=txiki", entry, bundle], { bin: resolveTjsBundleBin() });
   const bundleText = readFileSync(bundle, "utf8");
   if (bundleText.includes('runtime = "node"')) {
     throw new Error("txiki bundle retained default runtime implementation");

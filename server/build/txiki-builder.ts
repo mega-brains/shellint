@@ -74,10 +74,25 @@ export type PortableBuildResult = {
   };
 };
 
+/**
+ * `tsc`'s CLI wording, verbatim — `file(line,col): error TSxxxx: message`.
+ * The Node builder shells out to `tsc` and forwards its output, and the editor
+ * parses that shape to place gutter markers (`web/editor/build-error-gutter.tsx`).
+ * Building diagnostics in-process must not lose the location, or the txiki
+ * runtime silently drops every marker.
+ */
+function formatDiagnostic(diagnostic: PortableDiagnostic): string {
+  const where =
+    diagnostic.file && diagnostic.line != null && diagnostic.column != null
+      ? `${diagnostic.file}(${diagnostic.line},${diagnostic.column}): `
+      : "";
+  return `${where}${diagnostic.category} TS${diagnostic.code}: ${diagnostic.message}`;
+}
+
 export class PortableTypeCheckError extends Error {
   constructor(public readonly diagnostics: PortableDiagnostic[]) {
-    const first = diagnostics.find((diagnostic) => diagnostic.category === "error");
-    super(first ? `TypeScript ${first.code}: ${first.message}` : "TypeScript check failed");
+    const errors = diagnostics.filter((diagnostic) => diagnostic.category === "error");
+    super(errors.length ? errors.map(formatDiagnostic).join("\n") : "TypeScript check failed");
     this.name = "PortableTypeCheckError";
   }
 }
@@ -99,7 +114,17 @@ function categoryName(category: ts.DiagnosticCategory): PortableDiagnostic["cate
   }
 }
 
-function serializeDiagnostic(diagnostic: ts.Diagnostic): PortableDiagnostic {
+/**
+ * `scripts/main.ts`, not `/Users/…/scripts/main.ts`: the diagnostic text ends up
+ * in the UI status line, where `tsc`'s repo-relative wording is what the Node
+ * builder shows and what the editor's marker parser expects.
+ */
+function relativeTo(root: string, path: string): string {
+  const prefix = `${root}/`;
+  return path.startsWith(prefix) ? path.slice(prefix.length) : path;
+}
+
+function serializeDiagnostic(diagnostic: ts.Diagnostic, root: string): PortableDiagnostic {
   const out: PortableDiagnostic = {
     category: categoryName(diagnostic.category),
     code: diagnostic.code,
@@ -107,7 +132,7 @@ function serializeDiagnostic(diagnostic: ts.Diagnostic): PortableDiagnostic {
   };
   if (diagnostic.file && diagnostic.start != null) {
     const point = diagnostic.file.getLineAndCharacterOfPosition(diagnostic.start);
-    out.file = normalizePath(diagnostic.file.fileName);
+    out.file = relativeTo(root, normalizePath(diagnostic.file.fileName));
     out.line = point.line + 1;
     out.column = point.character + 1;
   }
@@ -169,7 +194,9 @@ function checkSources(
     options,
     host,
   });
-  return ts.getPreEmitDiagnostics(program).map(serializeDiagnostic);
+  return ts
+    .getPreEmitDiagnostics(program)
+    .map((diagnostic) => serializeDiagnostic(diagnostic, root));
 }
 
 function mergeMinify(input?: Partial<MinifyConfig>): MinifyConfig {

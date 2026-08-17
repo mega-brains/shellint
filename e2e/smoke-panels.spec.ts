@@ -43,7 +43,9 @@ test.describe("panels smoke", () => {
     );
     await toplevel.click();
     const req = await patch;
-    await expect(toplevel).toBeChecked({ checked: !before });
+    // The box only flips on the PATCH response, and a parallel worker's
+    // connected check can hold the server for seconds — 5s is too tight.
+    await expect(toplevel).toBeChecked({ checked: !before, timeout: 15_000 });
     expect(req.postData() ?? "").toMatch(/toplevel/);
     await expect(page.locator("#statusLine")).toContainText("minify options saved", {
       timeout: 10_000,
@@ -55,7 +57,7 @@ test.describe("panels smoke", () => {
     );
     await toplevel.click();
     await restore;
-    await expect(toplevel).toBeChecked({ checked: before });
+    await expect(toplevel).toBeChecked({ checked: before, timeout: 15_000 });
   });
 
   test("option tip stays inside the viewport on the last option", async ({

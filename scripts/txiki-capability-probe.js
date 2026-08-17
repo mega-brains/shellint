@@ -11,7 +11,11 @@ const requiredFunctions = {
 const checks = Object.fromEntries(
   Object.entries(requiredFunctions).map(([name, value]) => [name, typeof value === "function"]),
 );
+// tls is reported but not gated: no fetch/WebSocket call in this app ever
+// uses https:// or wss:// (device comms are plain ws:// on the LAN), so a
+// tjs build without it still works — see server/device/rpc.ts, debug-log.ts.
 checks["tjs.engine.features.tls"] = tjs.engine?.features?.tls === true;
+const optionalChecks = new Set(["tjs.engine.features.tls"]);
 checks["tjs.engine.features.webcrypto"] = tjs.engine?.features?.webcrypto === true;
 
 try {
@@ -32,7 +36,7 @@ try {
 }
 
 const missing = Object.entries(checks)
-  .filter(([, ok]) => !ok)
+  .filter(([name, ok]) => !ok && !optionalChecks.has(name))
   .map(([name]) => name);
 const report = {
   ok: missing.length === 0,

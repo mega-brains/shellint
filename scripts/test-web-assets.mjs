@@ -69,11 +69,14 @@ if (existsSync(join(ROOT, "web/dist/app.js.map"))) {
 }
 
 // api-docs.json is fetched at runtime; inlining it again would silently undo
-// ~21 KB of the bundle saving.
+// ~28 KB of the bundle saving. Checked on content rather than on a size
+// threshold: the bundle has grown on its own since (M18/M21), which made the
+// old `size > budget - docs` proxy fire on a bundle that inlines nothing.
+// `declare var console:` is api-docs.json's own wording for a hover signature —
+// the UI bundle has no other reason to carry it.
 if (existsSync(join(ROOT, "web/dist/app.js"))) {
-  const bundle = statSync(join(ROOT, "web/dist/app.js")).size;
-  const docs = statSync(join(ROOT, "web/dist/api-docs.json")).size;
-  if (bundle > 660_000 - docs) {
+  const bundle = readFileSync(join(ROOT, "web/dist/app.js"), "utf8");
+  if (bundle.includes("declare var console:")) {
     fail("app.js looks like it re-inlined api-docs.json");
   }
 }
