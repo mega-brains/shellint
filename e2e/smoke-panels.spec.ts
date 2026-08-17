@@ -1,5 +1,15 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 import { openApp } from "./helpers/open-app";
+
+/** A successful `PATCH /api/config` reply — i.e. devroom.json is written. */
+function patchResponse(page: Page) {
+  return page.waitForResponse(
+    (r) =>
+      r.url().includes("/api/config") &&
+      r.request().method() === "PATCH" &&
+      r.ok(),
+  );
+}
 
 test.describe("panels smoke", () => {
   test("inspector tabs are mutually exclusive and persist", async ({ page }) => {
@@ -35,29 +45,34 @@ test.describe("panels smoke", () => {
     await expect(page.locator("#pane-options")).toBeVisible();
     await expect(page.getByTestId("opt-compress")).toBeVisible();
 
+    // The panel renders its defaults first and repaints when /api/config lands,
+    // so read `before` only once that has happened — otherwise the click races
+    // the response, which then overwrites the toggle with the server's value.
+    // `#optionsPeek` is "…" until then (options-panel.tsx `loaded`).
+    await expect(page.locator("#optionsPeek")).not.toHaveText("…", {
+      timeout: 15_000,
+    });
+
     // devroom.json owns the defaults, so assert the flip rather than a value.
     const toplevel = page.getByTestId("opt-toplevel");
     const before = await toplevel.isChecked();
-    const patch = page.waitForRequest(
-      (r) => r.url().includes("/api/config") && r.method() === "PATCH",
-    );
+    // Wait for the *response*: the route writes devroom.json before replying,
+    // and waiting on the request alone can end the test — and with it the
+    // webServer — before the write lands.
+    const patch = patchResponse(page);
     await toplevel.click();
-    const req = await patch;
-    // The box only flips on the PATCH response, and a parallel worker's
-    // connected check can hold the server for seconds — 5s is too tight.
-    await expect(toplevel).toBeChecked({ checked: !before, timeout: 15_000 });
-    expect(req.postData() ?? "").toMatch(/toplevel/);
+    const res = await patch;
+    await expect(toplevel).toBeChecked({ checked: !before });
+    expect(res.request().postData() ?? "").toMatch(/toplevel/);
     await expect(page.locator("#statusLine")).toContainText("minify options saved", {
       timeout: 10_000,
     });
 
     // Restore so later runs / design snapshots keep default config.
-    const restore = page.waitForRequest(
-      (r) => r.url().includes("/api/config") && r.method() === "PATCH",
-    );
+    const restore = patchResponse(page);
     await toplevel.click();
     await restore;
-    await expect(toplevel).toBeChecked({ checked: before, timeout: 15_000 });
+    await expect(toplevel).toBeChecked({ checked: before });
   });
 
   test("option tip stays inside the viewport on the last option", async ({
