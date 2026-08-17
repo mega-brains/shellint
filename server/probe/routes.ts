@@ -28,9 +28,9 @@ function ecoOverride(v: unknown): EcoOverride | undefined {
 /** `?device=` (query) resolves to that device; omitted resolves to the active one.
  * Throws `NoDeviceError` only for "no device active" — an unknown `?device=`
  * id resolves to `null` so the route can 404 instead of 409. */
-function resolveDevice(c: Context): DeviceRecord | null {
+async function resolveDevice(c: Context): Promise<DeviceRecord | null> {
   const deviceId = c.req.query("device");
-  return deviceId ? getDevice(deviceId) : requireActive().device;
+  return deviceId ? await getDevice(deviceId) : (await requireActive()).device;
 }
 
 /**
@@ -54,24 +54,34 @@ export function registerProbeRoutes(app: Hono) {
     try {
       const report = await runProbe({ ecoOff: ecoOverride(body.ecoOff) });
       // Same as `mise run probe`: fresh answers, freshly generated typings.
-      const typings = writeGeneratedTypings();
-      const deviceId = requireActive().device.id;
-      const capture = resolveCapture(deviceId, report.ver);
-      return c.json({ ok: true, report, typings, capture, probe: probeState(deviceId) });
+      const typings = await writeGeneratedTypings();
+      const deviceId = (await requireActive()).device.id;
+      const capture = await resolveCapture(deviceId, report.ver);
+      return c.json({
+        ok: true,
+        report,
+        typings,
+        capture,
+        probe: await probeState(deviceId),
+      });
     } catch (e) {
       return deviceError(c, e);
     }
   });
 
-  app.get("/api/probe/state", (c) => {
+  app.get("/api/probe/state", async (c) => {
     let device: DeviceRecord | null;
     try {
-      device = resolveDevice(c);
+      device = await resolveDevice(c);
     } catch (e) {
       return c.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 409);
     }
     if (!device) return c.json({ ok: false, error: "unknown device" }, 404);
-    return c.json({ ok: true, ...probeState(device.id), captures: listCaptures(device.id) });
+    return c.json({
+      ok: true,
+      ...(await probeState(device.id)),
+      captures: await listCaptures(device.id),
+    });
   });
 
   /**
@@ -80,18 +90,22 @@ export function registerProbeRoutes(app: Hono) {
    * empty even though the answers are stored. Prefers the capture matching the
    * firmware the device reports now, else the newest one.
    */
-  app.get("/api/probe/last", (c) => {
+  app.get("/api/probe/last", async (c) => {
     let device: DeviceRecord | null;
     try {
-      device = resolveDevice(c);
+      device = await resolveDevice(c);
     } catch (e) {
       return c.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 409);
     }
     if (!device) return c.json({ ok: false, error: "unknown device" }, 404);
-    const state = probeState(device.id);
+    const state = await probeState(device.id);
     const meta = state.matched ?? state.newest;
     if (!meta) return c.json({ ok: true, capture: null, report: null });
-    return c.json({ ok: true, capture: meta, report: loadCapture(device.id, meta.verKey) });
+    return c.json({
+      ok: true,
+      capture: meta,
+      report: await loadCapture(device.id, meta.verKey),
+    });
   });
 
   app.post("/api/probe/skip", async (c) => {
@@ -103,32 +117,42 @@ export function registerProbeRoutes(app: Hono) {
     }
     let device: DeviceRecord | null;
     try {
-      device = body.device ? getDevice(body.device) : requireActive().device;
+      device = body.device ? await getDevice(body.device) : (await requireActive()).device;
     } catch (e) {
       if (e instanceof NoDeviceError) return c.json({ ok: false, error: e.message }, 409);
       return c.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 500);
     }
     if (!device) return c.json({ ok: false, error: `unknown device "${body.device}"` }, 404);
     const ver = body.ver !== undefined ? body.ver : (device.info?.ver ?? null);
-    setProbeSkip(device.id, ver);
-    return c.json({ ok: true, ...probeState(device.id), captures: listCaptures(device.id) });
+    await setProbeSkip(device.id, ver);
+    return c.json({
+      ok: true,
+      ...(await probeState(device.id)),
+      captures: await listCaptures(device.id),
+    });
   });
 
-  app.delete("/api/probe/captures/:verKey", (c) => {
+  app.delete("/api/probe/captures/:verKey", async (c) => {
     let device: DeviceRecord | null;
     try {
-      device = resolveDevice(c);
+      device = await resolveDevice(c);
     } catch (e) {
       return c.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 409);
     }
     if (!device) return c.json({ ok: false, error: "unknown device" }, 404);
     try {
-      deleteCapture(device.id, c.req.param("verKey"));
+      await deleteCapture(device.id, c.req.param("verKey"));
     } catch (e) {
       return c.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, 400);
     }
     // The deleted capture may have been what the mirror was showing.
-    if (loadDevices().active?.device === device.id) mirrorActiveDevice(device.id);
-    return c.json({ ok: true, ...probeState(device.id), captures: listCaptures(device.id) });
+    if ((await loadDevices()).active?.device === device.id) {
+      await mirrorActiveDevice(device.id);
+    }
+    return c.json({
+      ok: true,
+      ...(await probeState(device.id)),
+      captures: await listCaptures(device.id),
+    });
   });
 }

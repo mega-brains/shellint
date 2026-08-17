@@ -1,9 +1,11 @@
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname } from "node:path";
+import { runtime } from "#devroom/runtime";
 import { DEVICE_PROFILE_PATH, devicePaths } from "../core/paths.ts";
 import { loadConfig, assertDevroomCompiler } from "../core/config.ts";
 import { requireActive, mirrorActiveDevice, toDeviceInfo, touchDeviceInfo } from "./devices.ts";
 import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
+
+const { fs } = runtime;
+const { dirname } = runtime.path;
 
 /**
  * What the connected lint knows about the target device. `Shelly.ListMethods`
@@ -47,9 +49,9 @@ async function fetchComponents(rpc: ShellyRpc): Promise<string[]> {
 }
 
 export async function fetchDeviceProfile(): Promise<DeviceProfile> {
-  const cfg = loadConfig();
+  const cfg = await loadConfig();
   assertDevroomCompiler(cfg);
-  const target = requireActive();
+  const target = await requireActive();
 
   const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
   try {
@@ -63,7 +65,7 @@ export async function fetchDeviceProfile(): Promise<DeviceProfile> {
       ? listed.methods.filter((m): m is string => typeof m === "string")
       : [];
     const components = await fetchComponents(rpc);
-    touchDeviceInfo(target.device.id, toDeviceInfo(info));
+    await touchDeviceInfo(target.device.id, toDeviceInfo(info));
 
     const profile: DeviceProfile = {
       at: new Date().toISOString(),
@@ -75,7 +77,7 @@ export async function fetchDeviceProfile(): Promise<DeviceProfile> {
       methods,
       components,
     };
-    writeDeviceProfile(profile, target.device.id);
+    await writeDeviceProfile(profile, target.device.id);
     return profile;
   } finally {
     rpc.close();
@@ -87,17 +89,20 @@ export async function fetchDeviceProfile(): Promise<DeviceProfile> {
  * `.devroom/devices/<id>/`) and, since a fresh probe is always for the
  * currently active device, re-mirrors it into `types/device-profile.json`.
  */
-export function writeDeviceProfile(profile: DeviceProfile, deviceId: string): void {
+export async function writeDeviceProfile(
+  profile: DeviceProfile,
+  deviceId: string,
+): Promise<void> {
   const path = devicePaths(deviceId).profile;
-  mkdirSync(dirname(path), { recursive: true });
-  writeFileSync(path, JSON.stringify(profile, null, 2) + "\n", "utf8");
-  mirrorActiveDevice(deviceId);
+  await fs.mkdir(dirname(path), { recursive: true });
+  await fs.atomicWriteText(path, JSON.stringify(profile, null, 2) + "\n");
+  await mirrorActiveDevice(deviceId);
 }
 
-export function readDeviceProfile(): DeviceProfile | null {
-  if (!existsSync(DEVICE_PROFILE_PATH)) return null;
+export async function readDeviceProfile(): Promise<DeviceProfile | null> {
+  if (!(await fs.exists(DEVICE_PROFILE_PATH))) return null;
   try {
-    return JSON.parse(readFileSync(DEVICE_PROFILE_PATH, "utf8")) as DeviceProfile;
+    return JSON.parse(await fs.readText(DEVICE_PROFILE_PATH)) as DeviceProfile;
   } catch {
     return null;
   }

@@ -1,4 +1,4 @@
-import { readFileSync, existsSync } from "node:fs";
+import { runtime } from "#devroom/runtime";
 import ts from "typescript";
 import { SCRIPT_PATH } from "../core/paths.ts";
 import { checkUseBeforeDefine } from "./lint-hoisting.ts";
@@ -8,6 +8,7 @@ import {
   hasUnicodeEscape,
   stringArg,
   type Finding,
+  type FindingFix,
 } from "./lint-util.ts";
 
 export type { Finding };
@@ -70,9 +71,10 @@ export function lintSource(
     rule: string,
     severity: "error" | "warn",
     message: string,
+    fix?: FindingFix,
   ) => {
     const { line } = sf.getLineAndCharacterOfPosition(node.getStart(sf));
-    findings.push({ severity, rule, message, file: fileName, line: line + 1 });
+    findings.push({ severity, rule, message, file: fileName, line: line + 1, fix });
   };
 
   const addFileLevel = (
@@ -184,6 +186,12 @@ export function lintSource(
         "no-unicode-escapes",
         "warn",
         "only \\xHH escapes are supported in device strings",
+        {
+          title: "Replace Unicode escape with raw UTF-8 text",
+          start: node.getStart(sf),
+          end: node.getEnd(),
+          text: JSON.stringify(node.text),
+        },
       );
     }
   };
@@ -217,7 +225,7 @@ export function lintSource(
     const key = stringArg(node, 0);
     if (key == null) return;
     storageKeys.add(key);
-    const keyBytes = Buffer.byteLength(key, "utf8");
+    const keyBytes = runtime.byteLength(key);
     if (keyBytes > MAX_STORAGE_KEY_BYTES) {
       add(
         node,
@@ -229,7 +237,7 @@ export function lintSource(
     if (name.endsWith(".setItem")) {
       const value = stringArg(node, 1);
       if (value != null) {
-        const bytes = Buffer.byteLength(value, "utf8");
+        const bytes = runtime.byteLength(value);
         if (bytes > MAX_STORAGE_VALUE_BYTES) {
           add(
             node,
@@ -345,9 +353,9 @@ export function lintSource(
   return findings;
 }
 
-export function lintScriptFile(path = SCRIPT_PATH): Finding[] {
-  if (!existsSync(path)) {
+export async function lintScriptFile(path = SCRIPT_PATH): Promise<Finding[]> {
+  if (!(await runtime.fs.exists(path))) {
     throw new Error(`script not found: ${path}`);
   }
-  return lintSource(readFileSync(path, "utf8"), "scripts/main.ts");
+  return lintSource(await runtime.fs.readText(path), "scripts/main.ts");
 }

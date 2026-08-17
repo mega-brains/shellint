@@ -10,7 +10,7 @@ import { runBuild } from "./build.ts";
 import { analyzeScriptFile, analyzeVariants } from "./script-stats.ts";
 import { appendBuildHistory, readBuildHistory } from "./build-history.ts";
 import { checkBuildArtifacts } from "../lint/dialect-check.ts";
-import { runCheck } from "../lint/check.ts";
+import { runCheck, type CheckProgress, type CheckReport } from "../lint/check.ts";
 import { CHECK_CATALOG, CHECK_GROUPS } from "../lint/check-catalog.ts";
 import { estimateMemoryFile } from "./memory-estimate.ts";
 import { minFirmware } from "./min-firmware.ts";
@@ -19,14 +19,36 @@ import { registerScriptRoutes } from "./routes-source.ts";
 import { listDevices, loadDevices, sanitizeDevice } from "../device/devices.ts";
 import { MINIFY_KEYS } from "../../shared/minify-options.mjs";
 
+type CheckStreamEvent =
+  | { type: "progress"; done: number; total: number }
+  | { type: "report"; report: CheckReport }
+  | { type: "error"; error: string };
+
+async function checkConnected(c: Context): Promise<boolean> {
+  let connected = c.req.query("connected") === "1";
+  if (c.req.method !== "POST") return connected;
+  try {
+    const body = (await c.req.json()) as { connected?: unknown };
+    connected = body.connected === true;
+  } catch {
+    /* body is optional */
+  }
+  return connected;
+}
+
+function checkError(e: unknown): string {
+  return e instanceof Error ? e.message : String(e);
+}
+
 /** Config, build, check, stats, history, artifacts — plus script source CRUD (script-routes.ts). Split out of app.ts to stay under the 500-line cap. */
 export function registerScriptBuildRoutes(app: Hono) {
-  app.get("/api/config", (c) => {
-    const devicesFile = loadDevices();
+  app.get("/api/config", async (c) => {
+    const devicesFile = await loadDevices();
+    const devices = await listDevices();
     return c.json({
       ok: true,
-      config: sanitizeConfig(loadConfig()),
-      devices: listDevices().map(sanitizeDevice),
+      config: sanitizeConfig(await loadConfig()),
+      devices: await Promise.all(devices.map(sanitizeDevice)),
       active: devicesFile.active,
     });
   });
@@ -68,7 +90,7 @@ export function registerScriptBuildRoutes(app: Hono) {
         400,
       );
     }
-    const cfg = patchMinifyConfig(patch);
+    const cfg = await patchMinifyConfig(patch);
     return c.json({ ok: true, config: sanitizeConfig(cfg) });
   });
 
@@ -87,14 +109,14 @@ export function registerScriptBuildRoutes(app: Hono) {
       let stats = null;
       let variants = null;
       try {
-        stats = analyzeScriptFile();
-        variants = analyzeVariants(stats);
+        stats = await analyzeScriptFile();
+        variants = await analyzeVariants(stats);
       } catch {
         /* stats are best-effort */
       }
-      const estimate = estimateMemoryFile();
-      const historyRow = appendBuildHistory(sizes, stats, estimate.bytes);
-      const dialect = checkBuildArtifacts();
+      const estimate = await estimateMemoryFile();
+      const historyRow = await appendBuildHistory(sizes, stats, estimate.bytes);
+      const dialect = await checkBuildArtifacts();
       return c.json({
         ok: true,
         sizes,
@@ -120,15 +142,7 @@ export function registerScriptBuildRoutes(app: Hono) {
 
   // `ok` stays transport-level; compliance verdict lives in report.ok
   const check = async (c: Context) => {
-    let connected = c.req.query("connected") === "1";
-    if (c.req.method === "POST") {
-      try {
-        const body = (await c.req.json()) as { connected?: unknown };
-        connected = body.connected === true;
-      } catch {
-        /* body is optional */
-      }
-    }
+    const connected = await checkConnected(c);
     try {
       return c.json({ ok: true, report: await runCheck({ connected }) });
     } catch (e) {
@@ -145,19 +159,48 @@ export function registerScriptBuildRoutes(app: Hono) {
   app.post("/api/check", check);
   app.get("/api/check", check);
 
+  app.post("/api/check/stream", async (c) => {
+    const connected = await checkConnected(c);
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        const send = (event: CheckStreamEvent) => {
+          controller.enqueue(encoder.encode(`${JSON.stringify(event)}\n`));
+        };
+        const onProgress = ({ done, total }: CheckProgress) => {
+          send({ type: "progress", done, total });
+        };
+        void runCheck({ connected, onProgress }).then(
+          (report) => {
+            send({ type: "report", report });
+            controller.close();
+          },
+          (e) => {
+            send({ type: "error", error: checkError(e) });
+            controller.close();
+          },
+        );
+      },
+    });
+    return c.body(stream, 200, {
+      "Cache-Control": "no-store",
+      "Content-Type": "application/x-ndjson; charset=utf-8",
+    });
+  });
+
   // The catalog alone, so the UI can list every check before the first run.
   app.get("/api/checks", (c) => {
     return c.json({ ok: true, groups: CHECK_GROUPS, checks: CHECK_CATALOG });
   });
 
-  app.get("/api/stats", (c) => {
+  app.get("/api/stats", async (c) => {
     try {
-      const stats = analyzeScriptFile();
+      const stats = await analyzeScriptFile();
       return c.json({
         ok: true,
         stats,
-        variants: analyzeVariants(stats),
-        estimate: estimateMemoryFile(),
+        variants: await analyzeVariants(stats),
+        estimate: await estimateMemoryFile(),
         minFirmware: minFirmware(stats.apis),
       });
     } catch (e) {
@@ -168,21 +211,21 @@ export function registerScriptBuildRoutes(app: Hono) {
     }
   });
 
-  app.get("/api/history", (c) => {
+  app.get("/api/history", async (c) => {
     const limitRaw = c.req.query("limit");
     const limit = limitRaw ? Number(limitRaw) : 20;
-    const history = readBuildHistory(
+    const history = await readBuildHistory(
       Number.isFinite(limit) ? Math.min(100, Math.max(1, limit)) : 20,
     );
     return c.json({ ok: true, history });
   });
 
-  app.get("/api/artifacts", (c) => {
-    return c.json({ ok: true, artifacts: listArtifacts() });
+  app.get("/api/artifacts", async (c) => {
+    return c.json({ ok: true, artifacts: await listArtifacts() });
   });
 
-  app.get("/api/artifact", (c) => {
-    const artifact = readArtifact(c.req.query("name") ?? "");
+  app.get("/api/artifact", async (c) => {
+    const artifact = await readArtifact(c.req.query("name") ?? "");
     if (!artifact) {
       return c.json({ ok: false, error: "unknown or unbuilt artifact" }, 404);
     }

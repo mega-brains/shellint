@@ -14,7 +14,8 @@
   text-overflow: ellipsis;
 }
 
-.copy-findings {
+.copy-findings,
+.fix-findings {
   flex: 0 0 auto;
   padding: 3px 8px;
   border-radius: 5px;
@@ -25,6 +26,17 @@
 }
 
 .copy-findings.copied { color: var(--accent); }
+.fix-findings { color: var(--accent); }
+.finding-fix {
+  flex: 0 0 auto;
+  padding: 3px 7px;
+  background: var(--surface-3);
+  font-family: var(--mono);
+  font-size: 10.5px;
+  color: var(--accent);
+}
+.fix-error { font-size: 11px; color: var(--danger); }
+.diff-apply-fixes { white-space: nowrap; }
 
 /* ---------------------------------------------------------------- findings */
 

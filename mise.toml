@@ -1,6 +1,10 @@
 [tools]
 node = "22"
 
+[env]
+DEVROOM_TJS_VERSION = "26.6.0"
+DEVROOM_TJS_BIN = "../../txiki.js/build/tjs"
+
 [tasks.install]
 description = "Install npm dependencies"
 run = "npm install"
@@ -18,6 +22,14 @@ run = "npm run build:shelly"
 description = "Build web UI bundle"
 run = "npm run build:web"
 
+[tasks."build:txiki"]
+description = "Build txiki server and CLI bundles"
+run = "npm run build:txiki"
+
+[tasks."build:txiki:executable"]
+description = "Build standalone txiki server executable"
+run = "npm run build:txiki:executable"
+
 [tasks.build]
 description = "Build Shelly dual artifacts + web UI bundle (parallel)"
 depends = ["build:shelly", "build:web"]
@@ -31,6 +43,11 @@ description = "Serve site/ with a plain static file server — proves build:stat
 depends = "build:static"
 run = "npm run preview:static -- \"$@\""
 
+[tasks."start:txiki"]
+description = "Start bundled txiki server"
+depends = "build:txiki"
+run = "npm run start:txiki"
+
 [tasks.deploy]
 description = "Build then deploy (MODE=debug|prod, MINIFY=min|raw)"
 # Usage: mise run deploy -- debug min   OR   MODE=prod MINIFY=raw mise run deploy
@@ -40,6 +57,10 @@ minify="${2:-${MINIFY:-min}}"
 npm run build:shelly
 npm run deploy -- --mode "$mode" --minify "$minify"
 """
+
+[tasks."deploy:txiki"]
+description = "Build and deploy through txiki"
+run = "npm run deploy:txiki -- \"$@\""
 
 [tasks.lint]
 description = "Typecheck Shelly script + server + web"
@@ -78,6 +99,10 @@ run = "npm run test"
 description = "Playwright e2e (Chromium) against local DevRoom UI"
 run = "npm run test:e2e"
 
+[tasks."test:txiki"]
+description = "Typecheck and verify txiki parity"
+run = "npm run test:txiki"
+
 [tasks.b]
 alias="beforeCommit"
 description = "Pre-commit gate: line limit + typecheck + build run in parallel, then static build, test, then e2e"
@@ -91,9 +116,17 @@ npm run build:static
 description = "Run Script.Eval capability probe against device"
 run = "npm run probe"
 
+[tasks."probe:txiki"]
+description = "Run capability probe through txiki"
+run = "npm run probe:txiki"
+
 [tasks.profile]
 description = "Cache the device capability profile (ListMethods + components) for Tier 4 lint"
 run = "npm run profile"
+
+[tasks."profile:txiki"]
+description = "Cache device profile through txiki"
+run = "npm run profile:txiki"
 
 [tasks.clean]
 description = "Remove Shelly + web build artifacts"

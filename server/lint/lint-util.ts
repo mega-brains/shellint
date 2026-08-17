@@ -6,6 +6,14 @@ export type Finding = {
   message: string;
   file?: string;
   line?: number;
+  fix?: FindingFix;
+};
+
+export type FindingFix = {
+  title: string;
+  start: number;
+  end: number;
+  text: string;
 };
 
 /** Dotted name of a call target: `Timer.set`, `Script.storage.setItem`, … */
@@ -138,9 +146,10 @@ export function createSink(sf: ts.SourceFile, fileName: string) {
       rule: string,
       severity: Finding["severity"],
       message: string,
+      fix?: FindingFix,
     ) {
       const { line } = sf.getLineAndCharacterOfPosition(node.getStart(sf));
-      findings.push({ severity, rule, message, file: fileName, line: line + 1 });
+      findings.push({ severity, rule, message, file: fileName, line: line + 1, fix });
     },
     file(rule: string, severity: Finding["severity"], message: string) {
       findings.push({ severity, rule, message, file: fileName });

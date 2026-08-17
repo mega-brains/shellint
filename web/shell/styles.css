@@ -233,20 +233,22 @@ button:disabled { cursor: not-allowed; }
   left: 0;
   bottom: 0;
   height: 2px;
-  width: 48%;
+  width: 100%;
+  appearance: none;
+  border: 0;
+  background: transparent;
+}
+
+.btn-progress::-webkit-progress-bar {
+  background: transparent;
+}
+
+.btn-progress::-webkit-progress-value {
   background: var(--accent);
-  opacity: 0;
-  transform: translateX(-100%);
 }
 
-button.running .btn-progress {
-  opacity: 1;
-  animation: btn-progress-slide 1s ease-in-out infinite;
-}
-
-@keyframes btn-progress-slide {
-  0% { transform: translateX(-100%); }
-  100% { transform: translateX(250%); }
+.btn-progress::-moz-progress-bar {
+  background: var(--accent);
 }
 
 .menu {

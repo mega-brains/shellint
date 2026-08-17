@@ -8,10 +8,12 @@
  * from the fake `/api/build` and `/api/check` routes.
  */
 import type { MinifyConfig } from "../../shared/minify-options.mjs";
-import type { CheckReport } from "../../server/lint/check.ts";
+import type { CheckProgress, CheckReport } from "../../server/lint/check.ts";
 import type { ScriptStats, StatVariants } from "../../server/script/script-stats.ts";
 import type { MemoryEstimate } from "../../server/script/memory-estimate.ts";
 import type { MinFirmware } from "../../server/script/min-firmware.ts";
+
+export type { CheckProgress };
 
 /** Extension picks `allowJs` in transpile.ts — nothing else. */
 export type DeviceSourceKind = "ts" | "js";
@@ -102,8 +104,18 @@ export type CheckResponse =
   | { type: "check"; id: string; ok: true; result: CheckReport }
   | { type: "check"; id: string; ok: false; error: string };
 
+export type CheckProgressResponse = {
+  type: "check-progress";
+  id: string;
+  progress: CheckProgress;
+};
+
 export type StatsResponse =
   | { type: "stats"; id: string; ok: true; result: StatsResult }
   | { type: "stats"; id: string; ok: false; error: string };
 
-export type PipelineResponse = BuildResponse | CheckResponse | StatsResponse;
+export type PipelineResponse =
+  | BuildResponse
+  | CheckResponse
+  | CheckProgressResponse
+  | StatsResponse;

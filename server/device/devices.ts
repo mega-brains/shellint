@@ -1,16 +1,11 @@
-import {
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-  chmodSync,
-  renameSync,
-} from "node:fs";
-import { dirname, join } from "node:path";
+import { runtime } from "#devroom/runtime";
 import { ROOT, DEVICE_PROFILE_PATH, PROBE_PATH, devicePaths } from "../core/paths.ts";
 import { AuthFailedError, ShellyRpc } from "./rpc.ts";
 import { writeGeneratedTypings } from "../probe/probe-typings.ts";
 import { newestCapture, probeState, resolveCapture, type ProbeSkip } from "../probe/probe-store.ts";
+
+const { fs } = runtime;
+const { dirname, join } = runtime.path;
 
 export type DeviceAuth = { username: string; password: string };
 export type DeviceInfo = { model?: string; gen?: number; ver?: string; app?: string };
@@ -65,14 +60,14 @@ function emptyFile(): DevicesFile {
   return { version: 1, active: null, devices: [] };
 }
 
-function ensureDir(): void {
-  if (!existsSync(DEVICES_DIR)) mkdirSync(DEVICES_DIR, { recursive: true });
+async function ensureDir(): Promise<void> {
+  await fs.mkdir(DEVICES_DIR, { recursive: true });
 }
 
-function readRaw(): DevicesFile | null {
-  if (!existsSync(DEVICES_FILE)) return null;
+async function readRaw(): Promise<DevicesFile | null> {
+  if (!(await fs.exists(DEVICES_FILE))) return null;
   try {
-    const parsed = JSON.parse(readFileSync(DEVICES_FILE, "utf8")) as Partial<DevicesFile>;
+    const parsed = JSON.parse(await fs.readText(DEVICES_FILE)) as Partial<DevicesFile>;
     if (!Array.isArray(parsed.devices)) return null;
     return { version: 1, active: parsed.active ?? null, devices: parsed.devices };
   } catch {
@@ -80,15 +75,17 @@ function readRaw(): DevicesFile | null {
   }
 }
 
-function writeRaw(file: DevicesFile): void {
-  ensureDir();
-  writeFileSync(DEVICES_FILE, JSON.stringify(file, null, 2) + "\n", "utf8");
-  try {
-    // Plaintext passwords live in here — keep it out of reach of other local users.
-    chmodSync(DEVICES_FILE, 0o600);
-  } catch {
-    /* best-effort on platforms without POSIX chmod semantics */
-  }
+let writeQueue = Promise.resolve();
+
+function writeRaw(file: DevicesFile): Promise<void> {
+  const write = writeQueue.catch(() => undefined).then(async () => {
+    await ensureDir();
+    await fs.atomicWriteText(DEVICES_FILE, JSON.stringify(file, null, 2) + "\n", {
+      mode: 0o600,
+    });
+  });
+  writeQueue = write;
+  return write;
 }
 
 /**
@@ -96,13 +93,14 @@ function writeRaw(file: DevicesFile): void {
  * only when that capture names the device being migrated — an unrelated
  * device's profile would poison Tier 4 lint.
  */
-function adoptForDevice(src: string, dest: string, deviceIp: string): void {
-  if (!existsSync(src)) return;
+async function adoptForDevice(src: string, dest: string, deviceIp: string): Promise<void> {
+  if (!(await fs.exists(src))) return;
   try {
-    const parsed = JSON.parse(readFileSync(src, "utf8")) as { deviceIp?: string };
+    const text = await fs.readText(src);
+    const parsed = JSON.parse(text) as { deviceIp?: string };
     if (parsed.deviceIp !== deviceIp) return;
-    mkdirSync(dirname(dest), { recursive: true });
-    writeFileSync(dest, readFileSync(src, "utf8"), "utf8");
+    await fs.mkdir(dirname(dest), { recursive: true });
+    await fs.writeText(dest, text);
   } catch {
     /* best-effort — a corrupt capture just means a cold cache */
   }
@@ -114,14 +112,14 @@ function adoptForDevice(src: string, dest: string, deviceIp: string): void {
  * `devroom.json` itself is never rewritten, so it keeps working as the
  * fallback for as long as `devices.json` is absent.
  */
-function migrateFromLegacyConfig(): DevicesFile {
+async function migrateFromLegacyConfig(): Promise<DevicesFile> {
   const file = emptyFile();
   const path = join(ROOT, "devroom.json");
-  if (!existsSync(path)) return file;
+  if (!(await fs.exists(path))) return file;
 
   let raw: Record<string, unknown>;
   try {
-    raw = JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>;
+    raw = JSON.parse(await fs.readText(path)) as Record<string, unknown>;
   } catch {
     return file;
   }
@@ -139,13 +137,9 @@ function migrateFromLegacyConfig(): DevicesFile {
       slots: { [String(scriptId)]: { script: "main" } },
     };
 
-    // Carry over the cached capability profile *and* probe report, if they are
-    // for this device — keeps Tier 4 lint and the advisory probe typings warm
-    // across the migration. Missing either one here is what would otherwise
-    // make the first `setActive()` mirror an empty file over real data.
     const dest = devicePaths(id);
-    adoptForDevice(DEVICE_PROFILE_PATH, dest.profile, deviceIp);
-    adoptForDevice(PROBE_PATH, dest.probe, deviceIp);
+    await adoptForDevice(DEVICE_PROFILE_PATH, dest.profile, deviceIp);
+    await adoptForDevice(PROBE_PATH, dest.probe, deviceIp);
 
     file.devices.push(record);
     file.active = { device: id, slot: scriptId, script: "main" };
@@ -159,31 +153,43 @@ function migrateFromLegacyConfig(): DevicesFile {
 }
 
 let cache: DevicesFile | null = null;
+let loading: Promise<DevicesFile> | null = null;
 
-export function loadDevices(): DevicesFile {
+export async function loadDevices(): Promise<DevicesFile> {
   if (cache) return cache;
-  const existing = readRaw();
-  if (existing) {
-    cache = existing;
+  if (loading) return loading;
+  loading = (async () => {
+    const existing = await readRaw();
+    if (existing) return existing;
+    const migrated = await migrateFromLegacyConfig();
+    if (migrated.devices.length > 0) await writeRaw(migrated);
+    return migrated;
+  })();
+  try {
+    cache = await loading;
     return cache;
+  } finally {
+    loading = null;
   }
-  const migrated = migrateFromLegacyConfig();
-  cache = migrated;
-  if (migrated.devices.length > 0) writeRaw(migrated);
-  return cache;
 }
 
-function persist(file: DevicesFile): void {
+async function persist(file: DevicesFile): Promise<void> {
+  const previous = cache;
   cache = file;
-  writeRaw(file);
+  try {
+    await writeRaw(file);
+  } catch (error) {
+    if (cache === file) cache = previous;
+    throw error;
+  }
 }
 
-export function listDevices(): DeviceRecord[] {
-  return loadDevices().devices;
+export async function listDevices(): Promise<DeviceRecord[]> {
+  return (await loadDevices()).devices;
 }
 
-export function getDevice(id: string): DeviceRecord | null {
-  return loadDevices().devices.find((d) => d.id === id) ?? null;
+export async function getDevice(id: string): Promise<DeviceRecord | null> {
+  return (await loadDevices()).devices.find((d) => d.id === id) ?? null;
 }
 
 /** Minimal RPC surface `addDevice` needs — lets tests supply a fake device. */
@@ -215,8 +221,8 @@ export function toDeviceInfo(raw: Record<string, unknown>): DeviceInfo {
  * when nothing changed, so a five-second status poll does not rewrite a
  * `0600` JSON file every cycle.
  */
-export function touchDeviceInfo(id: string, info: DeviceInfo): void {
-  const file = loadDevices();
+export async function touchDeviceInfo(id: string, info: DeviceInfo): Promise<void> {
+  const file = await loadDevices();
   const idx = file.devices.findIndex((d) => d.id === id);
   if (idx === -1) return;
   const current = file.devices[idx]!.info;
@@ -228,7 +234,7 @@ export function touchDeviceInfo(id: string, info: DeviceInfo): void {
   if (!changed) return;
   const devices = [...file.devices];
   devices[idx] = { ...devices[idx]!, info, lastSeen: new Date().toISOString() };
-  persist({ ...file, devices });
+  await persist({ ...file, devices });
 }
 
 async function probeDeviceInfo(rpc: DeviceRpc): Promise<DeviceInfo & { id?: string }> {
@@ -257,7 +263,7 @@ export async function addDevice(
   input: AddDeviceInput,
   rpcFactory: DeviceRpcFactory = defaultRpcFactory,
 ): Promise<DeviceRecord> {
-  const file = loadDevices();
+  const file = await loadDevices();
   if (file.devices.some((d) => d.ip === input.ip)) {
     throw new DuplicateDeviceError(input.ip);
   }
@@ -274,7 +280,7 @@ export async function addDevice(
     lastSeen = new Date().toISOString();
   } catch (e) {
     if (e instanceof AuthFailedError) throw e;
-    // Offline / unreachable right now — still add it with the fallback id.
+    // Offline now — keep fallback id.
   } finally {
     rpc.close();
   }
@@ -292,14 +298,14 @@ export async function addDevice(
     ...(lastSeen ? { lastSeen } : {}),
     slots: {},
   };
-  persist({ ...file, devices: [...file.devices, record] });
+  await persist({ ...file, devices: [...file.devices, record] });
   return record;
 }
 
 export type UpdateDeviceInput = { label?: string; ip?: string; password?: string | null };
 
-export function updateDevice(id: string, patch: UpdateDeviceInput): DeviceRecord {
-  const file = loadDevices();
+export async function updateDevice(id: string, patch: UpdateDeviceInput): Promise<DeviceRecord> {
+  const file = await loadDevices();
   const idx = file.devices.findIndex((d) => d.id === id);
   if (idx === -1) throw new Error(`unknown device "${id}"`);
   const current = file.devices[idx]!;
@@ -313,22 +319,22 @@ export function updateDevice(id: string, patch: UpdateDeviceInput): DeviceRecord
   }
   const devices = [...file.devices];
   devices[idx] = next;
-  persist({ ...file, devices });
+  await persist({ ...file, devices });
   return next;
 }
 
 /** Clears `active` rather than leaving it dangling when it pointed at this device. */
-export function removeDevice(id: string): void {
-  const file = loadDevices();
+export async function removeDevice(id: string): Promise<void> {
+  const file = await loadDevices();
   const devices = file.devices.filter((d) => d.id !== id);
   const active = file.active?.device === id ? null : file.active;
-  persist({ ...file, devices, active });
+  await persist({ ...file, devices, active });
 }
 
 export type SetActiveInput = { device?: string; slot?: number; script?: string };
 
-export function setActive(input: SetActiveInput): ActiveTarget {
-  const file = loadDevices();
+export async function setActive(input: SetActiveInput): Promise<ActiveTarget> {
+  const file = await loadDevices();
   const deviceId = input.device ?? file.active?.device;
   if (!deviceId) throw new NoDeviceError();
   const device = file.devices.find((d) => d.id === deviceId);
@@ -337,18 +343,16 @@ export function setActive(input: SetActiveInput): ActiveTarget {
   const slot = input.slot ?? file.active?.slot ?? 1;
   const script = input.script ?? file.active?.script ?? "main";
   const active: ActiveSelection = { device: deviceId, slot, script };
-  persist({ ...file, active });
-  mirrorActiveDevice(deviceId);
+  await persist({ ...file, active });
+  await mirrorActiveDevice(deviceId);
   return { device, slot, script };
 }
 
 /** Copies `src` to `dest` via a temp file + rename, so a crash mid-write never
  * leaves `dest` half-written. */
-function atomicCopy(src: string, dest: string): void {
-  mkdirSync(dirname(dest), { recursive: true });
-  const tmp = `${dest}.tmp`;
-  writeFileSync(tmp, readFileSync(src));
-  renameSync(tmp, dest);
+async function atomicCopy(src: string, dest: string): Promise<void> {
+  await fs.mkdir(dirname(dest), { recursive: true });
+  await fs.atomicWriteText(dest, await fs.readText(src));
 }
 
 /**
@@ -371,37 +375,43 @@ function atomicCopy(src: string, dest: string): void {
  * legacy single-capture `probe.json` (M16 §4.2) — never all three absent at
  * once falls through to "leave the previous mirror standing" above.
  */
-export function mirrorActiveDevice(deviceId: string): void {
+export async function mirrorActiveDevice(deviceId: string): Promise<void> {
   const src = devicePaths(deviceId);
   let changed = false;
-  if (existsSync(src.profile)) {
-    atomicCopy(src.profile, DEVICE_PROFILE_PATH);
+  if (await fs.exists(src.profile)) {
+    await atomicCopy(src.profile, DEVICE_PROFILE_PATH);
     changed = true;
   }
-  const device = getDevice(deviceId);
-  const capture = resolveCapture(deviceId, device?.info?.ver) ?? newestCapture(deviceId);
-  const probeSrc = capture?.path ?? (existsSync(src.probe) ? src.probe : null);
+  const device = await getDevice(deviceId);
+  const capture =
+    (await resolveCapture(deviceId, device?.info?.ver)) ?? (await newestCapture(deviceId));
+  const probeSrc = capture?.path ?? ((await fs.exists(src.probe)) ? src.probe : null);
   if (probeSrc) {
-    atomicCopy(probeSrc, PROBE_PATH);
+    await atomicCopy(probeSrc, PROBE_PATH);
     changed = true;
   }
-  if (changed) writeGeneratedTypings();
+  if (changed) await writeGeneratedTypings();
 }
 
 /** Records which local script key a device slot holds — `Deploy` with a new slot writes this back. */
-export function bindSlot(deviceId: string, slot: number, script: string, name?: string): void {
-  const file = loadDevices();
+export async function bindSlot(
+  deviceId: string,
+  slot: number,
+  script: string,
+  name?: string,
+): Promise<void> {
+  const file = await loadDevices();
   const idx = file.devices.findIndex((d) => d.id === deviceId);
   if (idx === -1) throw new Error(`unknown device "${deviceId}"`);
   const current = file.devices[idx]!;
   const slots = { ...current.slots, [String(slot)]: { script, ...(name ? { name } : {}) } };
   const devices = [...file.devices];
   devices[idx] = { ...current, slots };
-  persist({ ...file, devices });
+  await persist({ ...file, devices });
 }
 
-export function requireActive(): ActiveTarget {
-  const file = loadDevices();
+export async function requireActive(): Promise<ActiveTarget> {
+  const file = await loadDevices();
   if (!file.active) throw new NoDeviceError();
   const device = file.devices.find((d) => d.id === file.active!.device);
   if (!device) throw new NoDeviceError();
@@ -409,16 +419,15 @@ export function requireActive(): ActiveTarget {
 }
 
 export type ActiveIdentity = { id: string; ip: string; ver: string | null };
-
 /**
  * Identity of the active device, or null when none is configured. Never
  * throws: the lint pass asks this offline, where "no device yet" is a normal
  * state. `ver` is `device.info?.ver` — refreshed by `touchDeviceInfo`, not
  * necessarily current the instant firmware changes underneath it.
  */
-export function activeDeviceIdentity(): ActiveIdentity | null {
+export async function activeDeviceIdentity(): Promise<ActiveIdentity | null> {
   try {
-    const { device } = requireActive();
+    const { device } = await requireActive();
     return { id: device.id, ip: device.ip, ver: device.info?.ver ?? null };
   } catch {
     return null;
@@ -426,8 +435,10 @@ export function activeDeviceIdentity(): ActiveIdentity | null {
 }
 
 /** Every RPC call site resolves its target through here. */
-export function resolveTarget(deviceId?: string): { ip: string; auth?: DeviceAuth } {
-  const device = deviceId ? getDevice(deviceId) : requireActive().device;
+export async function resolveTarget(
+  deviceId?: string,
+): Promise<{ ip: string; auth?: DeviceAuth }> {
+  const device = deviceId ? await getDevice(deviceId) : (await requireActive()).device;
   if (!device) throw new NoDeviceError();
   return { ip: device.ip, auth: device.auth };
 }
@@ -438,20 +449,20 @@ export function resolveTarget(deviceId?: string): { ip: string; auth?: DeviceAut
  * moves (M16 §3.3). `ver: null` covers the device-never-answered case, where
  * the skip is exactly what unblocks an unreachable box.
  */
-export function setProbeSkip(id: string, ver: string | null): ProbeSkip {
-  const file = loadDevices();
+export async function setProbeSkip(id: string, ver: string | null): Promise<ProbeSkip> {
+  const file = await loadDevices();
   const idx = file.devices.findIndex((d) => d.id === id);
   if (idx === -1) throw new Error(`unknown device "${id}"`);
   const skip: ProbeSkip = { ver, at: new Date().toISOString() };
   const devices = [...file.devices];
   devices[idx] = { ...devices[idx]!, probeSkipped: skip };
-  persist({ ...file, devices });
+  await persist({ ...file, devices });
   return skip;
 }
 
 /** Called once a probe succeeds for `ver` — a skip for that same `ver` is now moot. */
-export function clearProbeSkip(id: string, ver: string | null): void {
-  const file = loadDevices();
+export async function clearProbeSkip(id: string, ver: string | null): Promise<void> {
+  const file = await loadDevices();
   const idx = file.devices.findIndex((d) => d.id === id);
   if (idx === -1) return;
   const current = file.devices[idx]!;
@@ -459,12 +470,12 @@ export function clearProbeSkip(id: string, ver: string | null): void {
   const { probeSkipped: _drop, ...rest } = current;
   const devices = [...file.devices];
   devices[idx] = rest;
-  persist({ ...file, devices });
+  await persist({ ...file, devices });
 }
 
 /** Public view of a device — never serialize `auth.password` to a client. */
-export function sanitizeDevice(d: DeviceRecord) {
-  const state = probeState(d.id);
+export async function sanitizeDevice(d: DeviceRecord) {
+  const state = await probeState(d.id);
   return {
     id: d.id,
     label: d.label,
@@ -482,7 +493,7 @@ export function sanitizeDevice(d: DeviceRecord) {
   };
 }
 
-/** Test-only: drop the in-memory cache so a fresh `loadDevices()` re-reads disk. */
 export function _resetCache(): void {
   cache = null;
+  loading = null;
 }

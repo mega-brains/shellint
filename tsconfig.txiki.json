@@ -1,0 +1,24 @@
+{
+  "compilerOptions": {
+    "target": "ES2023",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "customConditions": ["txiki"],
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "types": ["@txikijs/types"],
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "allowImportingTsExtensions": true
+  },
+  "include": [
+    "server/**/*.ts",
+    "shared/**/*.d.mts",
+    "web/static/minify-adv-browser.ts"
+  ],
+  "exclude": [
+    "server/index.ts",
+    "server/build/node-builder-entry.ts",
+    "server/runtime/node.ts"
+  ]
+}

@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { runtime } from "#devroom/runtime";
 import ts from "typescript";
 import { SCRIPT_PATH } from "../core/paths.ts";
 import {
@@ -379,9 +379,9 @@ export function lintSemantics(
   return sink.findings;
 }
 
-export function lintSemanticsFile(path = SCRIPT_PATH): Finding[] {
-  if (!existsSync(path)) {
+export async function lintSemanticsFile(path = SCRIPT_PATH): Promise<Finding[]> {
+  if (!(await runtime.fs.exists(path))) {
     throw new Error(`script not found: ${path}`);
   }
-  return lintSemantics(readFileSync(path, "utf8"), "scripts/main.ts");
+  return lintSemantics(await runtime.fs.readText(path), "scripts/main.ts");
 }

@@ -1,12 +1,10 @@
 import { Hono } from "hono";
-import { readFileSync, existsSync } from "node:fs";
-import { join, relative } from "node:path";
-import { serveStatic } from "@hono/node-server/serve-static";
-import { WEB_DIR, ROOT } from "./core/paths.ts";
+import { runtime } from "#devroom/runtime";
+import { WEB_DIR } from "./core/paths.ts";
 import { registerDeviceRoutes } from "./device/routes.ts";
 import { registerProbeRoutes } from "./probe/routes.ts";
 import { registerScriptBuildRoutes } from "./script/routes.ts";
-import { apiDocsJson, appJs, appJsMap, css } from "./core/static-assets.ts";
+import { apiDocsJson, appJs, appJsMap, css, webAsset } from "./core/static-assets.ts";
 
 export function createApp() {
   const app = new Hono();
@@ -15,12 +13,12 @@ export function createApp() {
   registerDeviceRoutes(app);
   registerProbeRoutes(app);
 
-  app.get("/", (c) => {
-    const index = join(WEB_DIR, "index.html");
-    if (!existsSync(index)) {
+  app.get("/", async (c) => {
+    const index = runtime.path.join(WEB_DIR, "index.html");
+    if (!(await runtime.fs.exists(index))) {
       return c.text("web/index.html missing", 500);
     }
-    return c.html(readFileSync(index, "utf8"));
+    return c.html(await runtime.fs.readText(index));
   });
 
   app.get("/:name{[a-z0-9-]+\\.css}", (c) => css(c, c.req.param("name")));
@@ -31,14 +29,7 @@ export function createApp() {
 
   app.get("/app.js.map", appJsMap);
 
-  // Sourcemap and any other web/dist assets
-  const webRoot = relative(process.cwd(), ROOT) || ".";
-  app.use(
-    "/web/*",
-    serveStatic({
-      root: webRoot,
-    }),
-  );
+  app.get("/web/*", webAsset);
 
   return app;
 }

@@ -1,10 +1,9 @@
-import { dirname, join } from "node:path";
-import { fileURLToPath } from "node:url";
+import { runtime } from "#devroom/runtime";
 
-const here = dirname(fileURLToPath(import.meta.url));
+const { join } = runtime.path;
 
-/** Repo root (grandparent of core/). */
-export const ROOT = join(here, "..", "..");
+/** Repo root. Both server runtimes launch from this directory. */
+export const ROOT = runtime.process.cwd;
 
 export const SCRIPT_PATH = join(ROOT, "scripts", "main.ts");
 export const DIST_DIR = join(ROOT, "dist");

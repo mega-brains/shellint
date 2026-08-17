@@ -54,12 +54,12 @@ const eq = (got, want, what) => {
     fail("string cost must be measured in UTF-8 bytes, not characters");
   }
 
-  const sample = estimateMemoryFile();
+  const sample = await estimateMemoryFile();
   if (!(sample.bytes > 0)) fail("sample script should have a non-zero estimate");
   const parts = Object.values(sample.breakdown).reduce((a, b) => a + b, 0);
   eq(parts, sample.bytes, "breakdown must sum to the total");
 
-  const missing = estimateMemoryFile("/nonexistent/never-written.ts");
+  const missing = await estimateMemoryFile("/nonexistent/never-written.ts");
   eq(missing.bytes, 0, "missing file estimates zero instead of throwing");
 }
 

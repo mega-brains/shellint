@@ -1,9 +1,13 @@
 import type { Context } from "hono";
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { runtime } from "#devroom/runtime";
 import { ROOT, WEB_DIR } from "./paths.ts";
 
+const { join, normalize, relative } = runtime.path;
 const DIST = join(WEB_DIR, "dist");
+
+async function readBody(file: string): Promise<ArrayBuffer> {
+  return (await runtime.fs.readBytes(file)).slice().buffer as ArrayBuffer;
+}
 
 /**
  * Serve a build artifact, preferring the precompressed sibling the build wrote
@@ -13,7 +17,7 @@ const DIST = join(WEB_DIR, "dist");
  * the sibling is missing — a dev build, or a web/dist left over from an older
  * checkout, still serves correctly, just uncompressed.
  */
-export function sendAsset(c: Context, file: string, contentType: string) {
+export async function sendAsset(c: Context, file: string, contentType: string) {
   const accepted = c.req.header("accept-encoding") ?? "";
   c.header("Content-Type", contentType);
   c.header("Vary", "Accept-Encoding");
@@ -24,17 +28,17 @@ export function sendAsset(c: Context, file: string, contentType: string) {
   ] as const) {
     if (!accepted.includes(encoding)) continue;
     const packed = file + suffix;
-    if (!existsSync(packed)) continue;
+    if (!(await runtime.fs.exists(packed))) continue;
     c.header("Content-Encoding", encoding);
-    return c.body(readFileSync(packed));
+    return c.body(await readBody(packed));
   }
-  return c.body(readFileSync(file));
+  return c.body(await readBody(file));
 }
 
 /** GET /app.js — the bundled SPA. */
-export function appJs(c: Context) {
+export async function appJs(c: Context) {
   const js = join(DIST, "app.js");
-  if (!existsSync(js)) {
+  if (!(await runtime.fs.exists(js))) {
     return c.text(
       "console.error('web bundle missing — run: npm run build:web');",
       503,
@@ -44,24 +48,24 @@ export function appJs(c: Context) {
 }
 
 /** GET /app.js.map — dev builds only; prod omits the map entirely. */
-export function appJsMap(c: Context) {
+export async function appJsMap(c: Context) {
   const map = join(DIST, "app.js.map");
-  if (!existsSync(map)) return c.text("not found", 404);
+  if (!(await runtime.fs.exists(map))) return c.text("not found", 404);
   c.header("Content-Type", "application/json");
-  return c.body(readFileSync(map));
+  return c.body(await readBody(map));
 }
 
 /**
  * GET /api-docs.json — hover-tooltip data, fetched by the UI instead of being
  * bundled into app.js. Served from web/dist when built, else from types/.
  */
-export function apiDocsJson(c: Context) {
+export async function apiDocsJson(c: Context) {
   const built = join(DIST, "api-docs.json");
-  if (existsSync(built)) return sendAsset(c, built, "application/json");
+  if (await runtime.fs.exists(built)) return sendAsset(c, built, "application/json");
   const source = join(ROOT, "types", "api-docs.json");
-  if (!existsSync(source)) return c.text("not found", 404);
+  if (!(await runtime.fs.exists(source))) return c.text("not found", 404);
   c.header("Content-Type", "application/json");
-  return c.body(readFileSync(source));
+  return c.body(await readBody(source));
 }
 
 /**
@@ -69,13 +73,34 @@ export function apiDocsJson(c: Context) {
  * otherwise the individual web/*.css source file of that name, so an unbuilt
  * checkout still renders.
  */
-export function css(c: Context, name: string) {
+export async function css(c: Context, name: string) {
   const built = join(DIST, name);
-  if (existsSync(built)) {
+  if (await runtime.fs.exists(built)) {
     return sendAsset(c, built, "text/css; charset=utf-8");
   }
   const source = join(WEB_DIR, name);
-  if (!existsSync(source)) return c.text("not found", 404);
+  if (!(await runtime.fs.exists(source))) return c.text("not found", 404);
   c.header("Content-Type", "text/css; charset=utf-8");
-  return c.body(readFileSync(source, "utf8"));
+  return c.body(await runtime.fs.readText(source));
+}
+
+const TYPES: Record<string, string> = {
+  ".css": "text/css; charset=utf-8",
+  ".html": "text/html; charset=utf-8",
+  ".js": "application/javascript; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".map": "application/json; charset=utf-8",
+};
+
+/** Node-free fallback for source maps and other files below web/. */
+export async function webAsset(c: Context) {
+  const requested = c.req.path.slice(1);
+  const file = normalize(join(ROOT, requested));
+  const rel = relative(WEB_DIR, file);
+  if (rel === ".." || rel.startsWith(`..${runtime.path.sep}`)) {
+    return c.text("not found", 404);
+  }
+  if (!(await runtime.fs.exists(file))) return c.text("not found", 404);
+  const type = TYPES[runtime.path.extname(file)] ?? "application/octet-stream";
+  return sendAsset(c, file, type);
 }

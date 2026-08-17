@@ -37,8 +37,8 @@ function webSources(dir, out = []) {
   return out;
 }
 
-// `api("/api/foo")`, `api(`/api/foo?x=${y}`)`, and the bare fetch in hover-docs.
-const CALL = /\bapi<[^>]*>\(\s*[`"']([^`"']+)[`"']|\bapi\(\s*[`"']([^`"']+)[`"']/g;
+// `api("/api/foo")`, `apiStream("/api/foo")`, and bare fetch in hover-docs.
+const CALL = /\bapi(?:Stream)?<[^>]*>\(\s*[`"']([^`"']+)[`"']|\bapi(?:Stream)?\(\s*[`"']([^`"']+)[`"']/g;
 
 const called = new Set();
 for (const file of webSources(join(ROOT, "web"))) {
@@ -54,7 +54,10 @@ const router = readFileSync(join(ROOT, "web", "static", "local-api.ts"), "utf8")
 
 /** `case "/api/x":` entries. */
 const handled = new Set(
-  [...router.matchAll(/case\s+"([^"]+)"/g)].map((m) => m[1]),
+  [
+    ...router.matchAll(/case\s+"([^"]+)"/g),
+    ...router.matchAll(/path !== "(\/api\/[a-z/]+)"/g),
+  ].map((m) => m[1]),
 );
 /** The device-prefix rejection list, plus routes handled by a prefix match
  *  (`/api/script/history/<iso>`, whose id can't be a case label). */

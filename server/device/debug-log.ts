@@ -1,4 +1,5 @@
-import WebSocket from "ws";
+import { runtime } from "#devroom/runtime";
+import type { RuntimeWebSocket, RuntimeWebSocketMessage } from "../runtime/types.ts";
 import { loadConfig, assertDevroomCompiler } from "../core/config.ts";
 import { requireActive } from "./devices.ts";
 import { AuthNotSupportedError, ShellyRpc, type RpcTarget } from "./rpc.ts";
@@ -27,6 +28,10 @@ const MAX_LINES = 500;
 const MAX_METRICS = 1000;
 const CONNECT_TIMEOUT_MS = 9_000;
 
+function messageText(data: RuntimeWebSocketMessage): string {
+  return typeof data === "string" ? data : new TextDecoder().decode(data);
+}
+
 /** `#m <series> <value>`, anywhere in the line — device log lines carry file/line noise. */
 const METRIC_RE = /(?:^|\s)#m\s+(\S+)\s+(\S+)/;
 
@@ -38,7 +43,7 @@ let headSeq = 0;
 /** Highest seq evicted from the ring — a reader below this missed entries. */
 let evictedSeq = 0;
 
-let socket: WebSocket | null = null;
+let socket: RuntimeWebSocket | null = null;
 let connected = false;
 let enabledDebug = false;
 let restartRequired = false;
@@ -120,7 +125,7 @@ type OpenResult = { ok: true } | { ok: false; error: string };
 function openLogSocket(deviceIp: string, gen: number): Promise<OpenResult> {
   return new Promise<OpenResult>((resolve) => {
     const url = `ws://${deviceIp}/debug/log`;
-    const ws = new WebSocket(url);
+    const ws = runtime.websocket.connect(url);
     let settled = false;
 
     const finish = (r: OpenResult) => {
@@ -136,7 +141,7 @@ function openLogSocket(deviceIp: string, gen: number): Promise<OpenResult> {
         connected = false;
       }
       try {
-        ws.terminate();
+        ws.abort();
       } catch {
         /* ignore */
       }
@@ -147,7 +152,7 @@ function openLogSocket(deviceIp: string, gen: number): Promise<OpenResult> {
       drop();
     }, CONNECT_TIMEOUT_MS);
 
-    ws.on("open", () => {
+    ws.onOpen(() => {
       if (gen !== generation) {
         drop();
         finish({ ok: false, error: "log stream stopped while connecting" });
@@ -158,14 +163,14 @@ function openLogSocket(deviceIp: string, gen: number): Promise<OpenResult> {
       finish({ ok: true });
     });
 
-    ws.on("message", (data) => ingest(data.toString()));
+    ws.onMessage((data) => ingest(messageText(data)));
 
-    ws.on("error", (err) => {
+    ws.onError((err) => {
       finish({ ok: false, error: `${url}: ${msg(err)}` });
       drop();
     });
 
-    ws.on("close", () => {
+    ws.onClose(() => {
       finish({ ok: false, error: `${url} closed before any frame` });
       if (socket === ws) {
         socket = null;
@@ -179,9 +184,9 @@ async function begin(): Promise<LogStreamStart> {
   const gen = ++generation;
   let target: RpcTarget;
   try {
-    const cfg = loadConfig();
+    const cfg = await loadConfig();
     assertDevroomCompiler(cfg);
-    const active = requireActive();
+    const active = await requireActive();
     target = { ip: active.device.ip, auth: active.device.auth };
   } catch (e) {
     return { connected: false, enabledDebug: false, restartRequired: false, error: msg(e) };
@@ -209,7 +214,7 @@ async function begin(): Promise<LogStreamStart> {
 }
 
 export async function startLogStream(): Promise<LogStreamStart> {
-  if (socket && socket.readyState === WebSocket.OPEN) {
+  if (socket?.state === "open") {
     return { connected: true, enabledDebug, restartRequired };
   }
   if (starting) return starting;

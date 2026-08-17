@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import runtime from "#devroom/runtime";
 import { fetchDeviceProfile } from "../device/device-profile.ts";
 
 try {
@@ -10,5 +11,5 @@ try {
   console.log("→ types/device-profile.json");
 } catch (e) {
   console.error(e instanceof Error ? e.message : e);
-  process.exit(1);
+  runtime.process.exit(1);
 }

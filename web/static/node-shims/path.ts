@@ -7,7 +7,9 @@
  * handling is needed.
  */
 
-function normalize(path: string): string {
+export const sep = "/";
+
+export function normalize(path: string): string {
   const out: string[] = [];
   for (const part of path.split("/")) {
     if (part === "" || part === ".") continue;
@@ -15,6 +17,20 @@ function normalize(path: string): string {
     else out.push(part);
   }
   return (path.startsWith("/") ? "/" : "") + out.join("/");
+}
+
+export function basename(path: string): string {
+  return normalize(path).split("/").pop() ?? "";
+}
+
+export function extname(path: string): string {
+  const base = basename(path);
+  const index = base.lastIndexOf(".");
+  return index <= 0 ? "" : base.slice(index);
+}
+
+export function isAbsolute(path: string): boolean {
+  return path.startsWith("/");
 }
 
 export function join(...segments: string[]): string {
@@ -40,4 +56,14 @@ export function resolve(...segments: string[]): string {
   return normalize(segments.join("/"));
 }
 
-export default { join, dirname, relative, resolve };
+export default {
+  sep,
+  basename,
+  dirname,
+  extname,
+  isAbsolute,
+  join,
+  normalize,
+  relative,
+  resolve,
+};

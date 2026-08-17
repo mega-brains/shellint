@@ -11,12 +11,13 @@ import { lintSemantics } from "../server/lint/lint-semantics.ts";
 import { lintAdvisories, parseMeta } from "../server/lint/lint-advisories.ts";
 import { lintConnected } from "../server/lint/lint-connected.ts";
 import { runCheck } from "../server/lint/check.ts";
+import { previewCheckFixes } from "../server/lint/check-fixes.ts";
 import { CHECK_CATALOG } from "../server/lint/check-catalog.ts";
 import { acquireHost, removeScratch } from "../server/probe/probe.ts";
 import { MINIFY_KEYS } from "../shared/minify-options.mjs";
 import { createApp } from "../server/app.ts";
 
-const dialect = checkBuildArtifacts();
+const dialect = await checkBuildArtifacts();
 const bad = dialect.flatMap((r) => r.findings.filter((f) => f.severity === "error"));
 if (bad.length) {
   console.error(JSON.stringify(bad, null, 2));
@@ -54,7 +55,7 @@ if (emitted('var s = "' + "Timer.set(".repeat(6) + '";').has("max-timers")) {
   throw new Error("dialect guard counted Timer.set inside a string literal");
 }
 
-const stats = analyzeScriptFile();
+const stats = await analyzeScriptFile();
 const timerSample = analyzeSource("Timer.set(1000, false, function () {});", "sample.ts");
 if (!timerSample.apis["Timer.set"]) throw new Error("expected Timer.set in sample stats");
 const bleSample = analyzeSource(
@@ -88,6 +89,11 @@ has('import { x } from "y";', "no-modules");
 has("function* g() { yield 1; }", "no-generators");
 has("var o = { get a() { return 1; } };", "no-accessors");
 has('var s = "\\u00e9";', "no-unicode-escapes");
+const unicodeSource = 'var s = "\\u00e9";';
+const unicodePreview = previewCheckFixes(unicodeSource, lintSource(unicodeSource));
+if (unicodePreview?.after !== 'var s = "é";' || unicodePreview.count !== 1) {
+  throw new Error("Unicode escape automatic fix failed");
+}
 has("for (var i = 0; i < 9; i++) { Timer.set(1000, false, f); }", "no-registration-in-loop");
 has(
   "Timer.set(1,0,f);Timer.set(1,0,f);Timer.set(1,0,f);Timer.set(1,0,f);Timer.set(1,0,f);Timer.set(1,0,f);",
@@ -180,6 +186,14 @@ advNot('console.log("x");'.repeat(3), "excessive-console-log");
 adv('var s = "' + "a".repeat(1100) + '";', "prefer-short-strings");
 adv("var neverRead = 1; print(1);", "dead-code");
 advNot("var used = 1; print(used);", "dead-code");
+const unusedFunctionSource = "function unusedHelper() { return 1; }\nprint(1);";
+const unusedFunctionPreview = previewCheckFixes(
+  unusedFunctionSource,
+  lintAdvisories(unusedFunctionSource),
+);
+if (unusedFunctionPreview?.after !== "\nprint(1);") {
+  throw new Error("Unused function automatic fix failed");
+}
 adv(
   '// @meta {"vc":{"temp":{"type":"number"}}}\nvar h = Script.getVcHandle("humidity");',
   "meta-vc-role-matches",
@@ -224,6 +238,14 @@ const hasNotCon = (src, rule, profile) => {
 hasCon('Shelly.call("Swtich.Set", { id: 0 });', "no-unknown-rpc-method");
 hasCon('Shelly.call("switch.set", { id: 0 });', "no-unknown-rpc-method");
 hasNotCon('Shelly.call("Switch.Set", { id: 0 });', "no-unknown-rpc-method");
+const caseSource = 'Shelly.call("switch.getstatus", { id: 0 });';
+const casePreview = previewCheckFixes(
+  caseSource,
+  lintConnected(caseSource, gen2),
+);
+if (casePreview?.after !== 'Shelly.call("Switch.GetStatus", { id: 0 });') {
+  throw new Error("RPC method casing automatic fix failed");
+}
 hasCon('Shelly.call("Switch.Set", { id: 3 });', "component-exists");
 hasNotCon('Shelly.call("Switch.Set", { id: 0 });', "component-exists");
 hasCon('Shelly.getComponentStatus("cct", 0);', "component-exists");

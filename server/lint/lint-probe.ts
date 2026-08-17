@@ -62,8 +62,11 @@ function isSameDevice(report: ProbeReport, active: ActiveIdentity): boolean {
  * about the receiver's type. A name some other probe found present is dropped
  * from both maps: `array.indexOf` present makes `indexOf` unreportable.
  */
-function readAbsences(path: string, active: ActiveIdentity | null): Absences | null {
-  const report = readProbeReport(path);
+async function readAbsences(
+  path: string,
+  active: ActiveIdentity | null,
+): Promise<Absences | null> {
+  const report = await readProbeReport(path);
   if (!report) return null;
 
   const globals = new Map<string, ProbeEntry>();
@@ -91,7 +94,13 @@ function readAbsences(path: string, active: ActiveIdentity | null): Absences | n
       ? `; device now runs ${active.ver}`
       : null;
 
-  return { globals, members, origin: probeOrigin(report), isActiveTarget, staleNote };
+  return {
+    globals,
+    members,
+    origin: await probeOrigin(report),
+    isActiveTarget,
+    staleNote,
+  };
 }
 
 function message(name: string, entry: ProbeEntry, absences: Absences): string {
@@ -112,13 +121,14 @@ function isValueReference(id: ts.Identifier): boolean {
   return true;
 }
 
-export function lintProbe(
+export async function lintProbe(
   source: string,
   fileName = "scripts/main.ts",
   probePath = PROBE_PATH,
-  active: ActiveIdentity | null = activeDeviceIdentity(),
-): Finding[] {
-  const absences = readAbsences(probePath, active);
+  active?: ActiveIdentity | null,
+): Promise<Finding[]> {
+  const resolvedActive = active === undefined ? await activeDeviceIdentity() : active;
+  const absences = await readAbsences(probePath, resolvedActive);
   if (!absences) return [];
 
   const severity: Finding["severity"] = absences.isActiveTarget ? "error" : "warn";

@@ -26,7 +26,11 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import * as esbuild from "esbuild";
 import { staticEsbuildConfig } from "./static-esbuild.mjs";
 import { CHECK_CATALOG } from "../server/lint/check-catalog.ts";
-import { runCheck } from "../server/lint/check.ts";
+import {
+  CHECK_PROGRESS_STEPS,
+  CHECK_PROGRESS_TOTAL,
+  runCheck,
+} from "../server/lint/check.ts";
 
 const ROOT = path.join(path.dirname(fileURLToPath(import.meta.url)), "..");
 const DIST_DIR = path.join(ROOT, "dist");
@@ -99,9 +103,11 @@ async function bundleAndRunCheck(source, artifacts) {
     const previousSelf = globalThis.self;
     const previousPost = globalThis.postMessage;
     let deliver = null;
+    const messages = [];
     globalThis.self = globalThis;
     globalThis.postMessage = (msg) => {
-      if (deliver) {
+      messages.push(msg);
+      if (msg.type === "check" && deliver) {
         const resolve = deliver;
         deliver = null;
         resolve(msg);
@@ -114,7 +120,10 @@ async function bundleAndRunCheck(source, artifacts) {
         globalThis.onmessage({ data: { type: "check", id: "static-check-test", source, artifacts } });
       });
       if (!response.ok) fail(`static check request failed: ${response.error}`);
-      return response.result;
+      return {
+        progress: messages.filter((msg) => msg.type === "check-progress"),
+        report: response.result,
+      };
     } finally {
       globalThis.self = previousSelf;
       globalThis.postMessage = previousPost;
@@ -198,7 +207,17 @@ const source = readFileSync(path.join(ROOT, "scripts", "main.ts"), "utf8");
 const artifacts = readDistArtifacts();
 
 const serverReport = await runCheck({ connected: false });
-const staticReport = await bundleAndRunCheck(source, artifacts);
+const staticResult = await bundleAndRunCheck(source, artifacts);
+assert.deepStrictEqual(
+  staticResult.progress.map((event) => event.progress.done),
+  CHECK_PROGRESS_STEPS,
+  "static Check progress milestones changed",
+);
+assert.ok(
+  staticResult.progress.every((event) => event.progress.total === CHECK_PROGRESS_TOTAL),
+  "static Check progress total changed",
+);
+const staticReport = staticResult.report;
 
 const skipped = assertEquivalent(serverReport, staticReport);
 

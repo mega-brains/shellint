@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import runtime from "#devroom/runtime";
 import { deploy, type DeployMinify, type DeployMode } from "../device/deploy.ts";
 
 function parseArgs(argv: string[]) {
@@ -22,7 +23,7 @@ function parseArgs(argv: string[]) {
   return { mode, minify, skipProbeCheck };
 }
 
-const { mode, minify, skipProbeCheck } = parseArgs(process.argv.slice(2));
+const { mode, minify, skipProbeCheck } = parseArgs(runtime.process.args.slice(2));
 
 try {
   const result = await deploy(
@@ -34,5 +35,5 @@ try {
   console.log(JSON.stringify(result, null, 2));
 } catch (e) {
   console.error(e instanceof Error ? e.message : e);
-  process.exit(1);
+  runtime.process.exit(1);
 }

@@ -69,6 +69,47 @@ print("#m temp " + tC); // "#m <series> <value>"
 Charts are hand-rolled inline SVG — no charting dependency. The device's log buffer
 is circular, so dropped lines render as gaps rather than interpolated lines.
 
+### Optional txiki.js runtime
+
+Node.js remains the default runtime. txiki.js `v26.6.0` is supported as an
+opt-in server and CLI runtime. It runs a bundle because txiki does not resolve
+npm packages or parse TypeScript directly.
+
+Put `tjs` on `PATH`, or point at a local executable:
+
+```bash
+export DEVROOM_TJS_BIN=/path/to/txiki.js/build/tjs
+mise run build:txiki
+mise run start:txiki
+```
+
+This repository's `mise.toml` pins txiki.js `26.6.0` and resolves the sibling
+clone at `../../txiki.js/build/tjs`. `DEVROOM_TJS_BIN` may still override it.
+
+Build one standalone native executable:
+
+```bash
+mise run build:txiki:executable
+./.txiki/shelly-devroom
+```
+
+Executable embeds txiki runtime plus bundled server code. DevRoom remains a
+workspace tool, so mutable project files (`devroom.json`, `scripts/`, `types/`,
+`dist/`, `web/dist/`, and `.devroom/`) are still read from launch directory.
+
+Peer CLI and verification tasks are available:
+
+```bash
+mise run deploy:txiki -- --mode debug --minify min
+mise run probe:txiki
+mise run profile:txiki
+mise run test:txiki
+```
+
+txiki builds require WebCrypto, filesystem, process, WebSocket, and HTTP server
+features. npm installation, TypeScript checks, and Playwright remain Node-hosted.
+Static/offline mode stays independent from both server runtimes.
+
 ```bash
 mise run build
 mise run deploy -- debug min    # or: prod raw
@@ -148,4 +189,3 @@ Rationale, the plugin survey behind it, and what it deliberately leaves out:
 - ability to define meta.env.debug / meta.env.prod for build time feature gating
   - for example to create production minified build without debug logs or with shorter strings in logs, ...
 - ability to parse custom debug logs with numeric data in realtime graphs (uPlot)
-

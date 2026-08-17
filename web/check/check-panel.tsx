@@ -2,10 +2,12 @@ import { useRef } from "preact/hooks";
 import { Group } from "../ui/measure";
 import { CopyFindingsButton, FindingsList } from "./check-findings";
 import { CheckRules } from "./check-rules";
+import { CheckFixesButton } from "./check-fixes";
 import {
   pendingRows,
   tally,
   type CheckCatalog,
+  type CheckFixPreview,
   type CheckReport,
   type CheckRow,
   type Finding,
@@ -23,6 +25,7 @@ export type CheckPanelProps = {
   report: CheckReport | null;
   /** Dialect-guard findings from build (no full report). */
   dialectFindings: Finding[] | null;
+  onApplyFixes: (fixes: CheckFixPreview) => Promise<void>;
 };
 
 type View = {
@@ -109,8 +112,13 @@ export function CheckPanel(props: CheckPanelProps) {
             {view.note}
           </p>
           <CopyFindingsButton findings={view.findings} />
+          <CheckFixesButton fixes={props.report?.fixes ?? null} onApply={props.onApplyFixes} />
         </div>
-        <FindingsList findings={view.findings} />
+        <FindingsList
+          findings={view.findings}
+          fixSource={props.report?.fixes?.before}
+          onApplyFixes={props.onApplyFixes}
+        />
       </Group>
 
       <Group title="rule tiers" id="tiersBlock" caption="pass / warn / skipped">

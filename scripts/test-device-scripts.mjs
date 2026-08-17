@@ -176,7 +176,7 @@ try {
       },
       close() {},
     }));
-    setActive({ device: device.id, slot: 1, script: "main" });
+    await setActive({ device: device.id, slot: 1, script: "main" });
 
     let createCalls = 0;
     const fakeDeployRpc = () => ({
@@ -203,7 +203,7 @@ try {
     if (createCalls !== 1) fail(`expected exactly one Script.Create call, got ${createCalls}`);
     if (result.scriptId !== 42) fail(`expected deploy to target the new slot 42, got ${result.scriptId}`);
 
-    const bound = loadDevices().devices.find((d) => d.id === device.id)?.slots["42"];
+    const bound = (await loadDevices()).devices.find((d) => d.id === device.id)?.slots["42"];
     if (!bound || bound.script !== "main" || bound.name !== "presence") {
       fail(`expected slot 42 bound to {script:"main",name:"presence"}, got ${JSON.stringify(bound)}`);
     }

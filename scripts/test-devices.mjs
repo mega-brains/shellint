@@ -121,7 +121,7 @@ try {
   setDevicesFile(null);
   setDevroom({});
   _resetCache();
-  let file = loadDevices();
+  let file = await loadDevices();
   if (file.devices.length !== 0 || file.active !== null) {
     fail(`expected empty devices file with no legacy config, got ${JSON.stringify(file)}`);
   }
@@ -130,7 +130,7 @@ try {
   setDevicesFile("{ not json");
   setDevroom({});
   _resetCache();
-  file = loadDevices();
+  file = await loadDevices();
   if (file.devices.length !== 0 || file.active !== null) {
     fail("corrupt devices.json should fall back to an empty file, not throw");
   }
@@ -159,7 +159,7 @@ try {
     compiler: "devroom",
   });
   _resetCache();
-  file = loadDevices();
+  file = await loadDevices();
   if (file.devices.length !== 2) {
     fail(`expected migration to create 2 devices, got ${file.devices.length}`);
   }
@@ -177,20 +177,20 @@ try {
   }
   // Idempotent: devices.json now exists on disk, re-loading must not re-migrate.
   _resetCache();
-  const reloaded = loadDevices();
+  const reloaded = await loadDevices();
   if (reloaded.devices.length !== 2) fail("re-loading migrated devices.json should be a no-op");
 
   // --- resolveTarget() with no devices throws NoDeviceError ---
   setDevicesFile({ version: 1, active: null, devices: [] });
   _resetCache();
   try {
-    requireActive();
+    await requireActive();
     fail("requireActive() should throw NoDeviceError when no device is active");
   } catch (e) {
     if (!(e instanceof NoDeviceError)) fail(`expected NoDeviceError, got ${e}`);
   }
   try {
-    resolveTarget();
+    await resolveTarget();
     fail("resolveTarget() should throw NoDeviceError when no device is active");
   } catch (e) {
     if (!(e instanceof NoDeviceError)) fail(`expected NoDeviceError, got ${e}`);
@@ -228,13 +228,13 @@ try {
   }
 
   // --- removeDevice of the active device clears active, not dangling ---
-  setActive({ device: offlineDevice.id, slot: 1, script: "main" });
-  if (loadDevices().active?.device !== offlineDevice.id) fail("setActive did not take effect");
-  removeDevice(offlineDevice.id);
-  if (loadDevices().active !== null) {
+  await setActive({ device: offlineDevice.id, slot: 1, script: "main" });
+  if ((await loadDevices()).active?.device !== offlineDevice.id) fail("setActive did not take effect");
+  await removeDevice(offlineDevice.id);
+  if ((await loadDevices()).active !== null) {
     fail("removing the active device should clear active, not leave it dangling");
   }
-  if (loadDevices().devices.some((d) => d.id === offlineDevice.id)) {
+  if ((await loadDevices()).devices.some((d) => d.id === offlineDevice.id)) {
     fail("removeDevice should remove the device record");
   }
 
@@ -244,7 +244,9 @@ try {
   const app = createApp();
 
   const listEmpty = await (await app.request("/api/devices")).json();
-  if (!listEmpty.ok || listEmpty.devices.length !== 0) fail("expected empty device list over HTTP");
+  if (!listEmpty.ok || listEmpty.devices.length !== 0) {
+    fail(`expected empty device list over HTTP, got ${JSON.stringify(listEmpty)}`);
+  }
 
   // Port 9 (discard) on loopback — nobody listens, so the connect fails fast
   // rather than waiting out the full connect timeout.
@@ -292,7 +294,7 @@ try {
     "utf8",
   );
 
-  setActive({ device: deviceA.id, slot: 1, script: "main" });
+  await setActive({ device: deviceA.id, slot: 1, script: "main" });
   if (!existsSync(DEVICE_PROFILE_PATH)) fail("mirrorActiveDevice should copy device A's cached profile to the mirror");
   let mirrored = JSON.parse(readFileSync(DEVICE_PROFILE_PATH, "utf8"));
   if (mirrored.model !== "M-A") fail(`expected mirror to reflect device A, got ${JSON.stringify(mirrored)}`);
@@ -300,7 +302,7 @@ try {
   // Device B has no cache yet -> switching to it leaves A's mirror standing
   // rather than blanking a real capture. The mirror names its own source
   // device, so it stays self-identifying until B answers.
-  setActive({ device: deviceB.id, slot: 1, script: "main" });
+  await setActive({ device: deviceB.id, slot: 1, script: "main" });
   if (!existsSync(DEVICE_PROFILE_PATH)) {
     fail("switching to an uncached device should leave the previous mirror in place, not delete it");
   }
@@ -308,7 +310,7 @@ try {
   if (mirrored.deviceIp !== deviceA.ip) fail("stale mirror should still name the device it came from");
 
   // Explicit mirrorActiveDevice() call (as fetchDeviceProfile/runProbe use internally) is idempotent.
-  mirrorActiveDevice(deviceB.id);
+  await mirrorActiveDevice(deviceB.id);
   if (JSON.parse(readFileSync(DEVICE_PROFILE_PATH, "utf8")).model !== "M-A") {
     fail("mirrorActiveDevice for an uncached device should be a no-op");
   }
@@ -320,7 +322,7 @@ try {
     JSON.stringify({ at: "t", deviceIp: deviceB.ip, gen: 2, ver: "1.0.0", model: "M-B", app: null, methods: [], components: [] }),
     "utf8",
   );
-  mirrorActiveDevice(deviceB.id);
+  await mirrorActiveDevice(deviceB.id);
   if (JSON.parse(readFileSync(DEVICE_PROFILE_PATH, "utf8")).model !== "M-B") {
     fail("mirror should swap to device B once B has a cached profile");
   }
@@ -362,19 +364,19 @@ try {
   setDevicesFile({ version: 1, active: null, devices: [] });
   _resetCache();
   const touched = await addDevice({ ip: "10.0.2.1", label: "Touch" }, fakeRpcFactory({ failConnect: true }));
-  touchDeviceInfo(touched.id, { model: "M1", gen: 2, ver: "1.0.0", app: "App" });
-  let reloaded2 = loadDevices().devices.find((d) => d.id === touched.id);
+  await touchDeviceInfo(touched.id, { model: "M1", gen: 2, ver: "1.0.0", app: "App" });
+  let reloaded2 = (await loadDevices()).devices.find((d) => d.id === touched.id);
   if (reloaded2.info?.ver !== "1.0.0") fail("touchDeviceInfo should write a fresh info block");
   const seenAt = reloaded2.lastSeen;
   if (!seenAt) fail("touchDeviceInfo should stamp lastSeen");
   await new Promise((r) => setTimeout(r, 2));
-  touchDeviceInfo(touched.id, { model: "M1", gen: 2, ver: "1.0.0", app: "App" });
-  reloaded2 = loadDevices().devices.find((d) => d.id === touched.id);
+  await touchDeviceInfo(touched.id, { model: "M1", gen: 2, ver: "1.0.0", app: "App" });
+  reloaded2 = (await loadDevices()).devices.find((d) => d.id === touched.id);
   if (reloaded2.lastSeen !== seenAt) {
     fail("touchDeviceInfo should no-op (not rewrite lastSeen) when info is unchanged");
   }
-  touchDeviceInfo(touched.id, { model: "M1", gen: 2, ver: "1.1.0", app: "App" });
-  reloaded2 = loadDevices().devices.find((d) => d.id === touched.id);
+  await touchDeviceInfo(touched.id, { model: "M1", gen: 2, ver: "1.1.0", app: "App" });
+  reloaded2 = (await loadDevices()).devices.find((d) => d.id === touched.id);
   if (reloaded2.info?.ver !== "1.1.0") fail("touchDeviceInfo should write through a real change");
   if (reloaded2.lastSeen === seenAt) fail("a real change should also refresh lastSeen");
 
@@ -383,7 +385,7 @@ try {
     { ip: "10.0.2.2", label: "Guarded", password: "hunter2" },
     fakeRpcFactory({ failConnect: true }),
   );
-  const sanitized = sanitizeDevice(loadDevices().devices.find((d) => d.id === withPw.id));
+  const sanitized = await sanitizeDevice((await loadDevices()).devices.find((d) => d.id === withPw.id));
   if ("auth" in sanitized || "password" in sanitized) {
     fail("sanitizeDevice must never leak the raw auth object");
   }

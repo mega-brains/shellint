@@ -46,7 +46,7 @@
   padding: 8px 10px;
   border-radius: 8px;
   border-left: 3px solid var(--warn);
-  background: var(--surface-2);
+  background: var(--surface-3);
   box-shadow: var(--shadow-modal);
   font-family: var(--mono);
   font-size: 11.5px;

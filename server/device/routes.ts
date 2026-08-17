@@ -1,4 +1,5 @@
 import type { Context, Hono } from "hono";
+import { runtime } from "#devroom/runtime";
 import { CompilerNotWiredError } from "../core/config.ts";
 import {
   addDevice,
@@ -47,13 +48,18 @@ import { writeGeneratedTypings } from "../probe/probe-typings.ts";
  * `AuthNotSupportedError` → 401 (non-digest challenge), `CompilerNotWiredError`
  * → 400, everything else → 500.
  */
-export function deviceError(c: Context, e: unknown) {
+export async function deviceError(c: Context, e: unknown) {
   if (e instanceof NoDeviceError) {
     return c.json({ ok: false, error: e.message }, 409);
   }
   if (e instanceof ProbeRequiredError) {
     return c.json(
-      { ok: false, error: e.message, code: "probe-required", probe: probeState(e.deviceId) },
+      {
+        ok: false,
+        error: e.message,
+        code: "probe-required",
+        probe: await probeState(e.deviceId),
+      },
       409,
     );
   }
@@ -74,11 +80,12 @@ export function deviceError(c: Context, e: unknown) {
 
 /** Device telemetry, logs, probe, deploy. Split out of app.ts to stay under the 500-line cap. */
 export function registerDeviceRoutes(app: Hono) {
-  app.get("/api/devices", (c) => {
-    const file = loadDevices();
+  app.get("/api/devices", async (c) => {
+    const file = await loadDevices();
+    const devices = await listDevices();
     return c.json({
       ok: true,
-      devices: listDevices().map(sanitizeDevice),
+      devices: await Promise.all(devices.map(sanitizeDevice)),
       active: file.active,
     });
   });
@@ -102,12 +109,12 @@ export function registerDeviceRoutes(app: Hono) {
         label: typeof body.label === "string" ? body.label : undefined,
         password: typeof body.password === "string" ? body.password : undefined,
       });
-      return c.json({ ok: true, device: sanitizeDevice(device) });
+      return c.json({ ok: true, device: await sanitizeDevice(device) });
     } catch (e) {
       if (e instanceof DuplicateDeviceError) {
         return c.json({ ok: false, error: e.message }, 409);
       }
-      return deviceError(c, e);
+      return await deviceError(c, e);
     }
   });
 
@@ -119,8 +126,8 @@ export function registerDeviceRoutes(app: Hono) {
       return c.json({ ok: false, error: "expected JSON body" }, 400);
     }
     try {
-      const device = updateDevice(c.req.param("id"), body);
-      return c.json({ ok: true, device: sanitizeDevice(device) });
+      const device = await updateDevice(c.req.param("id"), body);
+      return c.json({ ok: true, device: await sanitizeDevice(device) });
     } catch (e) {
       return c.json(
         { ok: false, error: e instanceof Error ? e.message : String(e) },
@@ -129,8 +136,8 @@ export function registerDeviceRoutes(app: Hono) {
     }
   });
 
-  app.delete("/api/devices/:id", (c) => {
-    removeDevice(c.req.param("id"));
+  app.delete("/api/devices/:id", async (c) => {
+    await removeDevice(c.req.param("id"));
     return c.json({ ok: true });
   });
 
@@ -138,9 +145,9 @@ export function registerDeviceRoutes(app: Hono) {
     const id = c.req.param("id");
     let target;
     try {
-      target = resolveTarget(id);
+      target = await resolveTarget(id);
     } catch (e) {
-      return deviceError(c, e);
+      return await deviceError(c, e);
     }
     const rpc = new ShellyRpc(target);
     const t0 = performance.now();
@@ -150,7 +157,7 @@ export function registerDeviceRoutes(app: Hono) {
         string,
         unknown
       >;
-      touchDeviceInfo(id, toDeviceInfo(info));
+      await touchDeviceInfo(id, toDeviceInfo(info));
       return c.json({
         ok: true,
         online: true,
@@ -159,7 +166,7 @@ export function registerDeviceRoutes(app: Hono) {
       });
     } catch (e) {
       if (e instanceof AuthFailedError || e instanceof AuthNotSupportedError) {
-        return deviceError(c, e);
+        return await deviceError(c, e);
       }
       return c.json({
         ok: true,
@@ -182,7 +189,7 @@ export function registerDeviceRoutes(app: Hono) {
       );
     }
     try {
-      const target = setActive(body);
+      const target = await setActive(body);
       // A new active device means the old one's log ring must not bleed into it.
       resetForDeviceSwitch();
       // Same shape as `/api/devices` — a device *id*, not the record (which
@@ -190,10 +197,10 @@ export function registerDeviceRoutes(app: Hono) {
       return c.json({
         ok: true,
         active: { device: target.device.id, slot: target.slot, script: target.script },
-        probe: probeState(target.device.id),
+        probe: await probeState(target.device.id),
       });
     } catch (e) {
-      return deviceError(c, e);
+      return await deviceError(c, e);
     }
   });
 
@@ -202,10 +209,10 @@ export function registerDeviceRoutes(app: Hono) {
     let target;
     let device;
     try {
-      target = resolveTarget(deviceId);
-      device = deviceId ? getDevice(deviceId) : requireActive().device;
+      target = await resolveTarget(deviceId);
+      device = deviceId ? await getDevice(deviceId) : (await requireActive()).device;
     } catch (e) {
-      return deviceError(c, e);
+      return await deviceError(c, e);
     }
     const rpc = new ShellyRpc(target);
     try {
@@ -213,7 +220,7 @@ export function registerDeviceRoutes(app: Hono) {
       const slots = await listSlots(rpc, device ?? undefined);
       return c.json({ ok: true, slots });
     } catch (e) {
-      return deviceError(c, e);
+      return await deviceError(c, e);
     } finally {
       rpc.close();
     }
@@ -227,9 +234,9 @@ export function registerDeviceRoutes(app: Hono) {
     }
     let target;
     try {
-      target = resolveTarget(deviceId);
+      target = await resolveTarget(deviceId);
     } catch (e) {
-      return deviceError(c, e);
+      return await deviceError(c, e);
     }
     const rpc = new ShellyRpc(target);
     try {
@@ -238,11 +245,11 @@ export function registerDeviceRoutes(app: Hono) {
       return c.json({
         ok: true,
         slot: slotRaw,
-        bytes: Buffer.byteLength(code, "utf8"),
+        bytes: runtime.byteLength(code),
         code,
       });
     } catch (e) {
-      return deviceError(c, e);
+      return await deviceError(c, e);
     } finally {
       rpc.close();
     }
@@ -260,9 +267,9 @@ export function registerDeviceRoutes(app: Hono) {
     }
     let target;
     try {
-      target = resolveTarget(body.device);
+      target = await resolveTarget(body.device);
     } catch (e) {
-      return deviceError(c, e);
+      return await deviceError(c, e);
     }
     const rpc = new ShellyRpc(target);
     try {
@@ -270,7 +277,7 @@ export function registerDeviceRoutes(app: Hono) {
       const slot = await createSlot(rpc, body.name);
       return c.json({ ok: true, slot });
     } catch (e) {
-      return deviceError(c, e);
+      return await deviceError(c, e);
     } finally {
       rpc.close();
     }
@@ -284,9 +291,9 @@ export function registerDeviceRoutes(app: Hono) {
     const deviceId = c.req.query("device");
     let target;
     try {
-      target = resolveTarget(deviceId);
+      target = await resolveTarget(deviceId);
     } catch (e) {
-      return deviceError(c, e);
+      return await deviceError(c, e);
     }
     const rpc = new ShellyRpc(target);
     try {
@@ -294,19 +301,19 @@ export function registerDeviceRoutes(app: Hono) {
       await deleteSlot(rpc, slotRaw);
       return c.json({ ok: true });
     } catch (e) {
-      return deviceError(c, e);
+      return await deviceError(c, e);
     } finally {
       rpc.close();
     }
   });
 
-  app.get("/api/device/logs", (c) => {
+  app.get("/api/device/logs", async (c) => {
     const sinceRaw = Number(c.req.query("since"));
     const since = Number.isFinite(sinceRaw) ? Math.max(0, sinceRaw) : 0;
     const stream = readLogs(since);
     // Prod builds ship shortened log strings; the viewer is the other half of
     // that trade, so ids become readable again here rather than on the device.
-    const map = loadLogMap();
+    const map = await loadLogMap();
     const lines = stream.lines.map((l) => ({
       ...l,
       text: expandLogText(l.text, map),

@@ -2,37 +2,34 @@
  * Design tokens (M18). Dark is the default; light comes from
  * prefers-color-scheme, or from the header toggle's `data-theme` override
  * (web/shell/theme.ts).
- * Values are the redesign handoff's table — do not "round" them.
+ * Contrast is raised across both themes.
  */
 :root {
-  --bg: #14171c;
-  --surface: #1b1f26;
-  --surface-2: #232833;
-  --surface-3: #171b21;
-  --ink: #e8ecf2;
-  --muted: #9aa4b4;
-  --faint: #6b7686;
-  --accent: #35c8e0;
-  --accent-ink: #08222a;
-  --ok: #4bd39a;
-  --warn: #e3b341;
-  --danger: #f2685c;
+  --bg: #080b0f;
+  --surface: #1e2b39;
+  --surface-2: #2a3b4e;
+  --surface-3: #101720;
+  --ink: #ffffff;
+  --muted: #c0cbd9;
+  --faint: #96a3b4;
+  --accent: #59e0f3;
+  --accent-ink: #041b20;
+  --ok: #63e0a8;
+  --warn: #f3c75d;
+  --danger: #ff8376;
   /* Non-target bars, gutter numbers, tier-row fill. */
-  --neutral-bar: #4a5462;
-  --code-ink: #c6ced9;
-  --code-keyword: #c58cf0;
-  --code-string: #e3b341;
-  --gutter-ink: #4a5462;
-  --tier-fill: #1f242c;
-  --run-fill: #12312a;
+  --neutral-bar: #5b6a7d;
+  --code-ink: #dee6f0;
+  --code-keyword: #d4a6ff;
+  --code-string: #f3c75d;
+  --gutter-ink: #677589;
+  --tier-fill: #17202a;
+  --run-fill: #0c3b2e;
   /*
    * Artifact diff (web/diff/, and the in-editor patch buffer). The two fills
    * are translucent so CodeMirror's selection layer still shows through a
-   * changed line; every ratio below is against the fill as it composites over
-   * --surface. Add is deliberately the lighter of the two (1.17:1 apart in
-   * luminance) so the pair does not rest on hue alone.
-   * add fill 1.79:1 vs surface · del fill 1.53:1 · --ink on either ≥ 7.7:1
-   * ± glyph 5.65:1 (add) / 5.39:1 (del) · --ink on a word fill ≥ 5.0:1
+   * changed line. Add is deliberately lighter than delete, so pair does not
+   * rest on hue alone.
    */
   --diff-add-fill: rgba(38, 206, 131, 0.28);
   --diff-del-fill: rgba(250, 88, 81, 0.3);
@@ -40,7 +37,7 @@
   --diff-del-ink: #ff9d92;
   --diff-add-word: #297054;
   --diff-del-word: #94464b;
-  --scrim: rgba(20, 23, 28, 0.7);
+  --scrim: rgba(8, 11, 15, 0.75);
   --shadow-modal: 0 24px 64px rgba(0, 0, 0, 0.5);
   /* OS-bundled faces only (macOS / Windows / Linux) — nothing is downloaded. */
   --mono: ui-monospace, "SFMono-Regular", "Menlo", "Consolas", monospace;
@@ -56,30 +53,28 @@
  */
 @media (prefers-color-scheme: light) {
   :root:not([data-theme]) {
-    --bg: #f2f4f7;
+    --bg: #d3dde894;
     --surface: #ffffff;
-    --surface-2: #eaeef3;
-    --surface-3: #f7f9fb;
-    --ink: #171a1f;
-    --muted: #5b6472;
-    --faint: #8b95a3;
-    --accent: #0a7f96;
+    --surface-2: #c7d3dfa3;
+    --surface-3: #edf2f7;
+    --ink: #071018;
+    --muted: #39495b;
+    --faint: #5b6c80;
+    --accent: #00677c;
     --accent-ink: #ffffff;
-    --ok: #16855c;
-    --warn: #9a6b00;
-    --danger: #c0392b;
-    --neutral-bar: #c3ccd6;
-    --code-ink: #2c3440;
-    --code-keyword: #7a3ec8;
-    --code-string: #9a6b00;
-    --gutter-ink: #a8b1bd;
-    --tier-fill: #f0f3f7;
-    --run-fill: #e2f2ea;
+    --ok: #066b47;
+    --warn: #795300;
+    --danger: #a92117;
+    --neutral-bar: #aab7c5;
+    --code-ink: #172738;
+    --code-keyword: #6332ae;
+    --code-string: #795300;
+    --gutter-ink: #718196;
+    --tier-fill: #e5ecf3;
+    --run-fill: #d4ecdf;
     /*
-     * add fill 1.35:1 vs surface · del fill 1.58:1 · --ink on either ≥ 11:1
-     * ± glyph 4.98:1 (add) / 5.05:1 (del) · --ink on a word fill ≥ 8.0:1
-     * The glyph inks are a step darker than --ok / --danger: those two only
-     * reach 4.6:1 on plain white, so they drop under AA on any fill at all.
+     * Glyph inks stay darker than status colours, preserving readable diffs
+     * over translucent fills.
      */
     --diff-add-fill: rgba(55, 172, 112, 0.3);
     --diff-del-fill: rgba(212, 55, 38, 0.3);
@@ -87,37 +82,36 @@
     --diff-del-ink: #9a2418;
     --diff-add-word: #7fceaa;
     --diff-del-word: #f0998f;
-    --scrim: rgba(242, 244, 247, 0.7);
+    --scrim: rgba(210, 220, 231, 0.72);
   }
 }
 
 :root[data-theme="light"] {
-  --bg: #f2f4f7;
+  --bg: #d3dde894;
   --surface: #ffffff;
-  --surface-2: #eaeef3;
-  --surface-3: #f7f9fb;
-  --ink: #171a1f;
-  --muted: #5b6472;
-  --faint: #8b95a3;
-  --accent: #0a7f96;
+  --surface-2: #c7d3dfa3;
+  --surface-3: #edf2f7;
+  --ink: #071018;
+  --muted: #39495b;
+  --faint: #5b6c80;
+  --accent: #00677c;
   --accent-ink: #ffffff;
-  --ok: #16855c;
-  --warn: #9a6b00;
-  --danger: #c0392b;
-  --neutral-bar: #c3ccd6;
-  --code-ink: #2c3440;
-  --code-keyword: #7a3ec8;
-  --code-string: #9a6b00;
-  --gutter-ink: #a8b1bd;
-  --tier-fill: #f0f3f7;
-  --run-fill: #e2f2ea;
-  /* Ratios as in the prefers-color-scheme block above. */
+  --ok: #066b47;
+  --warn: #795300;
+  --danger: #a92117;
+  --neutral-bar: #aab7c5;
+  --code-ink: #172738;
+  --code-keyword: #6332ae;
+  --code-string: #795300;
+  --gutter-ink: #718196;
+  --tier-fill: #e5ecf3;
+  --run-fill: #d4ecdf;
+  /* Values mirror prefers-color-scheme block above. */
   --diff-add-fill: rgba(55, 172, 112, 0.3);
   --diff-del-fill: rgba(212, 55, 38, 0.3);
   --diff-add-ink: #0d6947;
   --diff-del-ink: #9a2418;
   --diff-add-word: #7fceaa;
   --diff-del-word: #f0998f;
-  --scrim: rgba(242, 244, 247, 0.7);
+  --scrim: rgba(210, 220, 231, 0.72);
 }
-

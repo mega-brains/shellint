@@ -1,6 +1,6 @@
 /**
  * GENERATED FILE — do not edit by hand. Regenerate with `mise run probe`.
- * Source: types/generated-probe.json (192.168.3.106 fw 2.0.0, probed 2026-08-13T09:14:42.545Z).
+ * Source: types/generated-probe.json (192.168.3.106 fw 2.0.0, probed 2026-08-17T08:18:36.972Z).
  *
  * ADVISORY ONLY. It is not part of the device compile and does not stand in
  * for types/espruino-lib.d.ts: every declaration sits inside one namespace,

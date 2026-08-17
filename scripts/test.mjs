@@ -53,6 +53,7 @@ const TESTS = [
   "test-device-scripts",
   "test-deploy-gate",
   "test-lint-memory",
+  "test-check-stream",
   "test-smoke",
 ];
 

@@ -1,5 +1,4 @@
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { runtime } from "#devroom/runtime";
 import { ROOT } from "./paths.ts";
 import {
   DEFAULT_MINIFY,
@@ -40,15 +39,15 @@ function parseMinify(raw: unknown): MinifyConfig {
   return out;
 }
 
-export function loadConfig(): DevroomConfig {
-  const path = join(ROOT, "devroom.json");
-  if (!existsSync(path)) {
+export async function loadConfig(): Promise<DevroomConfig> {
+  const path = runtime.path.join(ROOT, "devroom.json");
+  if (!(await runtime.fs.exists(path))) {
     return {
       ...DEFAULTS,
       minify: { ...DEFAULT_MINIFY },
     };
   }
-  const raw = JSON.parse(readFileSync(path, "utf8")) as Partial<DevroomConfig> &
+  const raw = JSON.parse(await runtime.fs.readText(path)) as Partial<DevroomConfig> &
     Record<string, unknown>;
   return {
     deviceIp: typeof raw.deviceIp === "string" ? raw.deviceIp : DEFAULTS.deviceIp,
@@ -78,10 +77,16 @@ export function sanitizeConfig(cfg: DevroomConfig) {
  */
 export function patchMinifyConfig(
   patch: Partial<MinifyConfig>,
-): DevroomConfig {
-  const path = join(ROOT, "devroom.json");
-  const raw: Record<string, unknown> = existsSync(path)
-    ? (JSON.parse(readFileSync(path, "utf8")) as Record<string, unknown>)
+): Promise<DevroomConfig> {
+  return patchMinifyConfigAsync(patch);
+}
+
+async function patchMinifyConfigAsync(
+  patch: Partial<MinifyConfig>,
+): Promise<DevroomConfig> {
+  const path = runtime.path.join(ROOT, "devroom.json");
+  const raw: Record<string, unknown> = await runtime.fs.exists(path)
+    ? (JSON.parse(await runtime.fs.readText(path)) as Record<string, unknown>)
     : {};
 
   const current = parseMinify(raw.minify);
@@ -90,7 +95,7 @@ export function patchMinifyConfig(
     if (typeof patch[key] === "boolean") next[key] = patch[key]!;
   }
   raw.minify = next;
-  writeFileSync(path, `${JSON.stringify(raw, null, 2)}\n`, "utf8");
+  await runtime.fs.atomicWriteText(path, `${JSON.stringify(raw, null, 2)}\n`);
   return loadConfig();
 }
 

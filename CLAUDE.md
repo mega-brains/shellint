@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - read [plans-in-project-dir](./.claude/memory/plans-in-project-dir.md)
 
 
-## Status: M0–M4 basic · M5–M10 done (lint Tier 1–5, incl. connected Tier 4) · M11 type-layer bans · M12 dashboard metrics · post-M12 UI (editor sidebar, permanent check indicator) · M13 tier-3 minify, prod log map, 104-probe capability run, artifact preview · M14 web bundle size (minify, CSS bundle, precompressed assets) · M14b device-pipeline minify knobs + `bench/` corpus · M15 multi-device + multi-script slot selection (device CRUD, digest auth, header device/slot pickers, per-device profile/probe mirroring) · M17 static GitHub Pages build (`site/`, offline, device-less) · M18 UI redesign (dark/light tokens, readiness rail, inspector tabs, measure-row grammar, fixed dock, shared modal frame)
+## Status: M0–M4 basic · M5–M10 done (lint Tier 1–5, incl. connected Tier 4) · M11 type-layer bans · M12 dashboard metrics · post-M12 UI (editor sidebar, permanent check indicator) · M13 tier-3 minify, prod log map, 104-probe capability run, artifact preview · M14 web bundle size (minify, CSS bundle, precompressed assets) · M14b device-pipeline minify knobs + `bench/` corpus · M15 multi-device + multi-script slot selection (device CRUD, digest auth, header device/slot pickers, per-device profile/probe mirroring) · M17 static GitHub Pages build (`site/`, offline, device-less) · M18 UI redesign (dark/light tokens, readiness rail, inspector tabs, measure-row grammar, fixed dock, shared modal frame) · M21 Node + txiki dual-runtime server and CLI
 
 Prefer **mise** tasks ([`mise.toml`](./mise.toml)). Verify with `ls` / `mise tasks`
 before assuming entrypoints exist.
@@ -27,7 +27,7 @@ process-per-test, for when a failure smells like cross-test module state.
 
 | Layer | Choice |
 |---|---|
-| Runtime | Node 22 via mise (`"type": "module"`) |
+| Runtime | Node 22 via mise by default; txiki.js v26.6.0 through conditional runtime and builder adapters |
 | Task runner | mise (`start`/`dev`, `build`, `lint`, `test`, `beforeCommit`, `probe`, `clean`) |
 | Device compile | `tsc` → ES5, `module: none`, `noEmitHelpers`, `noLib` + `types: []` |
 | Env gating | `meta.env` DCE → `*.raw.js`; then Terser minify → `*.js`; prod also shortens log strings into `dist/prod.logmap.json`, which the logs panel re-expands (M13) |
@@ -69,13 +69,21 @@ mise run test             # DCE/minify asserts + web + server smoke
 mise run bench            # minify-option benchmark over bench/*.ts
 mise run beforeCommit     # check:lines → typecheck → build → test
 mise run start            # DevRoom server (alias: mise run dev)
+mise run build:txiki      # bundle txiki server and CLI entries
+mise run start:txiki      # start the txiki server bundle
+mise run test:txiki       # capabilities and Node/txiki HTTP parity
 mise run deploy -- debug min   # MODE + MINIFY=min|raw
+mise run deploy:txiki -- --mode debug --minify min
 mise run probe
+mise run probe:txiki
 mise run profile # cache the device capability profile for Tier 4 lint
+mise run profile:txiki
 mise run clean
 ```
 
 Also available via `npm run …` (`build:shelly`, `build:web`, `dev`, `beforeCommit`, …).
+Set `DEVROOM_TJS_BIN` when `tjs` is not on `PATH`. txiki needs bundles under
+`.txiki/`; npm installation, TypeScript, and Playwright stay on Node.
 Build config: `tsconfig.shelly.json` / `tsconfig.server.json` / `tsconfig.web.json`. Entry: `scripts/main.ts`. Pipeline:
 `scripts/build-shelly.mjs`.
 

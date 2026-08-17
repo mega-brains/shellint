@@ -1,4 +1,5 @@
-import WebSocket from "ws";
+import { runtime } from "#devroom/runtime";
+import type { RuntimeWebSocket, RuntimeWebSocketMessage } from "../runtime/types.ts";
 import { buildAuthFrame, NonceCounter, type DigestChallenge } from "./auth-digest.ts";
 
 export class AuthNotSupportedError extends Error {
@@ -40,6 +41,10 @@ type Pending = {
   retried: boolean;
 };
 
+function messageText(data: RuntimeWebSocketMessage): string {
+  return typeof data === "string" ? data : new TextDecoder().decode(data);
+}
+
 const CONNECT_TIMEOUT_MS = 9_000;
 const RPC_TIMEOUT_MS = 10_000;
 
@@ -68,7 +73,7 @@ function parseChallenge(message: string): DigestChallenge | null {
  * retry becomes `AuthFailedError`.
  */
 export class ShellyRpc {
-  private ws: WebSocket | null = null;
+  private ws: RuntimeWebSocket | null = null;
   private nextId = 1;
   private pending = new Map<number, Pending>();
   private readonly src = "shelly-devroom";
@@ -87,12 +92,12 @@ export class ShellyRpc {
   }
 
   async connect(): Promise<void> {
-    if (this.ws && this.ws.readyState === WebSocket.OPEN) return;
+    if (this.ws?.state === "open") return;
     if (this.openPromise) return this.openPromise;
 
     this.openPromise = new Promise<void>((resolve, reject) => {
       const url = `ws://${this.ip}/rpc`;
-      const ws = new WebSocket(url);
+      const ws = runtime.websocket.connect(url);
       this.ws = ws;
       let settled = false;
 
@@ -115,7 +120,7 @@ export class ShellyRpc {
         fail(new Error(`connect timeout to ${url} (${CONNECT_TIMEOUT_MS}ms)`));
       }, CONNECT_TIMEOUT_MS);
 
-      ws.on("open", () => {
+      ws.onOpen(() => {
         // Warm the channel with a valid src (required before notifications / further use).
         this.call("Shelly.GetDeviceInfo", {})
           .then(() => ok())
@@ -132,9 +137,9 @@ export class ShellyRpc {
           });
       });
 
-      ws.on("message", (data) => this.onMessage(data.toString()));
+      ws.onMessage((data) => this.onMessage(messageText(data)));
 
-      ws.on("error", (err) => {
+      ws.onError((err) => {
         fail(
           err instanceof Error
             ? err
@@ -142,7 +147,7 @@ export class ShellyRpc {
         );
       });
 
-      ws.on("close", () => {
+      ws.onClose(() => {
         this.rejectAll(new Error("WebSocket closed"));
         this.ws = null;
         this.openPromise = null;
@@ -160,7 +165,7 @@ export class ShellyRpc {
   private cleanup() {
     if (this.ws) {
       try {
-        this.ws.terminate();
+        this.ws.abort();
       } catch {
         /* ignore */
       }
@@ -259,7 +264,7 @@ export class ShellyRpc {
       auth?: ReturnType<typeof buildAuthFrame>;
     },
   ): void {
-    if (!this.ws || this.ws.readyState !== WebSocket.OPEN) {
+    if (!this.ws || this.ws.state !== "open") {
       ctx.reject(new Error("WebSocket not connected"));
       return;
     }

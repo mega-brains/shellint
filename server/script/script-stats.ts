@@ -1,5 +1,4 @@
-import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import runtime from "#devroom/runtime";
 import ts from "typescript";
 import { DIST_DIR, SCRIPT_PATH } from "../core/paths.ts";
 
@@ -186,13 +185,13 @@ export function countersFromStats(stats: ScriptStats): StatCounters {
 }
 
 /** Analyze source + existing debug/prod raw+min artifacts (no *.adv.js). */
-export function analyzeVariants(sourceStats: ScriptStats): StatVariants {
+export async function analyzeVariants(sourceStats: ScriptStats): Promise<StatVariants> {
   const out: StatVariants = { source: countersFromStats(sourceStats) };
   for (const key of Object.keys(DIST_VARIANTS) as (keyof typeof DIST_VARIANTS)[]) {
     const name = DIST_VARIANTS[key];
-    const path = join(DIST_DIR, name);
-    if (!existsSync(path)) continue;
-    out[key] = countersFromStats(analyzeSource(readFileSync(path, "utf8"), name));
+    const path = runtime.path.join(DIST_DIR, name);
+    if (!(await runtime.fs.exists(path))) continue;
+    out[key] = countersFromStats(analyzeSource(await runtime.fs.readText(path), name));
   }
   return out;
 }
@@ -264,7 +263,7 @@ export function analyzeSource(source: string, fileName = "main.ts"): ScriptStats
 
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
       stats.literals.strings.count += 1;
-      stats.literals.strings.totalBytes += Buffer.byteLength(node.text, "utf8");
+      stats.literals.strings.totalBytes += runtime.byteLength(node.text);
       mark("strings", node);
     }
     if (ts.isNumericLiteral(node)) {
@@ -330,9 +329,9 @@ export function analyzeSource(source: string, fileName = "main.ts"): ScriptStats
   return stats;
 }
 
-export function analyzeScriptFile(path = SCRIPT_PATH): ScriptStats {
-  if (!existsSync(path)) {
+export async function analyzeScriptFile(path = SCRIPT_PATH): Promise<ScriptStats> {
+  if (!(await runtime.fs.exists(path))) {
     throw new Error(`script not found: ${path}`);
   }
-  return analyzeSource(readFileSync(path, "utf8"), path);
+  return analyzeSource(await runtime.fs.readText(path), path);
 }

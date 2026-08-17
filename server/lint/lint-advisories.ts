@@ -1,5 +1,4 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import { runtime } from "#devroom/runtime";
 import ts from "typescript";
 import { DIST_DIR, ROOT, SCRIPT_PATH } from "../core/paths.ts";
 import { analyzeSource } from "../script/script-stats.ts";
@@ -11,6 +10,7 @@ import {
   parseSource,
   stringArg,
   type Finding,
+  type FindingFix,
   type Sink,
 } from "./lint-util.ts";
 
@@ -27,6 +27,40 @@ const LOG_CALLS = ["console.log", "console.error", "console.warn", "print"];
 const MINIFIED_ARTIFACTS = ["debug.js", "prod.js"];
 /** "declared but its value is never read" and friends. */
 const UNUSED_CODES = new Set([6133, 6138, 6192, 6196, 6198, 6199]);
+
+function unusedFunctionFix(
+  source: ts.SourceFile,
+  position: number,
+): FindingFix | undefined {
+  let node: ts.FunctionDeclaration | undefined;
+  const visit = (candidate: ts.Node) => {
+    if (position < candidate.getFullStart() || position >= candidate.getEnd()) return;
+    if (
+      ts.isFunctionDeclaration(candidate) &&
+      candidate.name &&
+      position >= candidate.name.getStart(source) &&
+      position < candidate.name.getEnd()
+    ) {
+      node = candidate;
+    }
+    ts.forEachChild(candidate, visit);
+  };
+  visit(source);
+  if (!node?.name || !node.body) return undefined;
+  const functionName = node.name.text;
+  const parent = node.parent;
+  const siblings = ts.isSourceFile(parent) || ts.isBlock(parent) ? parent.statements : [];
+  const declarations = siblings.filter(
+    (item) => ts.isFunctionDeclaration(item) && item.name?.text === functionName,
+  );
+  if (declarations.length !== 1) return undefined;
+  return {
+    title: `Remove unused function "${functionName}"`,
+    start: node.getStart(source),
+    end: node.getEnd(),
+    text: "",
+  };
+}
 
 /** The prod build only strips logs that sit behind a meta.env guard. */
 function isDebugGuard(text: string): boolean {
@@ -51,29 +85,67 @@ export function parseMeta(source: string): MetaBlock {
   }
 }
 
-export function typeDeclarationFiles(): string[] {
-  const dir = join(ROOT, "types");
-  if (!existsSync(dir)) return [];
-  return readdirSync(dir)
-    .filter((f) => f.endsWith(".d.ts"))
-    .map((f) => join(dir, f));
+export async function typeDeclarationFiles(): Promise<string[]> {
+  const dir = runtime.path.join(ROOT, "types");
+  if (!(await runtime.fs.exists(dir))) return [];
+  return (await runtime.fs.readDir(dir))
+    .filter((entry) => entry.isFile && entry.name.endsWith(".d.ts"))
+    .map((entry) => runtime.path.join(dir, entry.name));
 }
 
 /**
  * 5.4 — every unused declaration costs bytes and JsVars. Delegated to `tsc`
  * rather than a hand-rolled scope pass, and downgraded to a warning.
  */
-export function deadCodeFindings(path: string, fileName: string): Finding[] {
-  const program = ts.createProgram([path, ...typeDeclarationFiles()], {
+export function deadCodeFindings(
+  path: string,
+  fileName: string,
+  files: ReadonlyMap<string, string>,
+): Finding[] {
+  const normalize = (name: string) => runtime.path.resolve(name);
+  const sources = new Map(
+    [...files].map(([name, source]) => [normalize(name), source]),
+  );
+  const options: ts.CompilerOptions = {
     noEmit: true,
     noUnusedLocals: true,
     noUnusedParameters: true,
     target: ts.ScriptTarget.ES5,
-    lib: ["lib.es5.d.ts"],
+    noLib: true,
     skipLibCheck: true,
     types: [],
-  });
-  const source = program.getSourceFile(path);
+  };
+  const canonical = (name: string) =>
+    runtime.process.platform === "win32" ? normalize(name).toLowerCase() : normalize(name);
+  const host: ts.CompilerHost = {
+    getSourceFile(name, languageVersion) {
+      const source = sources.get(normalize(name));
+      return source === undefined
+        ? undefined
+        : ts.createSourceFile(name, source, languageVersion, true, ts.ScriptKind.TS);
+    },
+    getDefaultLibFileName: () => "lib.d.ts",
+    writeFile: () => undefined,
+    getCurrentDirectory: () => ROOT,
+    getDirectories: () => [],
+    fileExists: (name) => sources.has(normalize(name)),
+    readFile: (name) => sources.get(normalize(name)),
+    getCanonicalFileName: canonical,
+    useCaseSensitiveFileNames: () => runtime.process.platform !== "win32",
+    getNewLine: () => "\n",
+    directoryExists(name) {
+      const prefix = `${normalize(name)}${runtime.path.sep}`;
+      return [...sources.keys()].some((candidate) => candidate.startsWith(prefix));
+    },
+    realpath: normalize,
+  };
+  const sourcePath = normalize(path);
+  const rootNames = [
+    sourcePath,
+    ...[...sources.keys()].filter((name) => name !== sourcePath),
+  ];
+  const program = ts.createProgram({ rootNames, options, host });
+  const source = program.getSourceFile(sourcePath);
   if (!source) return [];
 
   const findings: Finding[] = [];
@@ -86,17 +158,28 @@ export function deadCodeFindings(path: string, fileName: string): Finding[] {
       message: ts.flattenDiagnosticMessageText(d.messageText, " "),
       file: fileName,
       line: line + 1,
+      fix: unusedFunctionFix(source, d.start),
     });
   }
   return findings;
 }
 
-function checkMinifiedMeta(distDir: string): Finding[] {
-  const present = MINIFIED_ARTIFACTS.filter((f) => existsSync(join(distDir, f)));
-  if (!present.length) return [];
-  const stripped = present.filter(
-    (f) => !readFileSync(join(distDir, f), "utf8").includes("@meta"),
+async function checkMinifiedMeta(distDir: string): Promise<Finding[]> {
+  const candidates = MINIFIED_ARTIFACTS.map((name) => ({
+    name,
+    path: runtime.path.join(distDir, name),
+  }));
+  const exists = await Promise.all(
+    candidates.map(async ({ path }) => await runtime.fs.exists(path)),
   );
+  const present = candidates.filter((_, index) => exists[index]);
+  if (!present.length) return [];
+  const retained = await Promise.all(
+    present.map(async ({ path }) => (await runtime.fs.readText(path)).includes("@meta")),
+  );
+  const stripped = present
+    .filter((_, index) => !retained[index])
+    .map(({ name }) => name);
   if (!stripped.length) return [];
   return [
     {
@@ -126,14 +209,16 @@ function isDeclarationName(node: ts.Identifier): boolean {
  * everything at top level — where it is a global. This covers that half.
  */
 function unusedGlobals(sf: ts.SourceFile, sink: Sink) {
-  const declared = new Map<string, ts.Node>();
+  const declared = new Map<string, { name: ts.Node; declaration: ts.Node }>();
   for (const stmt of sf.statements) {
     if (ts.isFunctionDeclaration(stmt) && stmt.name) {
-      declared.set(stmt.name.text, stmt.name);
+      declared.set(stmt.name.text, { name: stmt.name, declaration: stmt });
     }
     if (ts.isVariableStatement(stmt)) {
       for (const d of stmt.declarationList.declarations) {
-        if (ts.isIdentifier(d.name)) declared.set(d.name.text, d.name);
+        if (ts.isIdentifier(d.name)) {
+          declared.set(d.name.text, { name: d.name, declaration: d });
+        }
       }
     }
   }
@@ -146,13 +231,16 @@ function unusedGlobals(sf: ts.SourceFile, sink: Sink) {
   };
   visit(sf);
 
-  for (const [name, node] of declared) {
+  for (const [name, site] of declared) {
     if (used.has(name)) continue;
     sink.at(
-      node,
+      site.name,
       "dead-code",
       "warn",
       `'${name}' is declared but never used — it still costs bytes and JsVars on the device`,
+      ts.isFunctionDeclaration(site.declaration)
+        ? unusedFunctionFix(sf, site.name.getStart(sf))
+        : undefined,
     );
   }
 }
@@ -160,7 +248,7 @@ function unusedGlobals(sf: ts.SourceFile, sink: Sink) {
 export function lintAdvisories(
   source: string,
   fileName = "scripts/main.ts",
-  distDir = DIST_DIR,
+  _distDir = DIST_DIR,
 ): Finding[] {
   const sf = parseSource(source, fileName);
   const sink = createSink(sf, fileName);
@@ -227,18 +315,24 @@ export function lintAdvisories(
     );
   }
 
-  if (meta) sink.findings.push(...checkMinifiedMeta(distDir));
-
   return sink.findings;
 }
 
-export function lintAdvisoriesFile(path = SCRIPT_PATH): Finding[] {
-  if (!existsSync(path)) {
+export async function lintAdvisoriesFile(path = SCRIPT_PATH): Promise<Finding[]> {
+  if (!(await runtime.fs.exists(path))) {
     throw new Error(`script not found: ${path}`);
   }
   const fileName = "scripts/main.ts";
-  return [
-    ...lintAdvisories(readFileSync(path, "utf8"), fileName),
-    ...deadCodeFindings(path, fileName),
-  ];
+  const source = await runtime.fs.readText(path);
+  const declarations = await typeDeclarationFiles();
+  const declarationSources = await Promise.all(
+    declarations.map(
+      async (declaration) => [declaration, await runtime.fs.readText(declaration)] as const,
+    ),
+  );
+  const files = new Map<string, string>([[path, source], ...declarationSources]);
+  const findings = lintAdvisories(source, fileName);
+  if (parseMeta(source)) findings.push(...await checkMinifiedMeta(DIST_DIR));
+  findings.push(...deadCodeFindings(path, fileName, files));
+  return findings;
 }

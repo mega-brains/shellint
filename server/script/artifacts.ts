@@ -1,5 +1,4 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import runtime from "#devroom/runtime";
 import { DIST_DIR } from "../core/paths.ts";
 
 export type ArtifactInfo = { name: string; bytes: number; mtime: string };
@@ -24,24 +23,24 @@ function isArtifactName(name: string): name is ArtifactName {
 }
 
 /** Only the artifacts that exist on disk right now. */
-export function listArtifacts(): ArtifactInfo[] {
+export async function listArtifacts(): Promise<ArtifactInfo[]> {
   const out: ArtifactInfo[] = [];
   for (const name of ARTIFACTS) {
-    const path = join(DIST_DIR, name);
-    if (!existsSync(path)) continue;
-    const st = statSync(path);
-    out.push({ name, bytes: st.size, mtime: st.mtime.toISOString() });
+    const path = runtime.path.join(DIST_DIR, name);
+    if (!(await runtime.fs.exists(path))) continue;
+    const st = await runtime.fs.stat(path);
+    out.push({ name, bytes: st.size, mtime: new Date(st.mtimeMs).toISOString() });
   }
   return out;
 }
 
 /** null for anything not on the allowlist, or not built yet. */
-export function readArtifact(
+export async function readArtifact(
   name: string,
-): { name: string; bytes: number; code: string } | null {
+): Promise<{ name: string; bytes: number; code: string } | null> {
   if (!isArtifactName(name)) return null;
-  const path = join(DIST_DIR, name);
-  if (!existsSync(path)) return null;
-  const code = readFileSync(path, "utf8");
-  return { name, bytes: Buffer.byteLength(code, "utf8"), code };
+  const path = runtime.path.join(DIST_DIR, name);
+  if (!(await runtime.fs.exists(path))) return null;
+  const code = await runtime.fs.readText(path);
+  return { name, bytes: runtime.byteLength(code), code };
 }

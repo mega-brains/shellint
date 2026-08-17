@@ -24,7 +24,11 @@ import {
   transformVariant,
 } from "../../shared/device-pipeline.mjs";
 import type { MinifyConfig } from "../../shared/minify-options.mjs";
-import { runCheck, type CheckReport } from "../../server/lint/check.ts";
+import {
+  runCheck,
+  type CheckProgress,
+  type CheckReport,
+} from "../../server/lint/check.ts";
 import { DIST_DIR, SCRIPT_PATH } from "../../server/core/paths.ts";
 import { analyzeSource, analyzeVariants } from "../../server/script/script-stats.ts";
 import { estimateMemory } from "../../server/script/memory-estimate.ts";
@@ -36,6 +40,7 @@ import type {
   BuildRequest,
   BuildResponse,
   BuildResult,
+  CheckProgressResponse,
   CheckRequest,
   CheckResponse,
   PipelineRequest,
@@ -137,13 +142,16 @@ async function runBuild(req: BuildRequest): Promise<BuildResult> {
  * Reset first so a check has no leftover state from an earlier request in
  * the same worker (e.g. a since-removed dist artifact).
  */
-async function runCheckRequest(req: CheckRequest): Promise<CheckReport> {
+async function runCheckRequest(
+  req: CheckRequest,
+  onProgress?: (progress: CheckProgress) => void,
+): Promise<CheckReport> {
   vfsReset();
   vfsWrite(SCRIPT_PATH, req.source);
   for (const [name, content] of Object.entries(req.artifacts)) {
     vfsWrite(`${DIST_DIR}/${name}`, content);
   }
-  return runCheck({ connected: false });
+  return runCheck({ connected: false, onProgress });
 }
 
 /**
@@ -152,7 +160,7 @@ async function runCheckRequest(req: CheckRequest): Promise<CheckReport> {
  * per-variant columns are empty until a build has happened — exactly the
  * server's behaviour before its first build.
  */
-function runStats(req: StatsRequest): StatsResult {
+async function runStats(req: StatsRequest): Promise<StatsResult> {
   vfsReset();
   vfsWrite(SCRIPT_PATH, req.source);
   for (const [name, content] of Object.entries(req.artifacts)) {
@@ -161,7 +169,7 @@ function runStats(req: StatsRequest): StatsResult {
   const stats = analyzeSource(req.source, SCRIPT_PATH);
   return {
     stats,
-    variants: analyzeVariants(stats),
+    variants: await analyzeVariants(stats),
     estimate: estimateMemory(req.source),
     minFirmware: minFirmware(stats.apis),
   };
@@ -172,7 +180,10 @@ function errorMessage(err: unknown): string {
 }
 
 /** Never lets a bad request become an unhandled rejection — always resolves to a response message. */
-async function handleMessage(req: PipelineRequest): Promise<PipelineResponse> {
+async function handleMessage(
+  req: PipelineRequest,
+  onProgress?: (progress: CheckProgress) => void,
+): Promise<PipelineResponse> {
   if (req.type === "build") {
     try {
       const result = await runBuild(req);
@@ -183,21 +194,29 @@ async function handleMessage(req: PipelineRequest): Promise<PipelineResponse> {
   }
   if (req.type === "stats") {
     try {
-      return { type: "stats", id: req.id, ok: true, result: runStats(req) };
+      return { type: "stats", id: req.id, ok: true, result: await runStats(req) };
     } catch (err) {
       return { type: "stats", id: req.id, ok: false, error: errorMessage(err) };
     }
   }
   try {
-    const result = await runCheckRequest(req);
+    const result = await runCheckRequest(req, onProgress);
     return { type: "check", id: req.id, ok: true, result };
   } catch (err) {
     return { type: "check", id: req.id, ok: false, error: errorMessage(err) };
   }
 }
 
-const post = self.postMessage as unknown as (msg: PipelineResponse) => void;
+const post = self.postMessage as unknown as (
+  msg: PipelineResponse | CheckProgressResponse,
+) => void;
 
 self.onmessage = (ev: MessageEvent<PipelineRequest>) => {
-  handleMessage(ev.data).then(post);
+  const req = ev.data;
+  const onProgress =
+    req.type === "check"
+      ? (progress: CheckProgress) =>
+          post({ type: "check-progress", id: req.id, progress })
+      : undefined;
+  handleMessage(req, onProgress).then(post);
 };

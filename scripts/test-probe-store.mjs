@@ -148,13 +148,13 @@ try {
       JSON.stringify({ probed: true, at: "t1", deviceIp: "10.9.9.1", ver: "1.2.3", results: [] }),
       "utf8",
     );
-    const captures = listCaptures(id);
+    const captures = await listCaptures(id);
     if (captures.length !== 1 || captures[0].verKey !== "1.2.3") {
       fail(`migration should key by the legacy capture's own ver, got ${JSON.stringify(captures)}`);
     }
     if (!existsSync(paths.probe)) fail("migration must leave the legacy file in place");
     // idempotent: running it again changes nothing.
-    const again = listCaptures(id);
+    const again = await listCaptures(id);
     if (again.length !== 1) fail("migration should not duplicate on a second read");
     rmSync(paths.probesDir, { recursive: true, force: true });
     rmSync(paths.profile, { force: true });
@@ -176,7 +176,7 @@ try {
       JSON.stringify({ probed: true, at: "t1", deviceIp: "10.9.9.1", results: [] }),
       "utf8",
     );
-    const captures = listCaptures(id);
+    const captures = await listCaptures(id);
     if (captures.length !== 1 || captures[0].verKey !== "2.0.0") {
       fail(`migration should borrow the matching profile's ver, got ${JSON.stringify(captures)}`);
     }
@@ -192,7 +192,7 @@ try {
       JSON.stringify({ probed: true, at: "t1", deviceIp: "10.9.9.99", results: [] }),
       "utf8",
     );
-    const captures = listCaptures(id);
+    const captures = await listCaptures(id);
     if (captures.length !== 1 || captures[0].verKey !== "unknown") {
       fail(`non-matching profile should fall back to "unknown", got ${JSON.stringify(captures)}`);
     }
@@ -205,26 +205,26 @@ try {
   {
     const id = FAKE_IDS[0];
     const r144 = makeReport("10.9.9.1", "1.4.4", id);
-    writeCapture(id, r144);
+    await writeCapture(id, r144);
     await new Promise((r) => setTimeout(r, 2)); // distinct `at` timestamps
     const r160 = makeReport("10.9.9.1", "1.6.0", id);
-    writeCapture(id, r160);
+    await writeCapture(id, r160);
 
-    const list = listCaptures(id);
+    const list = await listCaptures(id);
     if (list.length !== 2) fail(`expected 2 captures, got ${list.length}`);
     if (list[0].verKey !== "1.6.0") fail("listCaptures should sort newest first");
     if (list[0].present !== 1 || list[0].absent !== 1) fail("capture verdict counts should reflect the report");
 
-    if (resolveCapture(id, "1.4.4")?.verKey !== "1.4.4") fail("resolveCapture should exact-match by verKey");
-    if (resolveCapture(id, "9.9.9") !== null) fail("resolveCapture should miss an unknown ver");
-    if (newestCapture(id)?.verKey !== "1.6.0") fail("newestCapture should be the most recent");
+    if ((await resolveCapture(id, "1.4.4"))?.verKey !== "1.4.4") fail("resolveCapture should exact-match by verKey");
+    if ((await resolveCapture(id, "9.9.9")) !== null) fail("resolveCapture should miss an unknown ver");
+    if ((await newestCapture(id))?.verKey !== "1.6.0") fail("newestCapture should be the most recent");
 
-    deleteCapture(id, "1.4.4");
-    if (listCaptures(id).length !== 1) fail("deleteCapture should drop exactly the named capture");
-    if (resolveCapture(id, "1.4.4") !== null) fail("deleted capture should no longer resolve");
+    await deleteCapture(id, "1.4.4");
+    if ((await listCaptures(id)).length !== 1) fail("deleteCapture should drop exactly the named capture");
+    if ((await resolveCapture(id, "1.4.4")) !== null) fail("deleted capture should no longer resolve");
 
     try {
-      deleteCapture(id, "../etc/passwd");
+      await deleteCapture(id, "../etc/passwd");
       fail("deleteCapture should reject a path-unsafe verKey");
     } catch {
       /* expected */
@@ -246,13 +246,13 @@ try {
     _resetCache();
 
     // known ver, no captures -> required, never-probed
-    let state = probeState(FAKE_IDS[0]);
+    let state = await probeState(FAKE_IDS[0]);
     if (!state.required || state.reason !== "never-probed") {
       fail(`known ver + no captures: ${JSON.stringify(state)}`);
     }
 
     // seed a capture for a *different* ver, then set device info to a newer one
-    writeCapture(FAKE_IDS[0], makeReport("10.9.9.1", "1.4.4", FAKE_IDS[0]));
+    await writeCapture(FAKE_IDS[0], makeReport("10.9.9.1", "1.4.4", FAKE_IDS[0]));
     setDevicesFile({
       version: 1,
       active: null,
@@ -262,7 +262,7 @@ try {
       ],
     });
     _resetCache();
-    state = probeState(FAKE_IDS[0]);
+    state = await probeState(FAKE_IDS[0]);
     if (!state.required || state.reason !== "firmware-changed") {
       fail(`known ver + capture for a different ver: ${JSON.stringify(state)}`);
     }
@@ -278,17 +278,17 @@ try {
       ],
     });
     _resetCache();
-    state = probeState(FAKE_IDS[0]);
+    state = await probeState(FAKE_IDS[0]);
     if (state.required || state.reason !== "none") fail(`known ver + matching capture: ${JSON.stringify(state)}`);
     if (state.matched?.verKey !== "1.4.4") fail("matched state should carry the exact-ver capture");
 
     // unknown ver (device never answered), but a capture exists -> satisfied
-    state = probeState(FAKE_IDS[1]);
+    state = await probeState(FAKE_IDS[1]);
     if (!state.required || state.reason !== "never-probed") {
       fail(`unknown ver + no captures: ${JSON.stringify(state)}`);
     }
-    writeCapture(FAKE_IDS[1], makeReport("10.9.9.2", "3.0.0", FAKE_IDS[1]));
-    state = probeState(FAKE_IDS[1]);
+    await writeCapture(FAKE_IDS[1], makeReport("10.9.9.2", "3.0.0", FAKE_IDS[1]));
+    state = await probeState(FAKE_IDS[1]);
     if (state.required || state.reason !== "none") {
       fail(`unknown ver + any capture should satisfy the gate: ${JSON.stringify(state)}`);
     }
@@ -307,11 +307,11 @@ try {
     });
     _resetCache();
 
-    let state = probeState(FAKE_IDS[0]);
+    let state = await probeState(FAKE_IDS[0]);
     if (!state.required) fail("no skip, no capture: probe should still be required");
 
-    setProbeSkip(FAKE_IDS[0], "1.4.4");
-    state = probeState(FAKE_IDS[0]);
+    await setProbeSkip(FAKE_IDS[0], "1.4.4");
+    state = await probeState(FAKE_IDS[0]);
     if (state.required) fail("a skip for the current ver should suppress `required`");
     if (state.reason !== "never-probed") fail("skip must keep the underlying reason for display");
     if (!state.skipped || state.skipped.ver !== "1.4.4") fail("probeState should surface the skip record");
@@ -332,7 +332,7 @@ try {
       ],
     });
     _resetCache();
-    state = probeState(FAKE_IDS[0]);
+    state = await probeState(FAKE_IDS[0]);
     if (!state.required) fail("a skip for a stale ver must not suppress the new ver's requirement");
     if (state.skipped) fail("probeState must not surface a skip for a ver that no longer applies");
 
@@ -352,7 +352,7 @@ try {
       ],
     });
     _resetCache();
-    clearProbeSkip(FAKE_IDS[0], "1.4.4");
+    await clearProbeSkip(FAKE_IDS[0], "1.4.4");
     const file = JSON.parse(readFileSync(DEVICES_FILE, "utf8"));
     if (file.devices[0].probeSkipped) fail("clearProbeSkip should drop the record once the ver matches");
   }
@@ -367,21 +367,21 @@ try {
     );
     // addDevice used the probed id, which is not one of our fake ids — clean
     // it up under its real id too.
-    writeCapture(device.id, makeReport(device.ip, "1.4.4", device.id));
+    await writeCapture(device.id, makeReport(device.ip, "1.4.4", device.id));
     await new Promise((r) => setTimeout(r, 2));
-    writeCapture(device.id, makeReport(device.ip, "1.6.0", device.id));
+    await writeCapture(device.id, makeReport(device.ip, "1.6.0", device.id));
 
-    setActive({ device: device.id, slot: 1, script: "main" });
+    await setActive({ device: device.id, slot: 1, script: "main" });
     let mirrored = JSON.parse(readFileSync(PROBE_PATH, "utf8"));
     if (mirrored.ver !== "1.6.0") fail(`mirror should pick the exact-ver capture, got ${JSON.stringify(mirrored.ver)}`);
 
-    deleteCapture(device.id, "1.6.0");
-    mirrorActiveDevice(device.id);
+    await deleteCapture(device.id, "1.6.0");
+    await mirrorActiveDevice(device.id);
     mirrored = JSON.parse(readFileSync(PROBE_PATH, "utf8"));
     if (mirrored.ver !== "1.4.4") fail(`mirror should fall back to the newest remaining capture, got ${JSON.stringify(mirrored.ver)}`);
 
-    deleteCapture(device.id, "1.4.4");
-    mirrorActiveDevice(device.id);
+    await deleteCapture(device.id, "1.4.4");
+    await mirrorActiveDevice(device.id);
     mirrored = JSON.parse(readFileSync(PROBE_PATH, "utf8"));
     if (mirrored.ver !== "1.4.4") {
       fail("mirror should leave the previous mirror standing once every capture is gone, not blank it");

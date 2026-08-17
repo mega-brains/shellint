@@ -1,5 +1,4 @@
-import { existsSync, readFileSync, statSync } from "node:fs";
-import { join } from "node:path";
+import { runtime } from "#devroom/runtime";
 import { DIST_DIR, SCRIPT_PATH } from "../core/paths.ts";
 import { lintScriptFile } from "./lint-source.ts";
 import { lintSemanticsFile } from "./lint-semantics.ts";
@@ -14,8 +13,12 @@ import {
 import type { Finding } from "./lint-util.ts";
 import { checkBuildArtifacts } from "./dialect-check.ts";
 import { analyzeScriptFile, type ScriptStats } from "../script/script-stats.ts";
-import { summarizeChecks, type CheckRow } from "./check-catalog.ts";
+import { CHECK_CATALOG, summarizeChecks, type CheckRow } from "./check-catalog.ts";
 import { readProbeReport } from "../probe/probe-typings.ts";
+import { previewCheckFixes, type CheckFixPreview } from "./check-fixes.ts";
+
+const { fs } = runtime;
+const { join } = runtime.path;
 
 export type CheckProfileInfo = {
   source: "live" | "cache";
@@ -35,19 +38,34 @@ export type CheckReport = {
   artifacts: string[];
   stats: ScriptStats | null;
   profile: CheckProfileInfo | null;
+  fixes: CheckFixPreview | null;
 };
 
 export type CheckOptions = {
   /** Refresh the device profile over RPC before linting; falls back to cache. */
   connected?: boolean;
+  /** Called after each real, completed check phase. */
+  onProgress?: (progress: CheckProgress) => void;
 };
+
+export type CheckProgress = { done: number; total: number };
 
 const ARTIFACTS = ["debug.raw.js", "prod.raw.js"];
 
+export const CHECK_PROGRESS_TOTAL = CHECK_CATALOG.length;
+export const CHECK_PROGRESS_STEPS = [0, 42, 44, 57, 64] as const;
+
+function reportProgress(opts: CheckOptions, done: number): void {
+  opts.onProgress?.({ done, total: CHECK_PROGRESS_TOTAL });
+}
+
 /** Warn when dist/ predates the saved source: the dialect half is then stale. */
-function artifactFindings(): { findings: Finding[]; artifacts: string[] } {
+async function artifactFindings(): Promise<{ findings: Finding[]; artifacts: string[] }> {
   const findings: Finding[] = [];
-  const artifacts = ARTIFACTS.filter((f) => existsSync(join(DIST_DIR, f)));
+  const artifacts: string[] = [];
+  for (const artifact of ARTIFACTS) {
+    if (await fs.exists(join(DIST_DIR, artifact))) artifacts.push(artifact);
+  }
 
   if (!artifacts.length) {
     findings.push({
@@ -58,12 +76,15 @@ function artifactFindings(): { findings: Finding[]; artifacts: string[] } {
     return { findings, artifacts };
   }
 
-  const scriptMtime = existsSync(SCRIPT_PATH)
-    ? statSync(SCRIPT_PATH).mtimeMs
+  const scriptMtime = (await fs.exists(SCRIPT_PATH))
+    ? (await fs.stat(SCRIPT_PATH)).mtimeMs
     : 0;
-  const stale = artifacts.filter(
-    (f) => statSync(join(DIST_DIR, f)).mtimeMs < scriptMtime,
-  );
+  const stale: string[] = [];
+  for (const artifact of artifacts) {
+    if ((await fs.stat(join(DIST_DIR, artifact))).mtimeMs < scriptMtime) {
+      stale.push(artifact);
+    }
+  }
   if (stale.length) {
     findings.push({
       severity: "warn",
@@ -96,7 +117,7 @@ async function resolveProfile(
     }
   }
 
-  const cached = readDeviceProfile();
+  const cached = await readDeviceProfile();
   if (!cached) {
     findings.push({
       severity: "warn",
@@ -115,34 +136,39 @@ async function resolveProfile(
  * no prior build. Tier 4 additionally needs a device profile, live or cached.
  */
 export async function runCheck(opts: CheckOptions = {}): Promise<CheckReport> {
+  reportProgress(opts, CHECK_PROGRESS_STEPS[0]);
   const findings: Finding[] = [
-    ...lintScriptFile(),
-    ...lintSemanticsFile(),
-    ...lintAdvisoriesFile(),
+    ...(await lintScriptFile()),
+    ...(await lintSemanticsFile()),
+    ...(await lintAdvisoriesFile()),
   ];
+  const source = await fs.readText(SCRIPT_PATH);
+  reportProgress(opts, CHECK_PROGRESS_STEPS[1]);
 
   const { profile, findings: profileNotes } = await resolveProfile(
     opts.connected === true,
   );
   findings.push(...profileNotes);
-  if (existsSync(SCRIPT_PATH)) {
-    const source = readFileSync(SCRIPT_PATH, "utf8");
+  reportProgress(opts, CHECK_PROGRESS_STEPS[2]);
+  if (await fs.exists(SCRIPT_PATH)) {
     if (profile) findings.push(...lintConnected(source, profile));
-    findings.push(...lintProbe(source));
+    findings.push(...(await lintProbe(source)));
   }
+  reportProgress(opts, CHECK_PROGRESS_STEPS[3]);
 
-  const { findings: artifactNotes, artifacts } = artifactFindings();
+  const { findings: artifactNotes, artifacts } = await artifactFindings();
   findings.push(...artifactNotes);
 
-  for (const report of checkBuildArtifacts()) {
+  for (const report of await checkBuildArtifacts()) {
     for (const f of report.findings) {
       findings.push({ ...f, file: `dist/${report.file}` });
     }
   }
+  reportProgress(opts, CHECK_PROGRESS_STEPS[4]);
 
   let stats: ScriptStats | null = null;
   try {
-    stats = analyzeScriptFile();
+    stats = await analyzeScriptFile();
   } catch {
     /* stats are best-effort */
   }
@@ -155,11 +181,12 @@ export async function runCheck(opts: CheckOptions = {}): Promise<CheckReport> {
     checks: summarizeChecks(findings, {
       profile: profile !== null,
       artifacts,
-      probe: readProbeReport() !== null,
-      types: typeDeclarationFiles().length > 0,
+      probe: (await readProbeReport()) !== null,
+      types: (await typeDeclarationFiles()).length > 0,
     }),
     artifacts,
     stats,
+    fixes: previewCheckFixes(source, findings),
     profile: profile
       ? {
           source: opts.connected && !profileNotes.length ? "live" : "cache",

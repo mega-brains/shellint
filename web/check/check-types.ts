@@ -5,7 +5,34 @@ export type Finding = {
   message: string;
   file?: string;
   line?: number;
+  fix?: FindingFix;
 };
+
+export type FindingFix = {
+  title: string;
+  start: number;
+  end: number;
+  text: string;
+};
+
+export type CheckFixPreview = {
+  count: number;
+  rules: string[];
+  before: string;
+  after: string;
+};
+
+export function findingFixPreview(
+  finding: Finding,
+  source: string | undefined,
+): CheckFixPreview | null {
+  const fix = finding.fix;
+  if (!fix || source === undefined) return null;
+  if (fix.start < 0 || fix.end < fix.start || fix.end > source.length) return null;
+  const after = source.slice(0, fix.start) + fix.text + source.slice(fix.end);
+  if (after === source) return null;
+  return { count: 1, rules: [finding.rule], before: source, after };
+}
 
 export type CheckProfileInfo = {
   source: "live" | "cache";
@@ -39,6 +66,7 @@ export type CheckReport = {
   checks: CheckRow[];
   artifacts: string[];
   profile: CheckProfileInfo | null;
+  fixes: CheckFixPreview | null;
 };
 
 export const MARK: Record<CheckStatus, string> = {

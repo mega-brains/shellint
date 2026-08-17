@@ -43,17 +43,17 @@ const verdictOf = (verdicts, id) => verdicts.find((v) => v.id === id);
 
 // The committed probe fixture is re-generated from time to time (a different
 // device, IP, and firmware) — read those instead of hardcoding them.
-const probeReport = readProbeReport();
+const probeReport = await readProbeReport();
 const probedDeviceIp = probeReport?.deviceIp;
 if (!probedDeviceIp) fail("types/generated-probe.json should have a deviceIp");
 const probedDeviceId = probeReport?.deviceId;
 if (!probedDeviceId) fail("types/generated-probe.json should have a deviceId");
-const probedFirmware = probeOrigin(probeReport).match(/fw (\S+),/)?.[1];
+const probedFirmware = (await probeOrigin(probeReport)).match(/fw (\S+),/)?.[1];
 if (!probedFirmware) fail("could not determine the probed firmware version");
 
 // T1 — the repo's real probe answers.
 {
-  const verdicts = readProbeVerdicts();
+  const verdicts = await readProbeVerdicts();
   if (!verdicts.length) fail("types/generated-probe.json should yield verdicts");
 
   eq(verdictOf(verdicts, "array.map")?.present, true, "array.map is present");
@@ -65,7 +65,7 @@ if (!probedFirmware) fail("could not determine the probed firmware version");
 
 // T2 — the generated .d.ts declares the confirmed surface and parses clean.
 {
-  const { dts, present, absent } = generateTypings();
+  const { dts, present, absent } = await generateTypings();
   if (!present.includes("array.map")) fail("array.map should be generated");
   if (!absent.includes("string.padStart")) fail("string.padStart should be listed absent");
 
@@ -84,14 +84,14 @@ if (!probedFirmware) fail("could not determine the probed firmware version");
   }
 
   // The committed file is the generator's own output.
-  const written = writeGeneratedTypings();
+  const written = await writeGeneratedTypings();
   if (!written.path.endsWith("types/generated.d.ts")) fail("wrong output path");
 }
 
 // T3 — the lint pass reports only confirmed-absent APIs. A probe from some
 // other device stays advisory.
 {
-  const warned = asForeign('"x".padStart(2," ");');
+  const warned = await asForeign('"x".padStart(2," ");');
   eq(warned.length, 1, "padStart use warns once");
   eq(warned[0].rule, "probe-absent-api", "rule id");
   eq(warned[0].severity, "warn", "advisory severity for a foreign probe");
@@ -105,16 +105,16 @@ if (!probedFirmware) fail("could not determine the probed firmware version");
     fail("a foreign probe must say the finding is advisory");
   }
 
-  eq(asForeign("[1,2].map(f);").length, 0, "a present API is silent");
-  eq(asForeign("var x = 1;").length, 0, "unrelated code is silent");
-  eq(asForeign("setTimeout(f, 10);").length, 1, "an absent global warns");
-  eq(asForeign("Timer.set(1000, false, f);").length, 0, "a present global is silent");
+  eq((await asForeign("[1,2].map(f);")).length, 0, "a present API is silent");
+  eq((await asForeign("var x = 1;")).length, 0, "unrelated code is silent");
+  eq((await asForeign("setTimeout(f, 10);")).length, 1, "an absent global warns");
+  eq((await asForeign("Timer.set(1000, false, f);")).length, 0, "a present global is silent");
 }
 
 // T3b — same absences, but the probe is the active device's: the absence is a
 // fact about the deploy target, so it fails the check instead of nagging.
 {
-  const errored = asActive("setTimeout(f, 10);");
+  const errored = await asActive("setTimeout(f, 10);");
   eq(errored.length, 1, "an absent global on the active device reports once");
   eq(errored[0].severity, "error", "active-device severity");
   if (!/ReferenceError/.test(errored[0].message)) {
@@ -127,11 +127,11 @@ if (!probedFirmware) fail("could not determine the probed firmware version");
     fail("the finding must still name the device it came from");
   }
 
-  eq(asActive('"x".padStart(2," ");')[0].severity, "error", "members escalate too");
-  eq(asActive("[1,2].map(f);").length, 0, "a present API stays silent");
+  eq((await asActive('"x".padStart(2," ");'))[0].severity, "error", "members escalate too");
+  eq((await asActive("[1,2].map(f);")).length, 0, "a present API stays silent");
 
   // A different active device leaves the probe foreign, whatever its answers.
-  const other = lintProbe(
+  const other = await lintProbe(
     "setTimeout(f, 10);",
     "scripts/main.ts",
     PROBE_PATH,
@@ -141,7 +141,7 @@ if (!probedFirmware) fail("could not determine the probed firmware version");
 
   // Same device, but firmware has moved on since the capture — still advisory,
   // and the message says so (M16 §4.2).
-  const stale = lintProbe(
+  const stale = await lintProbe(
     "setTimeout(f, 10);",
     "scripts/main.ts",
     PROBE_PATH,
@@ -156,25 +156,25 @@ if (!probedFirmware) fail("could not determine the probed firmware version");
 // T4 — no probe report, or an empty one: no typings, no findings, no throw.
 {
   const missing = join(tmpdir(), "devroom-no-such-probe.json");
-  const empty = generateTypings(missing);
+  const empty = await generateTypings(missing);
   eq(empty.present.length, 0, "missing report declares nothing");
   eq(empty.absent.length, 0, "missing report reports nothing absent");
   if (!empty.dts.includes("declare namespace")) fail("still emits valid TypeScript");
-  eq(readProbeVerdicts(missing).length, 0, "missing report yields no verdicts");
-  eq(asForeign('"x".padStart(2," ");', missing).length, 0, "no report, no findings");
-  eq(asActive('"x".padStart(2," ");', missing).length, 0, "no report, no findings even for the active device");
+  eq((await readProbeVerdicts(missing)).length, 0, "missing report yields no verdicts");
+  eq((await asForeign('"x".padStart(2," ");', missing)).length, 0, "no report, no findings");
+  eq((await asActive('"x".padStart(2," ");', missing)).length, 0, "no report, no findings even for the active device");
 
   const dir = mkdtempSync(join(tmpdir(), "devroom-probe-"));
   const emptyPath = join(dir, "empty.json");
   writeFileSync(emptyPath, JSON.stringify({ probed: true, results: [] }), "utf8");
-  eq(readProbeVerdicts(emptyPath).length, 0, "empty report yields no verdicts");
-  eq(generateTypings(emptyPath).present.length, 0, "empty report declares nothing");
-  eq(asForeign('"x".padStart(2," ");', emptyPath).length, 0, "empty report, no findings");
+  eq((await readProbeVerdicts(emptyPath)).length, 0, "empty report yields no verdicts");
+  eq((await generateTypings(emptyPath)).present.length, 0, "empty report declares nothing");
+  eq((await asForeign('"x".padStart(2," ");', emptyPath)).length, 0, "empty report, no findings");
 
   const corruptPath = join(dir, "corrupt.json");
   writeFileSync(corruptPath, "{not json", "utf8");
-  eq(readProbeVerdicts(corruptPath).length, 0, "corrupt report yields no verdicts");
-  eq(asForeign("setTimeout(f, 10);", corruptPath).length, 0, "corrupt report, no findings");
+  eq((await readProbeVerdicts(corruptPath)).length, 0, "corrupt report yields no verdicts");
+  eq((await asForeign("setTimeout(f, 10);", corruptPath)).length, 0, "corrupt report, no findings");
 }
 
 console.log("typings: probe verdicts / generated.d.ts / probe-absent-api lint ok");

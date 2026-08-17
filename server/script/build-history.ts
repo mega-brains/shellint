@@ -1,11 +1,4 @@
-import {
-  appendFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
-import { join } from "node:path";
+import runtime from "#devroom/runtime";
 import { ROOT } from "../core/paths.ts";
 import type { BuildSizes } from "./build.ts";
 import type { ScriptStats } from "./script-stats.ts";
@@ -25,12 +18,13 @@ export type BuildHistoryRow = {
   memEstimate?: number;
 };
 
-const DIR = join(ROOT, ".devroom");
-const FILE = join(DIR, "build-history.jsonl");
+const DIR = runtime.path.join(ROOT, ".devroom");
+const FILE = runtime.path.join(DIR, "build-history.jsonl");
 const MAX_ROWS = 200;
+let writes: Promise<void> = Promise.resolve();
 
-function ensureDir() {
-  if (!existsSync(DIR)) mkdirSync(DIR, { recursive: true });
+async function ensureDir() {
+  await runtime.fs.mkdir(DIR, { recursive: true });
 }
 
 function summarizeStats(stats: ScriptStats | null | undefined) {
@@ -46,36 +40,44 @@ function summarizeStats(stats: ScriptStats | null | undefined) {
   };
 }
 
-export function appendBuildHistory(
+export async function appendBuildHistory(
   sizes: BuildSizes,
   stats?: ScriptStats | null,
   memEstimate?: number,
-): BuildHistoryRow {
-  ensureDir();
+): Promise<BuildHistoryRow> {
   const row: BuildHistoryRow = {
     ts: new Date().toISOString(),
     sizes,
     stats: summarizeStats(stats),
     memEstimate,
   };
-  appendFileSync(FILE, `${JSON.stringify(row)}\n`, "utf8");
-  trimHistory();
+  const operation = writes.then(async () => {
+    await ensureDir();
+    const existing = (await runtime.fs.exists(FILE))
+      ? await runtime.fs.readText(FILE)
+      : "";
+    await runtime.fs.atomicWriteText(FILE, `${existing}${JSON.stringify(row)}\n`);
+    await trimHistory();
+  });
+  writes = operation.catch(() => undefined);
+  await operation;
   return row;
 }
 
-function trimHistory() {
-  if (!existsSync(FILE)) return;
-  const lines = readFileSync(FILE, "utf8")
+async function trimHistory() {
+  if (!(await runtime.fs.exists(FILE))) return;
+  const lines = (await runtime.fs.readText(FILE))
     .split("\n")
     .filter((l) => l.trim().length > 0);
   if (lines.length <= MAX_ROWS) return;
   const kept = lines.slice(lines.length - MAX_ROWS);
-  writeFileSync(FILE, `${kept.join("\n")}\n`, "utf8");
+  await runtime.fs.atomicWriteText(FILE, `${kept.join("\n")}\n`);
 }
 
-export function readBuildHistory(limit = 30): BuildHistoryRow[] {
-  if (!existsSync(FILE)) return [];
-  const lines = readFileSync(FILE, "utf8")
+export async function readBuildHistory(limit = 30): Promise<BuildHistoryRow[]> {
+  await writes;
+  if (!(await runtime.fs.exists(FILE))) return [];
+  const lines = (await runtime.fs.readText(FILE))
     .split("\n")
     .filter((l) => l.trim().length > 0);
   const rows: BuildHistoryRow[] = [];

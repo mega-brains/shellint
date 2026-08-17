@@ -1,5 +1,4 @@
-import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { runtime } from "#devroom/runtime";
 import ts from "typescript";
 import { DIST_DIR } from "../core/paths.ts";
 import { calleeName, definesAccessor, hasUnicodeEscape } from "./lint-util.ts";
@@ -179,16 +178,16 @@ export function checkDialectSource(
 /** Suffixes of every artifact the build can emit, in ship order. */
 const ARTIFACT_SUFFIXES = ["raw.js", "js", "adv.js"] as const;
 
-export function checkBuildArtifacts(
+export async function checkBuildArtifacts(
   modes: Array<"debug" | "prod"> = ["debug", "prod"],
-): DialectReport[] {
+): Promise<DialectReport[]> {
   const reports: DialectReport[] = [];
   for (const mode of modes) {
     for (const suffix of ARTIFACT_SUFFIXES) {
       const fileName = `${mode}.${suffix}`;
-      const path = join(DIST_DIR, fileName);
-      if (!existsSync(path)) continue;
-      reports.push(checkDialectSource(readFileSync(path, "utf8"), fileName));
+      const path = runtime.path.join(DIST_DIR, fileName);
+      if (!(await runtime.fs.exists(path))) continue;
+      reports.push(checkDialectSource(await runtime.fs.readText(path), fileName));
     }
   }
   return reports;

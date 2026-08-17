@@ -254,9 +254,9 @@ export async function disableEcoForProbe(
  * temporary slot it creates and removes, otherwise read-only in another running script.
  */
 export async function runProbe(opts: RunProbeOptions = {}): Promise<ProbeReport> {
-  const cfg = loadConfig();
+  const cfg = await loadConfig();
   assertDevroomCompiler(cfg);
-  const target = requireActive();
+  const target = await requireActive();
 
   const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
   const results: ProbeEntry[] = [];
@@ -280,7 +280,7 @@ export async function runProbe(opts: RunProbeOptions = {}): Promise<ProbeReport>
     const ver = typeof info.ver === "string" ? info.ver : null;
     const model = typeof info.model === "string" ? info.model : null;
     const gen = typeof info.gen === "number" ? info.gen : null;
-    touchDeviceInfo(deviceId, toDeviceInfo(info));
+    await touchDeviceInfo(deviceId, toDeviceInfo(info));
     // Before `acquireHost`: slot creation and the keep-alive stub are round
     // trips that pay the eco penalty too.
     restoreEco = await disableEcoForProbe(rpc, opts.ecoOff, ecoNotes);
@@ -347,9 +347,9 @@ export async function runProbe(opts: RunProbeOptions = {}): Promise<ProbeReport>
       results,
     };
 
-    writeCapture(target.device.id, report);
-    clearProbeSkip(target.device.id, ver);
-    mirrorActiveDevice(target.device.id);
+    await writeCapture(target.device.id, report);
+    await clearProbeSkip(target.device.id, ver);
+    await mirrorActiveDevice(target.device.id);
     return report;
   } finally {
     // Only reached when the run failed before the inner `finally` could

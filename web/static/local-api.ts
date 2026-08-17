@@ -21,7 +21,7 @@ import {
 import { CHECK_CATALOG, CHECK_GROUPS } from "../../server/lint/check-catalog.ts";
 import type { ScriptStats } from "../../server/script/script-stats.ts";
 import type { BuildResult, StatsResult } from "./pipeline-protocol";
-import type { CheckReport } from "../../server/lint/check.ts";
+import type { CheckProgress, CheckReport } from "../../server/lint/check.ts";
 import { pipelineRequest } from "./worker-client";
 import { SAMPLE_SCRIPT } from "./sample-script";
 
@@ -424,4 +424,20 @@ export async function api<T>(
 ): Promise<T & { ok: boolean; error?: string }> {
   const data = await route(path, init);
   return { ok: true, ...(data as object) } as T & { ok: boolean; error?: string };
+}
+
+/** Static equivalent of web/lib/api.ts's streamed Check transport. */
+export async function apiStream<T>(
+  path: string,
+  _init: RequestInit | undefined,
+  onProgress: (progress: CheckProgress) => void,
+): Promise<T> {
+  if (path !== "/api/check/stream") {
+    throw new Error(`no static stream handler for ${path}`);
+  }
+  const report = await pipelineRequest<CheckReport>(
+    { type: "check", source: loadSource(), artifacts },
+    onProgress,
+  );
+  return report as T;
 }

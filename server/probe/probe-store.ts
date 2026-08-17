@@ -6,20 +6,14 @@
  *
  * Everything else calls into this module; no other file builds a capture path.
  */
-import {
-  existsSync,
-  mkdirSync,
-  readdirSync,
-  readFileSync,
-  renameSync,
-  unlinkSync,
-  writeFileSync,
-} from "node:fs";
-import { join } from "node:path";
+import { runtime } from "#devroom/runtime";
 import { devicePaths } from "../core/paths.ts";
 import { getDevice } from "../device/devices.ts";
 import { isAbsent, isPresent, probeEntries } from "./probe-typings.ts";
 import type { ProbeReport } from "./probe.ts";
+
+const { fs } = runtime;
+const { join } = runtime.path;
 
 const MAX_VER_KEY = 40;
 const SAFE_VER_KEY = /^[A-Za-z0-9._-]+$/;
@@ -52,10 +46,10 @@ export type CaptureMeta = {
   absent: number;
 };
 
-function readCapture(path: string): ProbeReport | null {
-  if (!existsSync(path)) return null;
+async function readCapture(path: string): Promise<ProbeReport | null> {
+  if (!(await fs.exists(path))) return null;
   try {
-    const parsed = JSON.parse(readFileSync(path, "utf8")) as ProbeReport;
+    const parsed = JSON.parse(await fs.readText(path)) as ProbeReport;
     return Array.isArray(parsed?.results) ? parsed : null;
   } catch {
     return null;
@@ -74,18 +68,18 @@ function countVerdicts(report: ProbeReport): { present: number; absent: number }
  * (b) the cached `profile.json`'s `ver` when its `deviceIp` matches the
  * capture's, else (c) `"unknown"`. The legacy file is left in place.
  */
-function migrateLegacy(deviceId: string): void {
+async function migrateLegacy(deviceId: string): Promise<void> {
   const paths = devicePaths(deviceId);
-  if (existsSync(paths.probesDir)) return;
-  const legacy = readCapture(paths.probe);
+  if (await fs.exists(paths.probesDir)) return;
+  const legacy = await readCapture(paths.probe);
   if (!legacy) return;
 
   let verKey: string;
   if (typeof legacy.ver === "string" && legacy.ver) {
     verKey = verKeyOf(legacy.ver);
-  } else if (existsSync(paths.profile)) {
+  } else if (await fs.exists(paths.profile)) {
     try {
-      const profile = JSON.parse(readFileSync(paths.profile, "utf8")) as {
+      const profile = JSON.parse(await fs.readText(paths.profile)) as {
         deviceIp?: string;
         ver?: string;
       };
@@ -97,24 +91,25 @@ function migrateLegacy(deviceId: string): void {
     verKey = "unknown";
   }
 
-  mkdirSync(paths.probesDir, { recursive: true });
+  await fs.mkdir(paths.probesDir, { recursive: true });
   const dest = join(paths.probesDir, `${verKey}.json`);
-  if (!existsSync(dest)) {
-    writeFileSync(dest, JSON.stringify(legacy, null, 2) + "\n", "utf8");
+  if (!(await fs.exists(dest))) {
+    await fs.writeText(dest, JSON.stringify(legacy, null, 2) + "\n");
   }
 }
 
 /** Newest first. Runs the §3.4 migration first, so a never-yet-read device
  * with only a legacy `probe.json` still shows one capture. */
-export function listCaptures(deviceId: string): CaptureMeta[] {
-  migrateLegacy(deviceId);
+export async function listCaptures(deviceId: string): Promise<CaptureMeta[]> {
+  await migrateLegacy(deviceId);
   const dir = devicePaths(deviceId).probesDir;
-  if (!existsSync(dir)) return [];
+  if (!(await fs.exists(dir))) return [];
   const metas: CaptureMeta[] = [];
-  for (const name of readdirSync(dir)) {
+  for (const entry of await fs.readDir(dir)) {
+    const name = entry.name;
     if (!name.endsWith(".json")) continue;
     const path = join(dir, name);
-    const report = readCapture(path);
+    const report = await readCapture(path);
     if (!report) continue;
     const { present, absent } = countVerdicts(report);
     metas.push({
@@ -131,37 +126,38 @@ export function listCaptures(deviceId: string): CaptureMeta[] {
 }
 
 /** mkdir -p + atomic (temp-then-rename) write, keyed by `verKeyOf(report.ver)`. */
-export function writeCapture(deviceId: string, report: ProbeReport): string {
+export async function writeCapture(deviceId: string, report: ProbeReport): Promise<string> {
   const dir = devicePaths(deviceId).probesDir;
-  mkdirSync(dir, { recursive: true });
+  await fs.mkdir(dir, { recursive: true });
   const path = join(dir, `${verKeyOf(report.ver)}.json`);
-  const tmp = `${path}.tmp`;
-  writeFileSync(tmp, JSON.stringify(report, null, 2) + "\n", "utf8");
-  renameSync(tmp, path);
+  await fs.atomicWriteText(path, JSON.stringify(report, null, 2) + "\n");
   return path;
 }
 
 /** Exact `verKey` match — the "does this exact firmware have a capture" question. */
-export function resolveCapture(deviceId: string, ver: string | null | undefined): CaptureMeta | null {
+export async function resolveCapture(
+  deviceId: string,
+  ver: string | null | undefined,
+): Promise<CaptureMeta | null> {
   const verKey = verKeyOf(ver);
-  return listCaptures(deviceId).find((c) => c.verKey === verKey) ?? null;
+  return (await listCaptures(deviceId)).find((c) => c.verKey === verKey) ?? null;
 }
 
 /** The full stored report behind a `CaptureMeta` — what the UI replays into the
  * probe log after a page reload. */
-export function loadCapture(deviceId: string, verKey: string): ProbeReport | null {
+export async function loadCapture(deviceId: string, verKey: string): Promise<ProbeReport | null> {
   assertSafeVerKey(verKey);
   return readCapture(join(devicePaths(deviceId).probesDir, `${verKey}.json`));
 }
 
-export function newestCapture(deviceId: string): CaptureMeta | null {
-  return listCaptures(deviceId)[0] ?? null;
+export async function newestCapture(deviceId: string): Promise<CaptureMeta | null> {
+  return (await listCaptures(deviceId))[0] ?? null;
 }
 
-export function deleteCapture(deviceId: string, verKey: string): void {
+export async function deleteCapture(deviceId: string, verKey: string): Promise<void> {
   assertSafeVerKey(verKey);
   const path = join(devicePaths(deviceId).probesDir, `${verKey}.json`);
-  if (existsSync(path)) unlinkSync(path);
+  await fs.remove(path, { force: true });
 }
 
 export type ProbeSkip = { ver: string | null; at: string };
@@ -184,11 +180,11 @@ export type ProbeState = {
  * the three probe routes, and the UI banner all call this. See the plan's
  * §4.1 truth table for the exact row-by-row behavior this implements.
  */
-export function probeState(deviceId: string): ProbeState {
-  const device = getDevice(deviceId);
+export async function probeState(deviceId: string): Promise<ProbeState> {
+  const device = await getDevice(deviceId);
   const ver = device?.info?.ver ?? null;
-  const matched = ver != null ? resolveCapture(deviceId, ver) : null;
-  const newest = matched ? null : newestCapture(deviceId);
+  const matched = ver != null ? await resolveCapture(deviceId, ver) : null;
+  const newest = matched ? null : await newestCapture(deviceId);
   const rawSkip = device?.probeSkipped ?? null;
   const skipped = rawSkip && rawSkip.ver === ver ? rawSkip : null;
 

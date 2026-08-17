@@ -48,6 +48,7 @@ export function staticEsbuildConfig(overrides = {}) {
     format: "esm",
     platform: "browser",
     target: ["es2022"],
+    conditions: ["static"],
     define: {
       require: "undefined",
       "import.meta.url": JSON.stringify(STATIC_IMPORT_META_URL),

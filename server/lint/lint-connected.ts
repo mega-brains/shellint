@@ -134,6 +134,14 @@ function checkRpcMethod(
     near
       ? `"${method}" is not an RPC method on this device — did you mean "${near}"?`
       : `"${method}" is not in this device's Shelly.ListMethods (${profile.model ?? "device"} fw ${profile.ver})`,
+    near && node.arguments[0]
+      ? {
+          title: `Change RPC method casing to "${near}"`,
+          start: node.arguments[0].getStart(),
+          end: node.arguments[0].getEnd(),
+          text: JSON.stringify(near),
+        }
+      : undefined,
   );
 }
 

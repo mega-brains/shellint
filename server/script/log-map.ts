@@ -1,9 +1,8 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
+import runtime from "#devroom/runtime";
 import { DIST_DIR } from "../core/paths.ts";
 
 /** Written by the prod build next to the artifact it describes. */
-export const LOG_MAP_PATH = join(DIST_DIR, "prod.logmap.json");
+export const LOG_MAP_PATH = runtime.path.join(DIST_DIR, "prod.logmap.json");
 
 /**
  * A shortened id as it reaches the log viewer: a standalone token, since device
@@ -12,11 +11,11 @@ export const LOG_MAP_PATH = join(DIST_DIR, "prod.logmap.json");
 const ID_RE = /(^|\s)(L\d+)(?=\s|$)/g;
 
 /** `{}` when the map is absent or unreadable — a missing map is not an error. */
-export function loadLogMap(): Record<string, string> {
-  if (!existsSync(LOG_MAP_PATH)) return {};
+export async function loadLogMap(): Promise<Record<string, string>> {
+  if (!(await runtime.fs.exists(LOG_MAP_PATH))) return {};
   let parsed: unknown;
   try {
-    parsed = JSON.parse(readFileSync(LOG_MAP_PATH, "utf8"));
+    parsed = JSON.parse(await runtime.fs.readText(LOG_MAP_PATH));
   } catch {
     return {};
   }
@@ -31,7 +30,7 @@ export function loadLogMap(): Record<string, string> {
 }
 
 /** Restore original log text for every mapped id token; leave the rest alone. */
-export function expandLogText(text: string, map = loadLogMap()): string {
+export function expandLogText(text: string, map: Record<string, string> = {}): string {
   return text.replace(ID_RE, (whole, lead: string, id: string) =>
     Object.hasOwn(map, id) ? `${lead}${map[id]}` : whole,
   );

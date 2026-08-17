@@ -38,6 +38,7 @@ export type ToolbarProps = {
   deployReady: boolean;
   buildAction: BuildAction;
   buildRunning: boolean;
+  checkProgress: { done: number; total: number } | null;
   skipTypeCheck: boolean;
   deployChoice: { mode: Mode; minify: Minify };
   autoBuildCheck: boolean;
@@ -209,8 +210,21 @@ export function Toolbar(props: ToolbarProps) {
             disabled={props.busy}
             onClick={props.onBuild}
           >
-            <span id="btnBuildLabel">{BUILD_LABEL[props.buildAction]}</span>
-            <span class="btn-progress" id="btnBuildProgress" />
+            <span id="btnBuildLabel">
+              {BUILD_LABEL[props.buildAction]}
+              {props.checkProgress
+                ? ` ${props.checkProgress.done}/${props.checkProgress.total}`
+                : ""}
+            </span>
+            {props.checkProgress ? (
+              <progress
+                class="btn-progress"
+                id="btnBuildProgress"
+                value={props.checkProgress.done}
+                max={props.checkProgress.total}
+                aria-label={`Checking ${props.checkProgress.done} of ${props.checkProgress.total} checks`}
+              />
+            ) : null}
           </Button>
         }
         menu={

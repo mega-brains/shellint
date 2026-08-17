@@ -86,7 +86,7 @@ const eq = (got, want, what) => {
 // Whether dist/prod.logmap.json exists depends on whether the sample script
 // has a prod-surviving log call, so nothing here may assume either way.
 {
-  const map = loadLogMap();
+  const map = await loadLogMap();
   if (map === null || typeof map !== "object" || Array.isArray(map)) {
     fail("loadLogMap must return a plain record");
   }

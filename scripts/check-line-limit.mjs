@@ -15,6 +15,7 @@ const SKIP_DIRS = new Set([
   "node_modules",
   "dist",
   ".tsc-out",
+  ".txiki",
   ".devroom",
   ".git",
   ".idea",

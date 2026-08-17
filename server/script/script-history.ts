@@ -1,11 +1,4 @@
-import {
-  appendFileSync,
-  existsSync,
-  mkdirSync,
-  readFileSync,
-  writeFileSync,
-} from "node:fs";
-import { join } from "node:path";
+import runtime from "#devroom/runtime";
 import { ROOT } from "../core/paths.ts";
 
 export type ScriptHistoryRow = {
@@ -14,19 +7,20 @@ export type ScriptHistoryRow = {
   bytes: number;
 };
 
-const DIR = join(ROOT, ".devroom");
-const FILE = join(DIR, "script-history.jsonl");
+const DIR = runtime.path.join(ROOT, ".devroom");
+const FILE = runtime.path.join(DIR, "script-history.jsonl");
 const MAX_ROWS = 10;
 /** Autosave snapshots within this long of the last row are coalesced away. */
 export const COALESCE_WINDOW_MS = 60_000;
+let writes: Promise<void> = Promise.resolve();
 
-function ensureDir() {
-  if (!existsSync(DIR)) mkdirSync(DIR, { recursive: true });
+async function ensureDir() {
+  await runtime.fs.mkdir(DIR, { recursive: true });
 }
 
-function readAllRows(): ScriptHistoryRow[] {
-  if (!existsSync(FILE)) return [];
-  const lines = readFileSync(FILE, "utf8")
+async function readAllRows(): Promise<ScriptHistoryRow[]> {
+  if (!(await runtime.fs.exists(FILE))) return [];
+  const lines = (await runtime.fs.readText(FILE))
     .split("\n")
     .filter((l) => l.trim().length > 0);
   const rows: ScriptHistoryRow[] = [];
@@ -40,27 +34,26 @@ function readAllRows(): ScriptHistoryRow[] {
   return rows;
 }
 
-function writeAllRows(rows: ScriptHistoryRow[]) {
-  writeFileSync(
+async function writeAllRows(rows: ScriptHistoryRow[]) {
+  await runtime.fs.atomicWriteText(
     FILE,
     rows.map((r) => JSON.stringify(r)).join("\n") + (rows.length ? "\n" : ""),
-    "utf8",
   );
 }
 
-function appendRow(
+async function appendRow(
   rows: ScriptHistoryRow[],
   source: string,
   now: number,
-): ScriptHistoryRow {
-  ensureDir();
+): Promise<ScriptHistoryRow> {
+  await ensureDir();
   const row: ScriptHistoryRow = {
     id: new Date(now).toISOString(),
     source,
-    bytes: Buffer.byteLength(source, "utf8"),
+    bytes: runtime.byteLength(source),
   };
   const trimmed = [...rows, row].slice(-MAX_ROWS);
-  writeAllRows(trimmed);
+  await writeAllRows(trimmed);
   return row;
 }
 
@@ -73,17 +66,21 @@ function appendRow(
  * `COALESCE_WINDOW_MS` (an editing burst under autosave's debounce
  * shouldn't consume most of the 10 slots). `now` is injectable for tests.
  */
-export function snapshotBeforeWrite(
+export async function snapshotBeforeWrite(
   currentSource: string,
   newSource: string,
   now: number = Date.now(),
-): void {
+): Promise<void> {
   if (currentSource === newSource) return;
-  const rows = readAllRows();
-  const last = rows[rows.length - 1];
-  if (last && last.source === currentSource) return;
-  if (last && now - new Date(last.id).getTime() < COALESCE_WINDOW_MS) return;
-  appendRow(rows, currentSource, now);
+  const operation = writes.then(async () => {
+    const rows = await readAllRows();
+    const last = rows[rows.length - 1];
+    if (last && last.source === currentSource) return;
+    if (last && now - new Date(last.id).getTime() < COALESCE_WINDOW_MS) return;
+    await appendRow(rows, currentSource, now);
+  });
+  writes = operation.catch(() => undefined);
+  await operation;
 }
 
 /**
@@ -92,22 +89,30 @@ export function snapshotBeforeWrite(
  * tick. Still dedupes against an identical most-recent row. Returns the
  * created row, or null if deduped.
  */
-export function checkpointNow(
+export async function checkpointNow(
   currentSource: string,
   now: number = Date.now(),
-): ScriptHistoryRow | null {
-  const rows = readAllRows();
-  const last = rows[rows.length - 1];
-  if (last && last.source === currentSource) return null;
-  return appendRow(rows, currentSource, now);
+): Promise<ScriptHistoryRow | null> {
+  let created: ScriptHistoryRow | null = null;
+  const operation = writes.then(async () => {
+    const rows = await readAllRows();
+    const last = rows[rows.length - 1];
+    if (last && last.source === currentSource) return;
+    created = await appendRow(rows, currentSource, now);
+  });
+  writes = operation.catch(() => undefined);
+  await operation;
+  return created;
 }
 
-export function listScriptHistory(): { id: string; bytes: number; ts: string }[] {
-  return readAllRows()
+export async function listScriptHistory(): Promise<{ id: string; bytes: number; ts: string }[]> {
+  await writes;
+  return (await readAllRows())
     .map((r) => ({ id: r.id, bytes: r.bytes, ts: r.id }))
     .reverse();
 }
 
-export function readScriptHistoryRow(id: string): ScriptHistoryRow | null {
-  return readAllRows().find((r) => r.id === id) ?? null;
+export async function readScriptHistoryRow(id: string): Promise<ScriptHistoryRow | null> {
+  await writes;
+  return (await readAllRows()).find((r) => r.id === id) ?? null;
 }

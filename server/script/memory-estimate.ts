@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import runtime from "#devroom/runtime";
 import ts from "typescript";
 import { calleeName, parseSource } from "../lint/lint-util.ts";
 import { SCRIPT_PATH } from "../core/paths.ts";
@@ -59,7 +59,7 @@ function nameCost(name: string, table: number[]): number {
 }
 
 function stringCost(text: string): number {
-  const bytes = Buffer.byteLength(text, "utf8");
+  const bytes = runtime.byteLength(text);
   const { stringBase, stringStep } = MEMORY_COSTS;
   if (bytes <= 9) return stringBase;
   if (bytes <= 19) return stringBase + stringStep;
@@ -189,7 +189,7 @@ export function estimateMemory(
   return est;
 }
 
-export function estimateMemoryFile(path = SCRIPT_PATH): MemoryEstimate {
-  if (!existsSync(path)) return emptyEstimate();
-  return estimateMemory(readFileSync(path, "utf8"), "scripts/main.ts");
+export async function estimateMemoryFile(path = SCRIPT_PATH): Promise<MemoryEstimate> {
+  if (!(await runtime.fs.exists(path))) return emptyEstimate();
+  return estimateMemory(await runtime.fs.readText(path), "scripts/main.ts");
 }

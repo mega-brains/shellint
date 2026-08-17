@@ -19,7 +19,7 @@ function fail(msg) {
   process.exit(1);
 }
 
-const reports = checkBuildArtifacts();
+const reports = await checkBuildArtifacts();
 const byFile = new Map(reports.map((r) => [r.file, r]));
 
 for (const mode of ["debug", "prod"]) {

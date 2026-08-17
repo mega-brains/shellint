@@ -7,11 +7,16 @@
  * compilers are also synchronous CPU hogs; running them off the main thread is
  * what keeps the editor from janking on every build.
  */
-import type { PipelineRequest, PipelineResponse } from "./pipeline-protocol";
+import type {
+  CheckProgress,
+  PipelineRequest,
+  PipelineResponse,
+} from "./pipeline-protocol";
 
 type Pending = {
   resolve: (value: never) => void;
   reject: (err: Error) => void;
+  onProgress?: (progress: CheckProgress) => void;
 };
 
 let worker: Worker | null = null;
@@ -35,6 +40,10 @@ function ensureWorker(): Worker {
     const msg = ev.data;
     const entry = pending.get(msg.id);
     if (!entry) return;
+    if (msg.type === "check-progress") {
+      entry.onProgress?.(msg.progress);
+      return;
+    }
     pending.delete(msg.id);
     if (msg.ok) {
       entry.resolve(msg.result as never);
@@ -66,11 +75,14 @@ type RequestBody = PipelineRequest extends infer T
   : never;
 
 /** Sends one request and resolves with its `result`, or rejects with its `error`. */
-export function pipelineRequest<R>(req: RequestBody): Promise<R> {
+export function pipelineRequest<R>(
+  req: RequestBody,
+  onProgress?: (progress: CheckProgress) => void,
+): Promise<R> {
   const id = req.id ?? `r${nextId++}`;
   const w = ensureWorker();
   return new Promise<R>((resolve, reject) => {
-    pending.set(id, { resolve: resolve as Pending["resolve"], reject });
+    pending.set(id, { resolve: resolve as Pending["resolve"], reject, onProgress });
     w.postMessage({ ...req, id } as PipelineRequest);
   });
 }

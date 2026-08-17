@@ -6,11 +6,14 @@ import {
 } from "../editor/goto-finding";
 import { HIGHLIGHT_LINES_EVENT, type LineHighlight } from "../editor/line-highlight";
 import {
+  findingFixPreview,
   findingLocation,
   findingsAsText,
   sortFindings,
   type Finding,
+  type CheckFixPreview,
 } from "./check-types";
+import { CheckFixesButton } from "./check-fixes";
 
 function emitHighlight(file: string, lines: number[]) {
   document.dispatchEvent(
@@ -56,7 +59,11 @@ export function CopyFindingsButton(props: { findings: Finding[] }) {
   );
 }
 
-export function FindingsList(props: { findings: Finding[] }) {
+export function FindingsList(props: {
+  findings: Finding[];
+  fixSource?: string;
+  onApplyFixes?: (fixes: CheckFixPreview) => Promise<void>;
+}) {
   const ordered = sortFindings(props.findings);
 
   useEffect(() => {
@@ -69,6 +76,7 @@ export function FindingsList(props: { findings: Finding[] }) {
     <ol class="findings-list" id="findingsList">
       {ordered.map((f, i) => {
         const where = findingLocation(f);
+        const fix = findingFixPreview(f, props.fixSource);
         return (
           <li
             key={`${f.rule}:${f.line ?? i}:${f.message}`}
@@ -103,6 +111,14 @@ export function FindingsList(props: { findings: Finding[] }) {
             <span class="finding-head">
               <span class="finding-dot" aria-hidden="true" />
               <span class="finding-rule">{f.rule}</span>
+              {fix && props.onApplyFixes ? (
+                <CheckFixesButton
+                  fixes={fix}
+                  onApply={props.onApplyFixes}
+                  compact
+                  title={`Preview fix: ${f.fix?.title ?? f.rule}`}
+                />
+              ) : null}
               {where ? (
                 f.line != null && f.file ? (
                   <button

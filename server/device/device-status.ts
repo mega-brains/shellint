@@ -58,8 +58,8 @@ function num(v: unknown): number | null {
  * round trip every five seconds on a component this device does not have.
  * `null` means "no profile yet" — then everything is worth a try.
  */
-function knownComponentTypes(): Set<string> | null {
-  const profile = readDeviceProfile();
+async function knownComponentTypes(): Promise<Set<string> | null> {
+  const profile = await readDeviceProfile();
   if (!profile?.components?.length) return null;
   return new Set(profile.components.map((c) => c.split(":")[0]!.toLowerCase()));
 }
@@ -111,9 +111,9 @@ async function softCall(
 }
 
 export async function fetchDeviceStatus(): Promise<DeviceStatus> {
-  const cfg = loadConfig();
+  const cfg = await loadConfig();
   assertDevroomCompiler(cfg);
-  const target = requireActive();
+  const target = await requireActive();
   const scriptId = target.slot;
 
   const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
@@ -126,7 +126,7 @@ export async function fetchDeviceStatus(): Promise<DeviceStatus> {
     if (infoCall) rtts.push(infoCall.ms);
     const info = (infoCall?.result ?? {}) as Record<string, unknown>;
     // Only on a successful answer — a failed poll must not blank out good info.
-    if (infoCall) touchDeviceInfo(target.device.id, toDeviceInfo(info));
+    if (infoCall) await touchDeviceInfo(target.device.id, toDeviceInfo(info));
 
     const scriptCall = await timedCall(rpc, "Script.GetStatus", {
       id: scriptId,
@@ -162,7 +162,7 @@ export async function fetchDeviceStatus(): Promise<DeviceStatus> {
 
     // A dedicated sensor is the real reading; a relay's own die temperature is
     // the fallback, because most Gen2 boxes report only that.
-    const present = knownComponentTypes();
+    const present = await knownComponentTypes();
     let temperatureC: number | null = null;
     let temperatureFrom: string | null = null;
 
@@ -287,9 +287,9 @@ export async function applyEcoMode(
 /** One `Sys.GetConfig` round trip — the probe-eco prompt asks this before it
  * decides whether to warn, and must not pay for a full status poll. */
 export async function fetchEcoMode(): Promise<{ eco_mode: boolean | null }> {
-  const cfg = loadConfig();
+  const cfg = await loadConfig();
   assertDevroomCompiler(cfg);
-  const target = requireActive();
+  const target = await requireActive();
 
   const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
   try {
@@ -301,9 +301,9 @@ export async function fetchEcoMode(): Promise<{ eco_mode: boolean | null }> {
 }
 
 export async function setEcoMode(eco_mode: boolean): Promise<EcoResult> {
-  const cfg = loadConfig();
+  const cfg = await loadConfig();
   assertDevroomCompiler(cfg);
-  const target = requireActive();
+  const target = await requireActive();
 
   const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
   try {
@@ -324,9 +324,9 @@ export type ScriptRunResult = { running: boolean | null; scriptId: number };
 export async function setScriptRunning(
   running: boolean,
 ): Promise<ScriptRunResult> {
-  const cfg = loadConfig();
+  const cfg = await loadConfig();
   assertDevroomCompiler(cfg);
-  const target = requireActive();
+  const target = await requireActive();
   const scriptId = target.slot;
 
   const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
@@ -348,9 +348,9 @@ export async function setScriptRunning(
  * uses the device default (1000 ms; minimum allowed is 500).
  */
 export async function rebootDevice(): Promise<void> {
-  const cfg = loadConfig();
+  const cfg = await loadConfig();
   assertDevroomCompiler(cfg);
-  const target = requireActive();
+  const target = await requireActive();
 
   const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
   try {

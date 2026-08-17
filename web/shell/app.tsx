@@ -11,7 +11,7 @@ import { BuildPanel, type DashboardPatch } from "../stats/dashboard";
 import { CheckPanel, summarize, type CheckCatalog, type CheckReport, type Finding } from "../check/check-panel";
 import { tally } from "../check/check-types";
 import { OptionsPanel } from "./options-panel";
-import { api } from "../lib/api";
+import { api, apiStream } from "../lib/api";
 import { createDeployGate } from "../device/deploy-gate";
 import { setDirtyBaseline } from "../editor/dirty-gutter";
 import {
@@ -25,7 +25,7 @@ import { useScriptHistory } from "../history/use-script-history";
 import { useInitialLoad } from "./use-initial-load";
 import { useDeviceSection } from "./device-section";
 import { StaticFileControls } from "./static-file-controls";
-
+import { applyCheckFixes } from "../check/apply-check-fixes";
 const AUTO_KEY = "shelly-devroom.autoBuildCheck";
 
 export function App() {
@@ -57,6 +57,10 @@ export function App() {
   const [dash, setDash] = useState<DashboardPatch>({ history: [] });
   const [catalog, setCatalog] = useState<CheckCatalog | null>(null);
   const [report, setReport] = useState<CheckReport | null>(null);
+  const [checkProgress, setCheckProgress] = useState<{
+    done: number;
+    total: number;
+  } | null>(null);
   const [dialectFindings, setDialectFindings] = useState<Finding[] | null>(
     null,
   );
@@ -115,33 +119,49 @@ export function App() {
   }, [deviceSection.memPeak]);
 
   const checkScript = useCallback(
-    async ({ quiet = false } = {}) => {
+    async ({ quiet = false, showProgress = false } = {}) => {
       if (!quiet) {
         setStatus(
           deviceSection.deviceOnline ? "checking (with device)…" : "checking…",
         );
       }
-      const data = await api<{ report: CheckReport }>("/api/check", {
-        method: "POST",
-        body: JSON.stringify({ connected: deviceSection.deviceOnline }),
-      });
-      setReport(data.report);
-      setDialectFindings(null);
-      setCheckFailed(!data.report.ok);
-      deployGate.setCheckOk(data.report.ok);
-      syncDeployReady();
-      if (quiet) return;
-      const scope = data.report.artifacts.length
-        ? `scripts/main.ts + ${data.report.artifacts.join(", ")}`
-        : "scripts/main.ts (no build artifacts)";
-      const p = data.report.profile;
-      const device = p
-        ? ` · device ${p.model ?? p.deviceIp} fw ${p.ver ?? "?"} (${p.source})`
-        : " · no device profile";
-      setStatus(
-        `check ${summarize(data.report.counts)} · ${scope}${device}`,
-        !data.report.ok,
-      );
+      if (showProgress) setCheckProgress(null);
+      try {
+        const report = showProgress
+          ? await apiStream<CheckReport>(
+              "/api/check/stream",
+              {
+                method: "POST",
+                body: JSON.stringify({ connected: deviceSection.deviceOnline }),
+              },
+              setCheckProgress,
+            )
+          : (
+              await api<{ report: CheckReport }>("/api/check", {
+                method: "POST",
+                body: JSON.stringify({ connected: deviceSection.deviceOnline }),
+              })
+            ).report;
+        setReport(report);
+        setDialectFindings(null);
+        setCheckFailed(!report.ok);
+        deployGate.setCheckOk(report.ok);
+        syncDeployReady();
+        if (quiet) return;
+        const scope = report.artifacts.length
+          ? `scripts/main.ts + ${report.artifacts.join(", ")}`
+          : "scripts/main.ts (no build artifacts)";
+        const p = report.profile;
+        const device = p
+          ? ` · device ${p.model ?? p.deviceIp} fw ${p.ver ?? "?"} (${p.source})`
+          : " · no device profile";
+        setStatus(
+          `check ${summarize(report.counts)} · ${scope}${device}`,
+          !report.ok,
+        );
+      } finally {
+        if (showProgress) setCheckProgress(null);
+      }
     },
     [deviceSection.deviceOnline, deployGate, setStatus, syncDeployReady],
   );
@@ -256,12 +276,20 @@ export function App() {
   }, [deployGate, setStatus, syncDeployReady]);
 
   const runBuildAction = useCallback(
-    async (action = buildAction, skipTypes = skipTypeCheck) => {
+    async ({
+      action = buildAction,
+      skipTypes = skipTypeCheck,
+      showCheckProgress = true,
+    }: {
+      action?: BuildAction;
+      skipTypes?: boolean;
+      showCheckProgress?: boolean;
+    } = {}) => {
       setBuildRunning(true);
       try {
-        if (action === "check") return await checkScript();
+        if (action === "check") return await checkScript({ showProgress: showCheckProgress });
         await buildScript(skipTypes);
-        if (action === "both") await checkScript();
+        if (action === "both") await checkScript({ showProgress: showCheckProgress });
       } finally {
         setBuildRunning(false);
       }
@@ -278,7 +306,7 @@ export function App() {
       autoTimer.current = null;
       void withBusy(async () => {
         await saveScript();
-        await runBuildAction();
+        await runBuildAction({ showCheckProgress: false });
       });
     }, 3000);
   }, [withBusy, saveScript, runBuildAction]);
@@ -341,6 +369,7 @@ export function App() {
           deployReady={deployReady}
           buildAction={buildAction}
           buildRunning={buildRunning}
+          checkProgress={checkProgress}
           skipTypeCheck={skipTypeCheck}
           deployChoice={deployChoice}
           autoBuildCheck={autoBuildCheck}
@@ -376,7 +405,7 @@ export function App() {
           onBuild={() => void withBusy(() => runBuildAction())}
           onBuildPick={(action) => {
             setBuildAction(action);
-            void withBusy(() => runBuildAction(action));
+            void withBusy(() => runBuildAction({ action }));
           }}
           onDeploy={() => void withBusy(() => deviceSection.deploy(deployChoice))}
           onDeployPick={(choice) => {
@@ -443,6 +472,7 @@ export function App() {
                 catalog={catalog}
                 report={report}
                 dialectFindings={dialectFindings}
+                onApplyFixes={(fixes) => applyCheckFixes(fixes, viewRef.current, scriptHistory.markSaved, setStatus).then(() => { setReport(null); setCheckFailed(false); deployGate.setCheckOk(false); syncDeployReady(); })}
               />
             }
             options={<OptionsPanel onStatus={setStatus} />}

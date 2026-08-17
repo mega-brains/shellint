@@ -7,12 +7,14 @@
  * seen is just another entry, and an answer outside the `typeof` vocabulary is
  * carried through with no opinion attached.
  */
-import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { runtime } from "#devroom/runtime";
 import { PROBE_PATH, ROOT } from "../core/paths.ts";
 import { readDeviceProfile } from "../device/device-profile.ts";
 import { activeDeviceIdentity } from "../device/devices.ts";
 import type { ProbeEntry, ProbeReport } from "./probe.ts";
+
+const { fs } = runtime;
+const { dirname, join } = runtime.path;
 
 export const GENERATED_DTS_PATH = join(ROOT, "types", "generated.d.ts");
 
@@ -48,10 +50,10 @@ const RESERVED = new Set([
  */
 export type ProbeVerdict = { id: string; present: boolean; result: unknown };
 
-export function readProbeReport(path = PROBE_PATH): ProbeReport | null {
-  if (!existsSync(path)) return null;
+export async function readProbeReport(path = PROBE_PATH): Promise<ProbeReport | null> {
+  if (!(await fs.exists(path))) return null;
   try {
-    const parsed = JSON.parse(readFileSync(path, "utf8")) as ProbeReport;
+    const parsed = JSON.parse(await fs.readText(path)) as ProbeReport;
     return Array.isArray(parsed?.results) ? parsed : null;
   } catch {
     return null;
@@ -80,8 +82,8 @@ export function isAbsent(entry: ProbeEntry): boolean {
 /** Which device, which firmware, when — so a finding can be falsified. `ver`
  * comes from the report's own provenance (M16 §3.2) first; `device-profile.json`
  * is only the fallback for a capture written before that field existed. */
-export function probeOrigin(report: ProbeReport): string {
-  const profile = readDeviceProfile();
+export async function probeOrigin(report: ProbeReport): Promise<string> {
+  const profile = await readDeviceProfile();
   const ver =
     typeof report.ver === "string" && report.ver
       ? report.ver
@@ -91,8 +93,8 @@ export function probeOrigin(report: ProbeReport): string {
   return `${report.deviceIp ?? "unknown device"} fw ${ver}, probed ${report.at ?? "unknown date"}`;
 }
 
-export function readProbeVerdicts(path = PROBE_PATH): ProbeVerdict[] {
-  const report = readProbeReport(path);
+export async function readProbeVerdicts(path = PROBE_PATH): Promise<ProbeVerdict[]> {
+  const report = await readProbeReport(path);
   if (!report) return [];
   return probeEntries(report).map((e) => ({
     id: e.id,
@@ -147,9 +149,9 @@ function render(node: Node, depth: number): string[] {
  * what Tier 4 lint reads, but the operator should re-probe before trusting
  * it. Silent for a mirror from some other device: that is a separate,
  * pre-existing advisory (`probe-absent-api`'s `warn` severity), not staleness. */
-function staleNote(report: ProbeReport | null): string {
+async function staleNote(report: ProbeReport | null): Promise<string> {
   if (!report || typeof report.ver !== "string" || !report.ver) return "";
-  const active = activeDeviceIdentity();
+  const active = await activeDeviceIdentity();
   if (!active?.ver) return "";
   const sameDevice =
     typeof report.deviceId === "string" && report.deviceId.length > 0
@@ -159,12 +161,12 @@ function staleNote(report: ProbeReport | null): string {
   return ` (stale — device now runs ${active.ver})`;
 }
 
-function header(report: ProbeReport | null): string {
-  const origin = report ? probeOrigin(report) : "no probe report yet";
+async function header(report: ProbeReport | null): Promise<string> {
+  const origin = report ? await probeOrigin(report) : "no probe report yet";
   return [
     "/**",
     " * GENERATED FILE — do not edit by hand. Regenerate with `mise run probe`.",
-    ` * Source: types/generated-probe.json (${origin}${staleNote(report)}).`,
+    ` * Source: types/generated-probe.json (${origin}${await staleNote(report)}).`,
     " *",
     " * ADVISORY ONLY. It is not part of the device compile and does not stand in",
     " * for types/espruino-lib.d.ts: every declaration sits inside one namespace,",
@@ -180,12 +182,12 @@ function header(report: ProbeReport | null): string {
  * side of the verdict. Absent ids are deliberately *not* declared here — the
  * lint pass is where their absence is reported.
  */
-export function generateTypings(path = PROBE_PATH): {
+export async function generateTypings(path = PROBE_PATH): Promise<{
   dts: string;
   present: string[];
   absent: string[];
-} {
-  const report = readProbeReport(path);
+}> {
+  const report = await readProbeReport(path);
   const entries = report ? probeEntries(report) : [];
   const root = emptyNode();
   const present: string[] = [];
@@ -195,7 +197,7 @@ export function generateTypings(path = PROBE_PATH): {
 
   const body = render(root, 1);
   const dts = [
-    header(report),
+    await header(report),
     "",
     body.length
       ? `declare namespace ProbedDevice {\n${body.join("\n")}\n}`
@@ -210,13 +212,13 @@ export function generateTypings(path = PROBE_PATH): {
   };
 }
 
-export function writeGeneratedTypings(path = PROBE_PATH): {
+export async function writeGeneratedTypings(path = PROBE_PATH): Promise<{
   path: string;
   present: string[];
   absent: string[];
-} {
-  const { dts, present, absent } = generateTypings(path);
-  mkdirSync(dirname(GENERATED_DTS_PATH), { recursive: true });
-  writeFileSync(GENERATED_DTS_PATH, dts, "utf8");
+}> {
+  const { dts, present, absent } = await generateTypings(path);
+  await fs.mkdir(dirname(GENERATED_DTS_PATH), { recursive: true });
+  await fs.atomicWriteText(GENERATED_DTS_PATH, dts);
   return { path: GENERATED_DTS_PATH, present, absent };
 }

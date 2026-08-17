@@ -1,5 +1,4 @@
-import { readFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { runtime } from "#devroom/runtime";
 import { DIST_DIR } from "../core/paths.ts";
 import { loadConfig, assertDevroomCompiler } from "../core/config.ts";
 import { bindSlot, getDevice, requireActive } from "./devices.ts";
@@ -12,6 +11,9 @@ import {
   RpcError,
   type RpcTarget,
 } from "./rpc.ts";
+
+const { fs } = runtime;
+const { join } = runtime.path;
 
 /** Thrown before the RPC connects — deploy is the one place the probe-required
  * gate is enforced server-side (M16 §2.3), so a CLI deploy cannot bypass what
@@ -87,7 +89,7 @@ export async function deploy(
   minify: DeployMinify = "min",
   opts: DeployOptions = {},
 ): Promise<DeployResult> {
-  const cfg = loadConfig();
+  const cfg = await loadConfig();
   assertDevroomCompiler(cfg);
 
   if (mode !== "debug" && mode !== "prod") {
@@ -103,17 +105,19 @@ export async function deploy(
   }
 
   const path = artifactPath(mode, minify);
-  if (!existsSync(path)) {
+  if (!(await fs.exists(path))) {
     throw new Error(`missing build artifact ${path} — run Build first`);
   }
 
-  const code = readFileSync(path, "utf8");
-  const localBytes = Buffer.byteLength(code, "utf8");
-  const active = requireActive();
-  const device = opts.deviceId ? (getDevice(opts.deviceId) ?? active.device) : active.device;
+  const code = await fs.readText(path);
+  const localBytes = runtime.byteLength(code);
+  const active = await requireActive();
+  const device = opts.deviceId
+    ? ((await getDevice(opts.deviceId)) ?? active.device)
+    : active.device;
 
   if (opts.skipProbeCheck !== true) {
-    const state = probeState(device.id);
+    const state = await probeState(device.id);
     if (state.required) {
       throw new ProbeRequiredError(device.id, device.label, state.ver, state.reason);
     }
@@ -129,7 +133,7 @@ export async function deploy(
     if (opts.createName) {
       onProgress("creating slot");
       scriptId = await createSlot(rpc, opts.createName);
-      bindSlot(device.id, scriptId, opts.scriptKey ?? "main", opts.createName);
+      await bindSlot(device.id, scriptId, opts.scriptKey ?? "main", opts.createName);
     }
     const targetId = scriptId!;
 

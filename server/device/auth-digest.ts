@@ -1,4 +1,4 @@
-import { createHash, randomBytes } from "node:crypto";
+import { runtime } from "#devroom/runtime";
 
 /**
  * Shelly Gen2 digest auth (https://shelly-api-docs.shelly.cloud/gen2/General/Authentication).
@@ -29,7 +29,7 @@ export type DigestAuthFrame = {
 const USERNAME = "admin";
 
 function sha256(s: string): string {
-  return createHash("sha256").update(s, "utf8").digest("hex");
+  return runtime.crypto.sha256Hex(s);
 }
 
 export function computeDigestResponse(opts: {
@@ -47,7 +47,11 @@ export function computeDigestResponse(opts: {
 }
 
 export function makeCnonce(): string {
-  return randomBytes(8).toString("hex");
+  let hex = "";
+  for (const byte of runtime.crypto.randomBytes(8)) {
+    hex += byte.toString(16).padStart(2, "0");
+  }
+  return hex;
 }
 
 export function buildAuthFrame(opts: {

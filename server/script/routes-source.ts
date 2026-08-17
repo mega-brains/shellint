@@ -1,5 +1,5 @@
 import type { Hono } from "hono";
-import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import runtime from "#devroom/runtime";
 import { SCRIPT_PATH } from "../core/paths.ts";
 import {
   snapshotBeforeWrite,
@@ -10,11 +10,11 @@ import {
 
 /** `/api/script` (read/write) plus history/checkpoint/restore. Split out of app.ts to stay under the 500-line cap. */
 export function registerScriptRoutes(app: Hono) {
-  app.get("/api/script", (c) => {
-    if (!existsSync(SCRIPT_PATH)) {
+  app.get("/api/script", async (c) => {
+    if (!(await runtime.fs.exists(SCRIPT_PATH))) {
       return c.json({ ok: false, error: "scripts/main.ts not found" }, 404);
     }
-    const source = readFileSync(SCRIPT_PATH, "utf8");
+    const source = await runtime.fs.readText(SCRIPT_PATH);
     return c.json({ ok: true, path: "scripts/main.ts", source });
   });
 
@@ -28,28 +28,28 @@ export function registerScriptRoutes(app: Hono) {
     if (typeof body.source !== "string") {
       return c.json({ ok: false, error: "body.source must be a string" }, 400);
     }
-    if (existsSync(SCRIPT_PATH)) {
-      snapshotBeforeWrite(readFileSync(SCRIPT_PATH, "utf8"), body.source);
+    if (await runtime.fs.exists(SCRIPT_PATH)) {
+      await snapshotBeforeWrite(await runtime.fs.readText(SCRIPT_PATH), body.source);
     }
-    writeFileSync(SCRIPT_PATH, body.source, "utf8");
-    return c.json({ ok: true, bytes: Buffer.byteLength(body.source, "utf8") });
+    await runtime.fs.atomicWriteText(SCRIPT_PATH, body.source);
+    return c.json({ ok: true, bytes: runtime.byteLength(body.source) });
   });
 
-  app.get("/api/script/history", (c) => {
-    return c.json({ ok: true, rows: listScriptHistory() });
+  app.get("/api/script/history", async (c) => {
+    return c.json({ ok: true, rows: await listScriptHistory() });
   });
 
-  app.post("/api/script/checkpoint", (c) => {
-    if (!existsSync(SCRIPT_PATH)) {
+  app.post("/api/script/checkpoint", async (c) => {
+    if (!(await runtime.fs.exists(SCRIPT_PATH))) {
       return c.json({ ok: false, error: "scripts/main.ts not found" }, 404);
     }
-    const source = readFileSync(SCRIPT_PATH, "utf8");
-    const row = checkpointNow(source);
+    const source = await runtime.fs.readText(SCRIPT_PATH);
+    const row = await checkpointNow(source);
     return c.json({ ok: true, created: row !== null, id: row?.id ?? null });
   });
 
-  app.get("/api/script/history/:id", (c) => {
-    const row = readScriptHistoryRow(c.req.param("id"));
+  app.get("/api/script/history/:id", async (c) => {
+    const row = await readScriptHistoryRow(c.req.param("id"));
     if (!row) {
       return c.json({ ok: false, error: "unknown history id" }, 404);
     }
@@ -66,14 +66,14 @@ export function registerScriptRoutes(app: Hono) {
     if (typeof body.id !== "string") {
       return c.json({ ok: false, error: "body.id must be a string" }, 400);
     }
-    const row = readScriptHistoryRow(body.id);
+    const row = await readScriptHistoryRow(body.id);
     if (!row) {
       return c.json({ ok: false, error: "unknown history id" }, 404);
     }
-    if (existsSync(SCRIPT_PATH)) {
-      snapshotBeforeWrite(readFileSync(SCRIPT_PATH, "utf8"), row.source);
+    if (await runtime.fs.exists(SCRIPT_PATH)) {
+      await snapshotBeforeWrite(await runtime.fs.readText(SCRIPT_PATH), row.source);
     }
-    writeFileSync(SCRIPT_PATH, row.source, "utf8");
-    return c.json({ ok: true, bytes: Buffer.byteLength(row.source, "utf8") });
+    await runtime.fs.atomicWriteText(SCRIPT_PATH, row.source);
+    return c.json({ ok: true, bytes: runtime.byteLength(row.source) });
   });
 }

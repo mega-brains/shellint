@@ -1,22 +1,25 @@
 {
   "probed": true,
-  "at": "2026-08-13T09:14:42.545Z",
+  "at": "2026-08-17T08:18:36.972Z",
   "deviceIp": "192.168.3.106",
-  "deviceId": "192-168-3-106",
+  "deviceId": "shellyplugsg3-543204661e8c",
   "ver": "2.0.0",
   "model": "S3PL-00112EU",
   "gen": 3,
-  "scriptId": 1,
-  "configuredScriptId": 1,
-  "strategy": "configured",
+  "scriptId": 4,
+  "configuredScriptId": 3,
+  "strategy": "scratch",
   "existingScriptIds": [
     1,
     2,
     3
   ],
-  "scratchScriptId": null,
+  "scratchScriptId": 4,
   "scratchRemoved": false,
-  "notes": [],
+  "notes": [
+    "script 3 not running — probed in temporary slot 4 (\"devroom-probe\"), removed afterwards",
+    "WARNING: temporary slot 4 could not be removed (RPC timeout: Script.Delete) — delete it on the device"
+  ],
   "results": [
     {
       "id": "array.map",
@@ -586,7 +589,7 @@
       "id": "hoisting.function-decl",
       "code": "(function () { try { return typeof h; } catch (e) { return \"throws:\" + (e.message || e); } function h() {} })()",
       "ok": true,
-      "result": "string"
+      "result": "undefined"
     },
     {
       "id": "hoisting.call",
@@ -598,7 +601,7 @@
       "id": "hoisting.var",
       "code": "(function () { try { return typeof v; } catch (e) { return \"throws:\" + (e.message || e); } var v = 1; })()",
       "ok": true,
-      "result": "object"
+      "result": "undefined"
     },
     {
       "id": "binary.uint8.construct",
