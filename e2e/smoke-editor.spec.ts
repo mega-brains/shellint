@@ -4,7 +4,7 @@ import { openApp } from "./helpers/open-app";
 test.describe("editor smoke", () => {
   test("boots with editor, sidebar, footer", async ({ page }) => {
     await openApp(page);
-    await expect(page).toHaveTitle("Shelly DevRoom");
+    await expect(page).toHaveTitle("shellint");
     await expect(page.locator("#editor")).toBeVisible();
     await expect(page.locator("#side")).toBeVisible();
     await expect(page.locator("#dock")).toBeVisible();
@@ -20,9 +20,9 @@ test.describe("editor smoke", () => {
     const text = await page.locator("#editor .cm-content").innerText();
     expect(text.length).toBeGreaterThan(40);
     // Markers of fixtures/device/main.ts — the script every e2e server is
-    // pointed at (DEVROOM_SCRIPT, see playwright.config.ts). Never the user's
+    // pointed at (SHELLINT_SCRIPT, see playwright.config.ts). Never user's
     // scripts/main.ts, whose contents the suite must not depend on.
-    expect(text).toMatch(/DevRoom test fixture|LOG_PREFIX|Shelly\.call|Timer\.set/);
+    expect(text).toMatch(/shellint test fixture|LOG_PREFIX|Shelly\.call|Timer\.set/);
   });
 
   test("Save PUTs /api/script", async ({ page }) => {
@@ -48,6 +48,8 @@ test.describe("editor smoke", () => {
     await expect(page.locator("#checkNote")).not.toHaveText("—", {
       timeout: 45_000,
     });
+    await page.getByTestId("tab-check").click();
+    await page.getByRole("button", { name: "rule tiers" }).click();
     await expect(page.locator("#checkRules")).not.toBeEmpty();
     // #checkNote/#checkRules are filled by the catalog at boot, so they say
     // nothing about the run. The gate is the first thing the report itself

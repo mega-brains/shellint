@@ -34,10 +34,10 @@ export class StaticModeError extends Error {
   }
 }
 
-const KEY_SOURCE = "shelly-devroom.static.source";
-const KEY_MINIFY = "shelly-devroom.static.minify";
-const KEY_HISTORY = "shelly-devroom.static.history";
-const KEY_SCRIPT_HISTORY = "shelly-devroom.static.scriptHistory";
+const KEY_SOURCE = "shellint.static.source";
+const KEY_MINIFY = "shellint.static.minify";
+const KEY_HISTORY = "shellint.static.history";
+const KEY_SCRIPT_HISTORY = "shellint.static.scriptHistory";
 const MAX_HISTORY = 200;
 
 const byteLen = (s: string) => new TextEncoder().encode(s).length;
@@ -99,7 +99,7 @@ function configPayload() {
     scriptId: 0,
     host: "",
     port: 0,
-    compiler: "devroom",
+    compiler: "shellint",
     minify: loadMinify(),
   };
 }
@@ -124,7 +124,7 @@ function patchMinify(body: { minify?: Partial<MinifyConfig> }) {
   }
   if (touched === 0) throw new Error("body.minify must include at least one known key");
   writeStore(KEY_MINIFY, JSON.stringify(next));
-  return { deviceIp: "", scriptId: 0, host: "", port: 0, compiler: "devroom", minify: next };
+  return { host: "", port: 0, compiler: "shellint", minify: next };
 }
 
 // ---------------------------------------------------------------- source

@@ -1,6 +1,6 @@
-import { runtime } from "#devroom/runtime";
+import { runtime } from "#shellint/runtime";
 import { DIST_DIR } from "../core/paths.ts";
-import { loadConfig, assertDevroomCompiler } from "../core/config.ts";
+import { loadConfig, assertShellintCompiler } from "../core/config.ts";
 import { bindSlot, getDevice, requireActive } from "./devices.ts";
 import { probeState, type ProbeState } from "../probe/probe-store.ts";
 import { createSlot } from "./device-scripts.ts";
@@ -90,7 +90,7 @@ export async function deploy(
   opts: DeployOptions = {},
 ): Promise<DeployResult> {
   const cfg = await loadConfig();
-  assertDevroomCompiler(cfg);
+  assertShellintCompiler(cfg);
 
   if (mode !== "debug" && mode !== "prod") {
     throw new Error(`invalid mode "${mode}" — use "debug" or "prod"`);

@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import runtime from "#devroom/runtime";
+import runtime from "#shellint/runtime";
 import { runProbe } from "../probe/probe.ts";
 import { writeGeneratedTypings } from "../probe/probe-typings.ts";
 import { resolveCapture } from "../probe/probe-store.ts";

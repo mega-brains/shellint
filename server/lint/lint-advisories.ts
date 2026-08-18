@@ -1,4 +1,4 @@
-import { runtime } from "#devroom/runtime";
+import { runtime } from "#shellint/runtime";
 import ts from "typescript";
 import { DIST_DIR, SCRIPT_LABEL, SCRIPT_PATH } from "../core/paths.ts";
 import { analyzeSource } from "../script/script-stats.ts";

@@ -16,7 +16,7 @@ const SKIP_DIRS = new Set([
   "dist",
   ".tsc-out",
   ".txiki",
-  ".devroom",
+  ".shellint",
   ".git",
   ".idea",
   // Minify benchmark inputs, not app source: they need bulk to be

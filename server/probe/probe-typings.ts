@@ -7,7 +7,7 @@
  * seen is just another entry, and an answer outside the `typeof` vocabulary is
  * carried through with no opinion attached.
  */
-import { runtime } from "#devroom/runtime";
+import { runtime } from "#shellint/runtime";
 import { PROBE_PATH, ROOT } from "../core/paths.ts";
 import { readDeviceProfile } from "../device/device-profile.ts";
 import { activeDeviceIdentity } from "../device/devices.ts";

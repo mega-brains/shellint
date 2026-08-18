@@ -1,7 +1,7 @@
 /**
  * Single source of truth for the Terser/log-map/tier-3 minify option schema.
  * Consumed directly by scripts/build-shelly.mjs (build pipeline) and
- * server/core/config.ts (devroom.json parse/PATCH), and bundled into web UI
+ * server/core/config.ts (shellint.json parse/PATCH), and bundled into web UI
  * (web/shell/options-panel.tsx) via esbuild. Types for TS consumers live in the
  * hand-written sibling `minify-options.d.ts` — see it for why.
  *

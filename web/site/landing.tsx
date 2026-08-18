@@ -1,6 +1,6 @@
 /*
  * Landing page (`site/index.html`, M26 plan §6.1). This is the front door for
- * a visitor who has never seen DevRoom: what it is, why the size/lint story
+ * a visitor who has never seen shellint: size and lint story
  * matters, and two ways in — the in-browser demo or the downloadable
  * executable. It shares tokens.css and the app's Button/theme so the site
  * reads as the same product as the app it links to, not a marketing skin
@@ -37,10 +37,10 @@ function HeroShot() {
   return (
     <div class="hero-shot" style={{ aspectRatio: "1620 / 660" }}>
       <img
-        src={theme === "dark" ? "./devroom-header-dark.png" : "./devroom-header.png"}
+        src={theme === "dark" ? "./shellint-header-dark.png" : "./shellint-header.png"}
         width={1620}
         height={908}
-        alt="DevRoom's editor, build dashboard and device dock"
+        alt="shellint editor, build dashboard and device dock"
         loading="eager"
       />
     </div>
@@ -54,7 +54,7 @@ export function SiteHeader() {
     <header class="site-top">
       <a class="site-wordmark" href="./">
         <span class="wordmark-dot" aria-hidden="true" />
-        <span>DevRoom</span>
+        <span>shellint</span>
       </a>
       <nav class="site-nav">
         <a href="./demo/">Demo</a>

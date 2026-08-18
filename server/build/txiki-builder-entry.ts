@@ -1,8 +1,9 @@
-import { runtime } from "#devroom/runtime";
+import { runtime } from "#shellint/runtime";
 import type { RuntimeAdapter as BuildRuntimeAdapter } from "./runtime-adapter.ts";
 import type { BuildOptions, BuildOutput } from "./builder-backend.ts";
 import { buildShellyPortable } from "./txiki-builder.ts";
 import { DIST_DIR, SCRIPT_PATH } from "../core/paths.ts";
+import { ensureMainScript } from "../core/ensure-main-script.ts";
 
 const adapter: BuildRuntimeAdapter = {
   readText: (path) => runtime.fs.readText(path),
@@ -16,9 +17,10 @@ const adapter: BuildRuntimeAdapter = {
 export async function runBuildBackend(
   options: BuildOptions = {},
 ): Promise<BuildOutput> {
+  await ensureMainScript();
   const result = await buildShellyPortable(adapter, {
     root: runtime.process.cwd,
-    // Honour the DEVROOM_SCRIPT/DEVROOM_DIST overrides the Node backend gets
+    // Honour the SHELLINT_SCRIPT/SHELLINT_DIST overrides Node backend gets
     // for free through the environment of its `npm run build:shelly` child.
     sourcePath: SCRIPT_PATH,
     distDir: DIST_DIR,
@@ -28,4 +30,3 @@ export async function runBuildBackend(
   const stderr = result.warnings.length ? `${result.warnings.join("\n")}\n` : "";
   return { sizes: result.sizes, stdout, stderr };
 }
-

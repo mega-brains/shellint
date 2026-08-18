@@ -1,5 +1,6 @@
 import { createApp } from "./app.ts";
 import { loadConfig } from "./core/config.ts";
+import { ensureMainScript } from "./core/ensure-main-script.ts";
 import { requireActive } from "./device/devices.ts";
 
 async function activeSummary(): Promise<string> {
@@ -12,6 +13,7 @@ async function activeSummary(): Promise<string> {
 }
 
 export async function prepareStartup() {
+  await ensureMainScript();
   const [config, summary] = await Promise.all([loadConfig(), activeSummary()]);
   return { app: createApp(), config, summary };
 }

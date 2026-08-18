@@ -66,6 +66,8 @@ async function runFullCycle(page: Page, name: string, source: string) {
   await page.locator("#btnBuildMenu").click();
   await page.locator('#buildMenu button[data-action="check"]').click();
   await expect(page.locator("#checkNote")).toContainText("device profile", { timeout: 45_000 });
+  await page.getByTestId("tab-check").click();
+  await page.getByRole("button", { name: "rule tiers" }).click();
   const componentExists = page.locator("#checkRules .check", {
     has: page.locator(".check-rule-name", { hasText: "component-exists" }),
   });
@@ -203,9 +205,9 @@ test.describe("presentation site (M26)", () => {
     // Deliberately not openStatic(): that helper's init script clears
     // localStorage on every load, which would erase the very theme choice
     // this test exists to prove survives a navigation (same origin, same
-    // "shelly-devroom.theme" key — web/shell/theme.ts).
+    // "shellint.theme" key — web/shell/theme.ts).
     await page.goto(`${STATIC_BASE}/`);
-    await page.evaluate(() => localStorage.removeItem("shelly-devroom.theme"));
+    await page.evaluate(() => localStorage.removeItem("shellint.theme"));
     const before = await page.evaluate(() => document.documentElement.dataset.theme);
 
     await page.locator("#themeToggle").click();
@@ -214,7 +216,7 @@ test.describe("presentation site (M26)", () => {
       .not.toBe(before);
     const after = await page.evaluate(() => document.documentElement.dataset.theme);
     await expect
-      .poll(() => page.evaluate(() => localStorage.getItem("shelly-devroom.theme")))
+      .poll(() => page.evaluate(() => localStorage.getItem("shellint.theme")))
       .toBe(after);
 
     await page.goto(`${STATIC_BASE}/demo/`);

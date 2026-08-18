@@ -1,5 +1,5 @@
 import { Hono } from "hono";
-import { runtime } from "#devroom/runtime";
+import { runtime } from "#shellint/runtime";
 import { WEB_DIR } from "./core/paths.ts";
 import { registerDeviceRoutes } from "./device/routes.ts";
 import { registerProbeRoutes } from "./probe/routes.ts";

@@ -1,14 +1,14 @@
 {
-  "name": "shelly-devroom",
+  "name": "shellint",
   "version": "0.0.1",
   "private": true,
   "type": "module",
   "imports": {
-    "#devroom/builder": {
+    "#shellint/builder": {
       "txiki": "./server/build/txiki-builder-entry.ts",
       "default": "./server/build/node-builder-entry.ts"
     },
-    "#devroom/runtime": {
+    "#shellint/runtime": {
       "txiki": "./server/runtime/txiki.ts",
       "static": "./web/static/runtime.ts",
       "default": "./server/runtime/node.ts"
@@ -16,7 +16,7 @@
   },
   "description": "Local playground for authoring Shelly Gen2 device scripts",
   "scripts": {
-    "build:shelly": "node scripts/build-shelly.mjs",
+    "build:shelly": "node scripts/ensure-main.mjs && node scripts/build-shelly.mjs",
     "build:shelly:fixture": "node scripts/build-fixture.mjs",
     "build:web": "node scripts/gen-api-docs.mjs && node scripts/build-web.mjs --prod",
     "build:web:dev": "node scripts/gen-api-docs.mjs && node scripts/build-web.mjs",
@@ -36,7 +36,7 @@
     "probe:txiki": "npm run build:txiki && node scripts/run-txiki.mjs probe",
     "profile:txiki": "npm run build:txiki && node scripts/run-txiki.mjs profile",
     "typecheck:shelly": "tsc -p tsconfig.shelly.fixture.json --noEmit",
-    "typecheck:script": "tsc -p tsconfig.shelly.script.json --noEmit",
+    "typecheck:script": "node scripts/ensure-main.mjs && tsc -p tsconfig.shelly.script.json --noEmit",
     "typecheck:server": "tsc -p tsconfig.server.json",
     "typecheck:web": "tsc -p tsconfig.web.json",
     "typecheck:txiki": "tsc -p tsconfig.txiki.json",

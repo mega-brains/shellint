@@ -194,7 +194,7 @@ async function main() {
   );
   if (!inputs.length) fail(`no bench input matched ${filters.join(", ")}`);
 
-  const outDir = mkdtempSync(path.join(tmpdir(), "devroom-bench-"));
+  const outDir = mkdtempSync(path.join(tmpdir(), "shellint-bench-"));
   const report = [];
   try {
     for (const input of inputs) {

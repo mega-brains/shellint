@@ -1,5 +1,5 @@
 import type { Hono } from "hono";
-import runtime from "#devroom/runtime";
+import runtime from "#shellint/runtime";
 import { SCRIPT_LABEL, SCRIPT_PATH } from "../core/paths.ts";
 import {
   snapshotBeforeWrite,

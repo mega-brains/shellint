@@ -1,7 +1,7 @@
 /**
  * Snapshot-on-save, no-op dedupe, coalescing window, checkpoint, 10-row FIFO
  * cap, restore round-trip (unit + HTTP), 404 on unknown id. Touches the real
- * scripts/main.ts and .devroom/script-history.jsonl, so both are backed up
+ * scripts/main.ts and .shellint/script-history.jsonl, so both are backed up
  * and restored.
  * Usage: node --import tsx scripts/test-script-history.mjs
  */
@@ -25,7 +25,7 @@ import {
 import { SCRIPT_PATH, ROOT } from "../server/core/paths.ts";
 import { createApp } from "../server/app.ts";
 
-const HISTORY_FILE = join(ROOT, ".devroom", "script-history.jsonl");
+const HISTORY_FILE = join(ROOT, ".shellint", "script-history.jsonl");
 // Spacing used between calls that should each land outside the coalescing
 // window, so tests don't depend on real wall-clock time passing.
 const STEP_MS = COALESCE_WINDOW_MS + 1000;

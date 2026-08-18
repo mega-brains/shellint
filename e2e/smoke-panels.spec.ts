@@ -1,7 +1,7 @@
 import { expect, test, type Page } from "@playwright/test";
 import { openApp } from "./helpers/open-app";
 
-/** A successful `PATCH /api/config` reply — i.e. devroom.json is written. */
+/** Successful `PATCH /api/config` reply means shellint.json is written. */
 function patchResponse(page: Page) {
   return page.waitForResponse(
     (r) =>
@@ -25,7 +25,7 @@ test.describe("panels smoke", () => {
     // The choice is remembered, unlike the old accordions. (A reload cannot be
     // asserted here: openApp clears localStorage on every navigation.)
     const stored = await page.evaluate(() =>
-      localStorage.getItem("shelly-devroom.inspectorTab"),
+      localStorage.getItem("shellint.inspectorTab"),
     );
     expect(stored).toBe("check");
   });
@@ -53,10 +53,10 @@ test.describe("panels smoke", () => {
       timeout: 15_000,
     });
 
-    // devroom.json owns the defaults, so assert the flip rather than a value.
+    // shellint.json owns defaults, so assert flip rather than value.
     const toplevel = page.getByTestId("opt-toplevel");
     const before = await toplevel.isChecked();
-    // Wait for the *response*: the route writes devroom.json before replying,
+    // Wait for response: route writes shellint.json before replying,
     // and waiting on the request alone can end the test — and with it the
     // webServer — before the write lands.
     const patch = patchResponse(page);
@@ -164,7 +164,7 @@ test.describe("panels smoke", () => {
     // Persisted for the next session (openApp clears storage on every
     // navigation, so assert the write rather than a reload).
     const stored = await page.evaluate(() =>
-      localStorage.getItem("shelly-devroom.dock.height"),
+      localStorage.getItem("shellint.dock.height"),
     );
     expect(Math.abs(Number(stored) - after)).toBeLessThan(3);
 

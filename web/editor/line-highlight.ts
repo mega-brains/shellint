@@ -6,7 +6,7 @@ import { Decoration, EditorView, type DecorationSet } from "@codemirror/view";
  * from the dashboard badges. Like the finding gutter, the artifact view decides
  * which buffer the lines belong to, since it owns what the editor shows.
  */
-export const HIGHLIGHT_LINES_EVENT = "devroom:highlight-lines";
+export const HIGHLIGHT_LINES_EVENT = "shellint:highlight-lines";
 
 export type LineHighlight = {
   file: string;

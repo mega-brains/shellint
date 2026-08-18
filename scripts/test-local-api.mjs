@@ -80,7 +80,7 @@ if (uncovered.length) {
 }
 
 // The api() swap must genuinely replace the HTTP transport, not sit beside it.
-const dir = mkdtempSync(join(tmpdir(), "devroom-static-app-"));
+const dir = mkdtempSync(join(tmpdir(), "shellint-static-app-"));
 try {
   const outfile = join(dir, "app.js");
   const result = await esbuild.build(

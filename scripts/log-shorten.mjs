@@ -1,5 +1,5 @@
 /**
- * Log-string shortening. Strings are RAM on device, and DevRoom owns both the
+ * Log-string shortening. Strings are RAM on device, and shellint owns both.
  * compiler and the log viewer, so `console.log("motion detected", x)` ships as
  * `console.log("L1", x)` and the log panel re-expands `L1` from the map.
  *

@@ -1,6 +1,6 @@
 .idea/
 .DS_Store
-.claude/.*
+.claude/
 node_modules/
 dist/
 .tsc-out/
@@ -10,7 +10,9 @@ web/dist/
 # Anchored: the build output is the repo-root site/ only. A bare `site/` would
 # also swallow web/site/, the presentation page *sources* (M26).
 /site/
+.shellint/
 .devroom/
+scripts/main.ts
 .txiki/
 test-results/
 playwright-report/

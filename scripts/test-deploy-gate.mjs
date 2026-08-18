@@ -3,7 +3,7 @@
  * capture must refuse Deploy over HTTP (409, code: "probe-required") and at
  * the `deploy()` function level (`ProbeRequiredError`); a skip must lift it;
  * `skipProbeCheck` must bypass it entirely. Split out of test-smoke.mjs to
- * stay under the 500-line cap. Touches the real `.devroom/devices.json`, so
+ * stay under 500-line cap. Touches real `.shellint/devices.json`, so
  * it is backed up and restored, scoped to one fake device.
  * Usage: node --import tsx scripts/test-deploy-gate.mjs
  */
@@ -14,7 +14,7 @@ import { _resetCache, addDevice, setActive } from "../server/device/devices.ts";
 import { deploy, ProbeRequiredError } from "../server/device/deploy.ts";
 import { createApp } from "../server/app.ts";
 
-const DEVICES_DIR = join(ROOT, ".devroom");
+const DEVICES_DIR = join(ROOT, ".shellint");
 const DEVICES_FILE = join(DEVICES_DIR, "devices.json");
 const originalDevices = existsSync(DEVICES_FILE) ? readFileSync(DEVICES_FILE, "utf8") : null;
 

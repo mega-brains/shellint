@@ -27,7 +27,7 @@ export type StaticFileControlsProps = {
 /**
  * Load-from-disk / save-to-disk / artifact-download controls for the static
  * build (M17.6) — only meaningful offline, where the source lives in the
- * browser rather than on the DevRoom's own disk. Split out of toolbar.tsx
+ * browser rather than shellint's disk. Split out of toolbar.tsx
  * (already 432/500 lines) and wired in as a `staticControls` slot rather
  * than importing anything static-only from shared code: everything below
  * goes through the ordinary `api()` seam (see web/static/file-io.ts's header).

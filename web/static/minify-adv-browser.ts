@@ -5,7 +5,7 @@
  * directly here instead of importing that whole plugin, which expects a
  * global `Espruino.Core.*` app we don't have. The vendored libs
  * (./vendor/espruino-entry.js) are loaded lazily on first use — most builds
- * never touch tier 3 (devroom.json's `advanced` defaults to false), and the
+ * never touch tier 3 (shellint.json `advanced` defaults false), and the
  * libs are ~450 KB.
  *
  * `@meta` re-attach + terser-parse validation is shared with the Node CLI

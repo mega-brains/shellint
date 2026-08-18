@@ -1,12 +1,12 @@
 /**
- * Owns `.devroom/devices/<id>/probes/<verKey>.json` — one probe capture per
+ * Owns `.shellint/devices/<id>/probes/<verKey>.json` — one probe capture per
  * firmware, kept forever (M16 §2.2: an OTA must not silently overwrite the
  * previous firmware's answers). Also answers "is a probe required", the one
  * definition the deploy gate, the routes, and the UI banner all share.
  *
  * Everything else calls into this module; no other file builds a capture path.
  */
-import { runtime } from "#devroom/runtime";
+import { runtime } from "#shellint/runtime";
 import { devicePaths } from "../core/paths.ts";
 import { getDevice } from "../device/devices.ts";
 import { isAbsent, isPresent, probeEntries } from "./probe-typings.ts";

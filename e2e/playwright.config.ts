@@ -17,14 +17,14 @@ export const STATIC_PORT = 8788;
 /**
  * The device script under test: a fresh copy of `fixtures/device/main.ts`,
  * built into its own dist. `scripts/build-fixture.mjs` (first command of the
- * webServer below) creates it; `DEVROOM_SCRIPT`/`DEVROOM_DIST` point the
+ * webServer below) creates it; `SHELLINT_SCRIPT`/`SHELLINT_DIST` point the
  * server, its builder and its Check at it. Nothing in the suite reads or
  * writes the user's `scripts/main.ts` — specs save to the editor, and that
  * write lands here.
  */
 export const FIXTURE_ENV = {
-  DEVROOM_SCRIPT: ".tmp/e2e/main.ts",
-  DEVROOM_DIST: ".tmp/e2e/dist",
+  SHELLINT_SCRIPT: ".tmp/e2e/main.ts",
+  SHELLINT_DIST: ".tmp/e2e/dist",
 };
 const STATIC_BASE = `http://127.0.0.1:${STATIC_PORT}`;
 
@@ -71,7 +71,7 @@ export default defineConfig({
         "node scripts/build-fixture.mjs e2e && npm run build:web && node --import tsx server/index.ts",
       cwd: ROOT,
       url: BASE,
-      env: { ...FIXTURE_ENV, DEVROOM_PORT: String(PORT) },
+      env: { ...FIXTURE_ENV, SHELLINT_PORT: String(PORT) },
       // Never reuse: a server already on this port may be pointed at another
       // script, which is exactly the dependency this suite must not have.
       reuseExistingServer: false,

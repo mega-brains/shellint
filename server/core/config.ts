@@ -1,5 +1,5 @@
-import { runtime } from "#devroom/runtime";
-import { ROOT } from "./paths.ts";
+import { runtime } from "#shellint/runtime";
+import { LEGACY_CONFIG_JSON, SHELLINT_JSON } from "./paths.ts";
 import {
   DEFAULT_MINIFY,
   MINIFY_KEYS,
@@ -9,21 +9,17 @@ import {
 export type { MinifyConfig };
 export { DEFAULT_MINIFY };
 
-export type DevroomConfig = {
-  deviceIp: string;
-  scriptId: number;
+export type ShellintConfig = {
   host: string;
   port: number;
   compiler: string;
   minify: MinifyConfig;
 };
 
-const DEFAULTS: DevroomConfig = {
-  deviceIp: "192.168.1.100",
-  scriptId: 1,
+const DEFAULTS: ShellintConfig = {
   host: "0.0.0.0",
   port: 8787,
-  compiler: "devroom",
+  compiler: "shellint",
   minify: { ...DEFAULT_MINIFY },
 };
 
@@ -40,32 +36,43 @@ function parseMinify(raw: unknown): MinifyConfig {
 }
 
 /**
- * `DEVROOM_PORT` wins over devroom.json, so a second instance (the txiki
+ * `SHELLINT_PORT` wins over shellint.json, so a second instance (the txiki
  * single-file executable under e2e, e2e/playwright.txiki.config.ts) can run
  * beside a dev server without editing a committed file.
  */
 function envPort(): number | null {
-  const raw = runtime.process.env.DEVROOM_PORT?.trim();
+  const raw = runtime.process.env.SHELLINT_PORT?.trim();
   if (!raw) return null;
   const port = Number(raw);
   return Number.isInteger(port) && port > 0 && port < 65_536 ? port : null;
 }
 
-export async function loadConfig(): Promise<DevroomConfig> {
-  const path = runtime.path.join(ROOT, "devroom.json");
+let legacyNoticePrinted = false;
+
+/** Prefer shellint.json; retain devroom.json only for one-time migration. */
+export async function resolveConfigPath(): Promise<string | null> {
+  if (await runtime.fs.exists(SHELLINT_JSON)) return SHELLINT_JSON;
+  if (!(await runtime.fs.exists(LEGACY_CONFIG_JSON))) return null;
+  if (!legacyNoticePrinted) {
+    legacyNoticePrinted = true;
+    console.warn("shellint: using legacy devroom.json; rename it to shellint.json");
+  }
+  return LEGACY_CONFIG_JSON;
+}
+
+export async function loadConfig(): Promise<ShellintConfig> {
+  const path = await resolveConfigPath();
   const override = envPort();
-  if (!(await runtime.fs.exists(path))) {
+  if (!path) {
     return {
       ...DEFAULTS,
       ...(override == null ? {} : { port: override }),
       minify: { ...DEFAULT_MINIFY },
     };
   }
-  const raw = JSON.parse(await runtime.fs.readText(path)) as Partial<DevroomConfig> &
+  const raw = JSON.parse(await runtime.fs.readText(path)) as Partial<ShellintConfig> &
     Record<string, unknown>;
   return {
-    deviceIp: typeof raw.deviceIp === "string" ? raw.deviceIp : DEFAULTS.deviceIp,
-    scriptId: typeof raw.scriptId === "number" ? raw.scriptId : DEFAULTS.scriptId,
     host: typeof raw.host === "string" ? raw.host : DEFAULTS.host,
     port: override ?? (typeof raw.port === "number" ? raw.port : DEFAULTS.port),
     compiler: typeof raw.compiler === "string" ? raw.compiler : DEFAULTS.compiler,
@@ -74,10 +81,8 @@ export async function loadConfig(): Promise<DevroomConfig> {
 }
 
 /** Public config for GET /api/config — no secrets (none stored yet). */
-export function sanitizeConfig(cfg: DevroomConfig) {
+export function sanitizeConfig(cfg: ShellintConfig) {
   return {
-    deviceIp: cfg.deviceIp,
-    scriptId: cfg.scriptId,
     host: cfg.host,
     port: cfg.port,
     compiler: cfg.compiler,
@@ -86,19 +91,19 @@ export function sanitizeConfig(cfg: DevroomConfig) {
 }
 
 /**
- * Merge a partial `minify` patch into `devroom.json`, preserving unknown keys
- * (e.g. `deviceIp2`). Only minify booleans are writable via the API.
+ * Merge a partial `minify` patch into shellint.json. Only minify booleans are
+ * writable via the API.
  */
 export function patchMinifyConfig(
   patch: Partial<MinifyConfig>,
-): Promise<DevroomConfig> {
+): Promise<ShellintConfig> {
   return patchMinifyConfigAsync(patch);
 }
 
 async function patchMinifyConfigAsync(
   patch: Partial<MinifyConfig>,
-): Promise<DevroomConfig> {
-  const path = runtime.path.join(ROOT, "devroom.json");
+): Promise<ShellintConfig> {
+  const path = SHELLINT_JSON;
   const raw: Record<string, unknown> = await runtime.fs.exists(path)
     ? (JSON.parse(await runtime.fs.readText(path)) as Record<string, unknown>)
     : {};
@@ -113,8 +118,8 @@ async function patchMinifyConfigAsync(
   return loadConfig();
 }
 
-export function assertDevroomCompiler(cfg: DevroomConfig): void {
-  if (cfg.compiler !== "devroom") {
+export function assertShellintCompiler(cfg: ShellintConfig): void {
+  if (cfg.compiler !== "shellint" && cfg.compiler !== "devroom") {
     throw new CompilerNotWiredError(cfg.compiler);
   }
 }
@@ -122,7 +127,7 @@ export function assertDevroomCompiler(cfg: DevroomConfig): void {
 export class CompilerNotWiredError extends Error {
   constructor(compiler: string) {
     super(
-      `compiler "${compiler}" is not wired yet — only "devroom" (clean-room tsc+Terser) is supported. shelly-forge path not wired yet.`,
+      `compiler "${compiler}" is not wired yet — only "shellint" (clean-room tsc+Terser) is supported. shelly-forge path not wired yet.`,
     );
     this.name = "CompilerNotWiredError";
   }

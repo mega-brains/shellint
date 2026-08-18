@@ -7,7 +7,7 @@ import { ROOT, resolveTjsBin } from "./txiki-test-util.mjs";
 function parseArgs(argv) {
   const out = {
     runtime: "node",
-    url: process.env.DEVROOM_SMOKE_URL ?? "http://127.0.0.1:8787",
+    url: process.env.SHELLINT_SMOKE_URL ?? "http://127.0.0.1:8787",
     bundle: resolve(ROOT, ".txiki", "server.js"),
     timeoutMs: 20_000,
     spawn: true,

@@ -17,7 +17,7 @@
   "scratchScriptId": 4,
   "scratchRemoved": false,
   "notes": [
-    "script 3 not running — probed in temporary slot 4 (\"devroom-probe\"), removed afterwards",
+    "script 3 not running — probed in temporary slot 4 (\"shellint-probe\"), removed afterwards",
     "WARNING: temporary slot 4 could not be removed (RPC timeout: Script.Delete) — delete it on the device"
   ],
   "results": [

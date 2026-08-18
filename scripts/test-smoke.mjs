@@ -406,7 +406,7 @@ const artifact = await (await app.request("/api/artifact?name=prod.js")).json();
 if (!artifact.code.length || artifact.bytes !== Buffer.byteLength(artifact.code)) {
   throw new Error("artifact read should return the file and its byte length");
 }
-for (const name of ["../package.json", "devroom.json", "", "prod.js.map"]) {
+for (const name of ["../package.json", "shellint.json", "", "prod.js.map"]) {
   const res = await app.request("/api/artifact?name=" + encodeURIComponent(name));
   if (res.status !== 404) throw new Error("artifact route served off-allowlist name: " + name);
 }
@@ -428,7 +428,7 @@ for (const body of ["{}", '{"running":"yes"}', "not json"]) {
   if (res.status !== 400) throw new Error("script route accepted bad body: " + body);
 }
 
-// Minify options live in devroom.json — GET exposes them; PATCH merges booleans.
+// Minify options live in shellint.json — GET exposes them; PATCH merges booleans.
 {
   const patch = (body) =>
     app.request("/api/config", {

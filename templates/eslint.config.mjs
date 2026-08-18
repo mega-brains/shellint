@@ -1,9 +1,9 @@
 /**
- * DevRoom's dialect bans, as an ESLint flat config you can drop into your own
- * Shelly script repo — for your editor and your CI, where DevRoom's Check
+ * shellint dialect bans, as ESLint flat config for your own
+ * Shelly script repo — for editor and CI, where shellint Check
  * button cannot reach.
  *
- * **This is a template, not part of DevRoom.** DevRoom neither installs nor
+ * **This is a template, not part of shellint.** shellint neither installs nor
  * runs ESLint; its own 64 checks are hand-rolled TypeScript-AST passes, because
  * no linter can express the cooperative scheduler, the RAM budget, `Shelly.*`
  * existence, or the live capability probe. See
@@ -32,7 +32,7 @@ import tsPlugin from "@typescript-eslint/eslint-plugin";
  * `tsc --target es5` legally down-levels — arrow functions, template literals,
  * destructuring, spread, `let`/`const`, `for-of`, classes — is deliberately
  * absent here: banning it in source would be banning your own compiler's input.
- * Assert on the emit instead, which is what DevRoom's post-compile guard does.
+ * Assert on emit instead, like shellint post-compile guard.
  */
 const DIALECT_BANS = [
   // No RegExp on device. All three spellings, including the bare call.

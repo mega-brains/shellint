@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import runtime from "#devroom/runtime";
+import runtime from "#shellint/runtime";
 import { deploy, type DeployMinify, type DeployMode } from "../device/deploy.ts";
 
 function parseArgs(argv: string[]) {

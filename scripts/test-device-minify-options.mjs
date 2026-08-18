@@ -2,7 +2,7 @@
  * The four M15 device-pipeline minify options (P3–P5): dropConsole, passes,
  * hoistProps, deviceDCE. Exercises the pure functions build-shelly.mjs
  * exports (envPass, minifyPass, resolveVariantOptions, deviceGlobalDefs)
- * directly against small fixtures — no devroom.json involved, so this never
+ * directly against small fixtures — no shellint.json involved, so this never
  * touches the user's live device config.
  * Usage: node scripts/test-device-minify-options.mjs
  */
@@ -28,7 +28,7 @@ const eq = (got, want, what) => {
   }
 };
 
-const tmp = mkdtempSync(join(tmpdir(), "devroom-test-"));
+const tmp = mkdtempSync(join(tmpdir(), "shellint-test-"));
 try {
   // --- resolveVariantOptions: scope enforcement ---------------------------
   {

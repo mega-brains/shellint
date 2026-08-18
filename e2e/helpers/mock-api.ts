@@ -368,7 +368,7 @@ export const mockMinFirmware = {
  * `mockDeviceApis` above) so most e2e specs exercise the real analyzer
  * against the real `scripts/main.ts` fixture. But that fixture is a real,
  * evolving demo script — every edit to it (or every local `mise run build`,
- * which appends to the on-disk `.devroom/build-history.jsonl`) shifts the
+ * which appends to on-disk `.shellint/build-history.jsonl`) shifts the
  * byte counts and memory estimate the dashboard renders, which has nothing
  * to do with layout or styling. Design baselines need those numbers pinned,
  * so this mock makes `/api/stats` + `/api/history` authoritative instead of

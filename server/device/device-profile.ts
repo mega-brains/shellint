@@ -1,6 +1,6 @@
-import { runtime } from "#devroom/runtime";
+import { runtime } from "#shellint/runtime";
 import { DEVICE_PROFILE_PATH, devicePaths } from "../core/paths.ts";
-import { loadConfig, assertDevroomCompiler } from "../core/config.ts";
+import { loadConfig, assertShellintCompiler } from "../core/config.ts";
 import { requireActive, mirrorActiveDevice, toDeviceInfo, touchDeviceInfo } from "./devices.ts";
 import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
 
@@ -50,7 +50,7 @@ async function fetchComponents(rpc: ShellyRpc): Promise<string[]> {
 
 export async function fetchDeviceProfile(): Promise<DeviceProfile> {
   const cfg = await loadConfig();
-  assertDevroomCompiler(cfg);
+  assertShellintCompiler(cfg);
   const target = await requireActive();
 
   const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
@@ -86,7 +86,7 @@ export async function fetchDeviceProfile(): Promise<DeviceProfile> {
 
 /**
  * Writes the per-device profile (the authoritative copy, under
- * `.devroom/devices/<id>/`) and, since a fresh probe is always for the
+ * `.shellint/devices/<id>/`) and, since fresh probe is always for
  * currently active device, re-mirrors it into `types/device-profile.json`.
  */
 export async function writeDeviceProfile(

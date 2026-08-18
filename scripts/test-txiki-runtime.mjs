@@ -24,7 +24,7 @@ run([
   join(ROOT, ".txiki", "server.js"),
 ]);
 
-const reports = mkdtempSync(join(tmpdir(), "devroom-runtime-smoke-"));
+const reports = mkdtempSync(join(tmpdir(), "shellint-runtime-smoke-"));
 try {
   const nodeReport = join(reports, "node.json");
   run([

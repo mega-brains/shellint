@@ -6,8 +6,8 @@ import type { DeviceStatusState } from "./use-device-status";
 
 export type DockTab = "device" | "logs";
 
-const OPEN_KEY = "shelly-devroom.dock.open";
-const TAB_KEY = "shelly-devroom.dock.tab";
+const OPEN_KEY = "shellint.dock.open";
+const TAB_KEY = "shellint.dock.tab";
 
 function readFlag(key: string, fallback: boolean): boolean {
   try {
@@ -63,7 +63,7 @@ export function Dock(props: DockProps) {
   onResize.current = props.onResize;
 
   useSplitter(rootRef, handleRef, dockRef, {
-    storageKey: "shelly-devroom.dock.height",
+    storageKey: "shellint.dock.height",
     cssVar: "--dock-h",
     axis: "y",
     minPanel: 140,

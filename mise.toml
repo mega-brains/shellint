@@ -2,19 +2,19 @@
 node = "22"
 
 [env]
-DEVROOM_TJS_VERSION = "26.6.0"
-# DEVROOM_TJS_BIN ships as the final executable; build-smallest-compressed
-# has no `tjs bundle` (esbuild) support, so DEVROOM_TJS_BUNDLE_BIN carries
+SHELLINT_TJS_VERSION = "26.6.0"
+# SHELLINT_TJS_BIN ships as the final executable; build-smallest-compressed
+# has no `tjs bundle` (esbuild) support, so SHELLINT_TJS_BUNDLE_BIN carries
 # the full build for that one step.
-DEVROOM_TJS_BIN = "../../txiki.js/build-smallest-compressed/tjs"
-DEVROOM_TJS_BUNDLE_BIN = "../../txiki.js/build/tjs"
+SHELLINT_TJS_BIN = "../../txiki.js/build-smallest-compressed/tjs"
+SHELLINT_TJS_BUNDLE_BIN = "../../txiki.js/build/tjs"
 
 [tasks.install]
 description = "Install npm dependencies"
 run = "npm install"
 
 [tasks.start]
-description = "Start DevRoom server (host/port from devroom.json)"
+description = "Start shellint server (host/port from shellint.json)"
 alias = "dev"
 run = "npm run dev"
 
@@ -114,7 +114,7 @@ description = "Shelly DCE/minify asserts + web bundle + server smoke"
 run = "npm run test"
 
 [tasks."test:e2e"]
-description = "Playwright e2e (Chromium) against local DevRoom UI"
+description = "Playwright e2e (Chromium) against local shellint UI"
 run = "npm run test:e2e"
 
 [tasks."test:e2e:txiki"]

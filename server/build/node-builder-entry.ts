@@ -1,7 +1,7 @@
 import { spawn } from "node:child_process";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
-import { loadConfig, assertDevroomCompiler } from "../core/config.ts";
+import { loadConfig, assertShellintCompiler } from "../core/config.ts";
 import { DIST_DIR, ROOT } from "../core/paths.ts";
 import type {
   BuildOptions,
@@ -65,7 +65,7 @@ export async function runBuildBackend(
   options: BuildOptions = {},
 ): Promise<BuildOutput> {
   const config = await loadConfig();
-  assertDevroomCompiler(config);
+  assertShellintCompiler(config);
 
   const packagePath = join(ROOT, "package.json");
   let result: { code: number; stdout: string; stderr: string };

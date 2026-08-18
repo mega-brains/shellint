@@ -88,7 +88,7 @@ function readDistArtifacts() {
  * a real Worker runs, not a reimplementation of it.
  */
 async function bundleAndRunCheck(source, artifacts) {
-  const outDir = mkdtempSync(path.join(tmpdir(), "devroom-static-check-"));
+  const outDir = mkdtempSync(path.join(tmpdir(), "shellint-static-check-"));
   try {
     const outfile = path.join(outDir, "pipeline.worker.mjs");
     const result = await esbuild.build({
@@ -190,7 +190,7 @@ function assertEquivalent(serverReport, staticReport) {
   // number) that a bare count match would miss.
   const nonExempt = (f) => !EXPECT_SKIPPED_STATIC.has(f.rule) && !INPUT_GROUP_RULES.has(f.rule);
   // The static build always names the script "scripts/main.ts" (a browser has
-  // no repo path); the server names whatever DEVROOM_SCRIPT points at. Same
+  // no repo path); server names whatever SHELLINT_SCRIPT points at. Same
   // file, two labels — compared under one name so the fixture workspace
   // doesn't read as a divergence.
   const label = (f) =>

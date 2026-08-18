@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import runtime from "#devroom/runtime";
+import runtime from "#shellint/runtime";
 import { fetchDeviceProfile } from "../device/device-profile.ts";
 
 try {

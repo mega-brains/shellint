@@ -82,13 +82,13 @@ export function LogsPanel(props: LogsPanelProps) {
   const [noteWarn, setNoteWarn] = useState(false);
   const [filter, setFilter] = useState("");
   const [follow, setFollow] = useState(() =>
-    readFlag("shelly-devroom.logsPanel.follow", "on", true),
+    readFlag("shellint.logsPanel.follow", "on", true),
   );
   const [separate, setSeparate] = useState(() =>
-    readFlag("shelly-devroom.logsChart.separate", "1", false),
+    readFlag("shellint.logsChart.separate", "1", false),
   );
   const [chartCollapsed, setChartCollapsed] = useState(() =>
-    readCollapsed("shelly-devroom.logsChart.collapsed", false),
+    readCollapsed("shellint.logsChart.collapsed", false),
   );
 
   const since = useRef(0);
@@ -292,7 +292,7 @@ export function LogsPanel(props: LogsPanelProps) {
             onChange={(e) => {
               const on = (e.target as HTMLInputElement).checked;
               setFollow(on);
-              writeFlag("shelly-devroom.logsPanel.follow", on, "on", "off");
+              writeFlag("shellint.logsPanel.follow", on, "on", "off");
             }}
           />
           follow
@@ -315,7 +315,7 @@ export function LogsPanel(props: LogsPanelProps) {
             onClick={() => {
               const next = !chartCollapsed;
               setChartCollapsed(next);
-              writeCollapsed("shelly-devroom.logsChart.collapsed", next);
+              writeCollapsed("shellint.logsChart.collapsed", next);
             }}
           >
             <span aria-hidden="true">{chartCollapsed ? "▸" : "▾"}</span> metrics
@@ -334,7 +334,7 @@ export function LogsPanel(props: LogsPanelProps) {
               onChange={(e) => {
                 const on = (e.target as HTMLInputElement).checked;
                 setSeparate(on);
-                writeFlag("shelly-devroom.logsChart.separate", on, "1", "0");
+                writeFlag("shellint.logsChart.separate", on, "1", "0");
               }}
             />
             separate

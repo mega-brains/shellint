@@ -76,7 +76,10 @@ async function openSettled(page: Page) {
   await expect(page.locator("#btnBuildMenu")).toBeEnabled();
   // Device poll paints mocked gauges before we snapshot.
   await expect(page.locator("#dCpu")).toHaveText("18%", { timeout: 10_000 });
+  await page.getByTestId("tab-check").click();
+  await page.getByRole("button", { name: "rule tiers" }).click();
   await expect(page.locator("#checkRules")).not.toBeEmpty({ timeout: 15_000 });
+  await page.getByTestId("tab-build").click();
   // Quiet check on boot fills the readiness rail — wait so snapshots do not
   // race catalog-pending vs report-complete paint.
   await expect(page.getByTestId("gate-checked")).not.toContainText("not checked", {
@@ -108,6 +111,7 @@ test.describe("design baselines", () => {
     await openSettled(page);
     await page.getByTestId("tab-check").click();
     await expect(page.locator("#pane-check")).toBeVisible();
+    await page.getByRole("button", { name: "rule tiers" }).click();
     await expect(page.locator("#checkRules")).not.toBeEmpty();
     await expect(page.locator("#side")).toHaveScreenshot("check-panel.png", {
       mask: masks(page),

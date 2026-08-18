@@ -19,7 +19,7 @@ import { PROBE_PATH } from "../server/core/paths.ts";
 
 // Severity depends on which device (and firmware) the probe came from, so
 // every lint call here says so explicitly instead of inheriting whatever
-// .devroom has active.
+// .shellint has active.
 const asForeign = (src, path = PROBE_PATH) => lintProbe(src, "scripts/main.ts", path, null);
 // The active device must match the fixture's own id and firmware for T3b's
 // "active device, current firmware" case to land on `error`.
@@ -155,7 +155,7 @@ if (!probedFirmware) fail("could not determine the probed firmware version");
 
 // T4 — no probe report, or an empty one: no typings, no findings, no throw.
 {
-  const missing = join(tmpdir(), "devroom-no-such-probe.json");
+  const missing = join(tmpdir(), "shellint-no-such-probe.json");
   const empty = await generateTypings(missing);
   eq(empty.present.length, 0, "missing report declares nothing");
   eq(empty.absent.length, 0, "missing report reports nothing absent");
@@ -164,7 +164,7 @@ if (!probedFirmware) fail("could not determine the probed firmware version");
   eq((await asForeign('"x".padStart(2," ");', missing)).length, 0, "no report, no findings");
   eq((await asActive('"x".padStart(2," ");', missing)).length, 0, "no report, no findings even for the active device");
 
-  const dir = mkdtempSync(join(tmpdir(), "devroom-probe-"));
+  const dir = mkdtempSync(join(tmpdir(), "shellint-probe-"));
   const emptyPath = join(dir, "empty.json");
   writeFileSync(emptyPath, JSON.stringify({ probed: true, results: [] }), "utf8");
   eq((await readProbeVerdicts(emptyPath)).length, 0, "empty report yields no verdicts");

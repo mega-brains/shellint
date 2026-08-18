@@ -1,8 +1,9 @@
-import { runtime } from "#devroom/runtime";
+import { runtime } from "#shellint/runtime";
 import { ROOT, DEVICE_PROFILE_PATH, PROBE_PATH, devicePaths } from "../core/paths.ts";
 import { AuthFailedError, ShellyRpc } from "./rpc.ts";
 import { writeGeneratedTypings } from "../probe/probe-typings.ts";
 import { newestCapture, probeState, resolveCapture, type ProbeSkip } from "../probe/probe-store.ts";
+import { resolveConfigPath } from "../core/config.ts";
 
 const { fs } = runtime;
 const { dirname, join } = runtime.path;
@@ -30,7 +31,7 @@ export type DevicesFile = {
 };
 export type ActiveTarget = { device: DeviceRecord; slot: number; script: string };
 
-const DEVICES_DIR = join(ROOT, ".devroom");
+const DEVICES_DIR = join(ROOT, ".shellint");
 const DEVICES_FILE = join(DEVICES_DIR, "devices.json");
 
 export class NoDeviceError extends Error {
@@ -107,15 +108,14 @@ async function adoptForDevice(src: string, dest: string, deviceIp: string): Prom
 }
 
 /**
- * One-way, automatic, idempotent migration from `devroom.json`'s legacy
+ * One-way, automatic, idempotent migration from legacy config fields.
  * single-device fields. Runs only when `devices.json` does not exist yet;
- * `devroom.json` itself is never rewritten, so it keeps working as the
- * fallback for as long as `devices.json` is absent.
+ * Config selection follows core/config.ts. Files never get rewritten here.
  */
 async function migrateFromLegacyConfig(): Promise<DevicesFile> {
   const file = emptyFile();
-  const path = join(ROOT, "devroom.json");
-  if (!(await fs.exists(path))) return file;
+  const path = await resolveConfigPath();
+  if (!path) return file;
 
   let raw: Record<string, unknown>;
   try {

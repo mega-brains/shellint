@@ -1,30 +1,30 @@
-# Shelly DevRoom
+# shellint
 
 Small, simple development room (playground) for developing shelly scripts
 
 ## How to run
 
-1. Copy or edit `devroom.json`:
+1. Copy or edit `shellint.json`:
 
 ```json
 {
   "host": "0.0.0.0",
   "port": 8787,
-  "compiler": "devroom"
+  "compiler": "shellint"
 }
 ```
 
 | Field | Meaning |
 |---|---|
-| `host` / `port` | DevRoom HTTP bind (default `0.0.0.0:8787`) |
-| `compiler` | Must be `"devroom"` for now (`shelly-forge` not wired) |
+| `host` / `port` | shellint HTTP bind (default `0.0.0.0:8787`) |
+| `compiler` | Must be `"shellint"` for now (`shelly-forge` not wired) |
 
-Devices are no longer configured in `devroom.json` — add one from the UI's
-header device picker (`+ Add device…`), which stores it in `.devroom/devices.json`
+Devices are no longer configured in `shellint.json` — add one from UI
+header device picker (`+ Add device…`), which stores it in `.shellint/devices.json`
 (gitignored, `0600`; the password field is plaintext — this is a LAN-only tool
-with no login of its own). A legacy `devroom.json` with `deviceIp`/`scriptId`
-still works: the first server start migrates it into `.devroom/devices.json`
-automatically, one-way, without touching `devroom.json` itself.
+with no login of its own). Migration: if `shellint.json` is absent, legacy
+`devroom.json` remains readable once. Rename it, then move `.devroom/` to
+`.shellint/` yourself; credentials are never moved automatically.
 
 2. Install and start (mise preferred):
 
@@ -47,7 +47,7 @@ compliance pass — it works offline, and when the device is answering it also
 checks RPC method names, component ids and firmware capabilities against that
 device. **Probe** runs `Script.Eval` checks and
 writes `types/generated-probe.json`; it never overwrites stored device scripts —
-if the configured slot is not running it creates a throwaway `devroom-probe`
+if configured slot is not running it creates throwaway `shellint-probe`
 slot and deletes it again. The footer polls live device telemetry (script
 mem/cpu, RAM/FS, latency, RSSI) and has an **eco** toggle.
 
@@ -78,24 +78,24 @@ npm packages or parse TypeScript directly.
 Put `tjs` on `PATH`, or point at a local executable:
 
 ```bash
-export DEVROOM_TJS_BIN=/path/to/txiki.js/build/tjs
+export SHELLINT_TJS_BIN=/path/to/txiki.js/build/tjs
 mise run build:txiki
 mise run start:txiki
 ```
 
 This repository's `mise.toml` pins txiki.js `26.6.0` and resolves the sibling
-clone at `../../txiki.js/build/tjs`. `DEVROOM_TJS_BIN` may still override it.
+clone at `../../txiki.js/build/tjs`. `SHELLINT_TJS_BIN` may still override it.
 
 Build one standalone native executable:
 
 ```bash
 mise run build:txiki:executable
-./.txiki/shelly-devroom
+./.txiki/shellint
 ```
 
-Executable embeds txiki runtime plus bundled server code. DevRoom remains a
-workspace tool, so mutable project files (`devroom.json`, `scripts/`, `types/`,
-`dist/`, `web/dist/`, and `.devroom/`) are still read from launch directory.
+Executable embeds txiki runtime plus bundled server code. shellint remains
+workspace tool, so mutable project files (`shellint.json`, `scripts/`, `types/`,
+`dist/`, `web/dist/`, and `.shellint/`) are still read from launch directory.
 
 Peer CLI and verification tasks are available:
 
@@ -123,7 +123,7 @@ Unauthenticated devices only; a 401 surfaces as **auth not supported yet**.
 
 ## Using the checks in your editor
 
-DevRoom's own checks run behind the **Check** button — they are hand-rolled
+shellint checks run behind **Check** button — they are hand-rolled
 TypeScript-AST passes, not a linter, because none of the cooperative scheduler,
 the RAM budget, `Shelly.*` existence or the live capability probe is something
 an off-the-shelf ESLint plugin can express.
@@ -131,8 +131,8 @@ an off-the-shelf ESLint plugin can express.
 The *syntax* half of Tier 1 is another matter: it needs no custom rule code at
 all. [`templates/eslint.config.mjs`](./templates/eslint.config.mjs) is that
 half as a flat config you can copy into your own Shelly script repo, so your
-editor and your CI flag the same dialect bans DevRoom does. It is a template —
-DevRoom itself neither installs nor runs ESLint.
+editor and CI flag same dialect bans shellint does. It is template —
+shellint itself neither installs nor runs ESLint.
 
 Rationale, the plugin survey behind it, and what it deliberately leaves out:
 [`.claude/plans/2026-08-15_19_lint-gaps-and-eslint.md`](./.claude/plans/2026-08-15_19_lint-gaps-and-eslint.md).

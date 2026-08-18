@@ -1,4 +1,4 @@
-import { runtime } from "#devroom/runtime";
+import { runtime } from "#shellint/runtime";
 import type { RuntimeWebSocket, RuntimeWebSocketMessage } from "../runtime/types.ts";
 import { buildAuthFrame, NonceCounter, type DigestChallenge } from "./auth-digest.ts";
 
@@ -76,7 +76,7 @@ export class ShellyRpc {
   private ws: RuntimeWebSocket | null = null;
   private nextId = 1;
   private pending = new Map<number, Pending>();
-  private readonly src = "shelly-devroom";
+  private readonly src = "shellint";
   private openPromise: Promise<void> | null = null;
   private readonly ip: string;
   private readonly auth?: { username?: string; password: string };

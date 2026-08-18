@@ -1,5 +1,5 @@
 /**
- * @title DevRoom test fixture — device script
+ * @title shellint test fixture — device script
  * @description Stand-in for scripts/main.ts in the build/test/e2e pipelines.
  *   Nothing in the gate may read the user's live script, so every parity,
  *   lint and screenshot assertion compiles *this* file instead.
