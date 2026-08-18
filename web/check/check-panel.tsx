@@ -121,7 +121,13 @@ export function CheckPanel(props: CheckPanelProps) {
         />
       </Group>
 
-      <Group title="rule tiers" id="tiersBlock" caption="pass / warn / skipped">
+      <Group
+        title="rule tiers"
+        id="tiersBlock"
+        caption="pass / warn / skipped"
+        collapseKey="shelly-devroom.tiersBlock.collapsed"
+        defaultCollapsed
+      >
         <CheckRules catalog={props.catalog} rows={view.rows} />
       </Group>
     </div>

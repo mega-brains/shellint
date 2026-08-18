@@ -10,8 +10,9 @@
   padding: 10px;
   border: none;
   border-radius: 8px;
-  /* Opaque — never let inspector text show through. */
-  background-color: var(--surface-2);
+  /* Opaque — never let inspector text show through. --surface-2 carries
+     alpha in the light theme, so use --surface, which is solid in both. */
+  background-color: var(--surface);
   color: var(--ink);
   box-shadow: var(--shadow-modal);
   pointer-events: none;

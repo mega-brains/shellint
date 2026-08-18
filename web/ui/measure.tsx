@@ -1,4 +1,22 @@
 import type { ComponentChildren } from "preact";
+import { useState } from "preact/hooks";
+
+function readCollapsed(key: string, fallback: boolean): boolean {
+  try {
+    const v = localStorage.getItem(key);
+    return v === null ? fallback : v === "1";
+  } catch {
+    return fallback;
+  }
+}
+
+function writeCollapsed(key: string, collapsed: boolean) {
+  try {
+    localStorage.setItem(key, collapsed ? "1" : "0");
+  } catch {
+    /* ignore */
+  }
+}
 
 /**
  * The inspector's one data-display grammar (M18): a labelled bar with its
@@ -74,19 +92,49 @@ export type GroupProps = {
   caption?: ComponentChildren;
   id?: string;
   children: ComponentChildren;
+  /** When set, the body collapses behind a toggle, state kept in localStorage under this key. */
+  collapseKey?: string;
+  /** Collapsed state on first render when nothing is stored yet. */
+  defaultCollapsed?: boolean;
 };
 
 /** Uppercase caption + optional right-hand unit note, then the group's body. */
 export function Group(props: GroupProps) {
+  const collapsible = props.collapseKey != null;
+  const [collapsed, setCollapsed] = useState(() =>
+    collapsible
+      ? readCollapsed(props.collapseKey as string, props.defaultCollapsed ?? false)
+      : false,
+  );
+  const bodyId = props.id ? `${props.id}Body` : undefined;
+
   return (
     <section class="group" id={props.id}>
       <div class="group-head">
-        <h2 class="group-title">{props.title}</h2>
+        {collapsible ? (
+          <button
+            type="button"
+            class="group-toggle"
+            aria-expanded={collapsed ? "false" : "true"}
+            aria-controls={bodyId}
+            onClick={() => {
+              const next = !collapsed;
+              setCollapsed(next);
+              writeCollapsed(props.collapseKey as string, next);
+            }}
+          >
+            <span aria-hidden="true">{collapsed ? "▸" : "▾"}</span> {props.title}
+          </button>
+        ) : (
+          <h2 class="group-title">{props.title}</h2>
+        )}
         {props.caption != null ? (
           <span class="group-caption">{props.caption}</span>
         ) : null}
       </div>
-      {props.children}
+      {collapsible && collapsed ? null : (
+        <div id={bodyId}>{props.children}</div>
+      )}
     </section>
   );
 }
