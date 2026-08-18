@@ -1,0 +1,9 @@
+/*
+ * Bundle entry for the presentation site's stylesheet (scripts/build-static.mjs
+ * bundles this to site/site.css). Pulls in the full design-token contract —
+ * every colour/type/radius the site uses — then the site's own layout rules.
+ * Deliberately does NOT import web/styles.entry.css: that chain drags in
+ * editor/panel/dock CSS (~35 KB) the site has no use for (M26 plan §5).
+ */
+@import "../shell/tokens.css";
+@import "./site.css";

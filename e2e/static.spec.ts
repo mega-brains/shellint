@@ -2,10 +2,13 @@ import { expect, test, type Page } from "@playwright/test";
 import { STATIC_PORT } from "./playwright.config";
 
 /**
- * Playwright against `site/` (M17.8), served by the plain static server from
- * `scripts/preview-static.mjs` (wired as a second `webServer` entry in
- * playwright.config.ts) — proving the offline/device-less build works end to
- * end with zero relation to the Hono dev server the other specs use.
+ * Playwright against `site/` (M17.8, moved under `site/demo/` by M26), served
+ * by the plain static server from `scripts/preview-static.mjs` (wired as a
+ * second `webServer` entry in playwright.config.ts) — proving the
+ * offline/device-less build works end to end with zero relation to the Hono
+ * dev server the other specs use. The demo app itself lives one level down
+ * from the site root now (`${STATIC_BASE}/demo/`); the landing/download shell
+ * around it is covered separately below.
  */
 const STATIC_BASE = `http://127.0.0.1:${STATIC_PORT}`;
 
@@ -29,7 +32,7 @@ const TS_SAMPLE = [
 
 async function openStatic(page: Page) {
   await page.addInitScript(() => localStorage.clear());
-  await page.goto(`${STATIC_BASE}/`);
+  await page.goto(`${STATIC_BASE}/demo/`);
   await expect(page.locator("#editor .cm-content")).toBeVisible();
   await expect(page.locator("#statusLine")).toContainText("loaded", {
     timeout: 30_000,
@@ -169,5 +172,53 @@ test.describe("static/offline build (M17)", () => {
     } finally {
       await context.setOffline(false);
     }
+  });
+});
+
+test.describe("presentation site (M26)", () => {
+  // Selectors here are the agreed contract with the agent building web/site/*:
+  // landing root #site, hero CTAs #ctaDemo/#ctaDownload, the shared theme
+  // toggle #themeToggle (reused by both the landing and download pages), and
+  // the download page's platform table #downloadTable.
+
+  test("landing loads and the demo CTA navigates into the booted app", async ({ page }) => {
+    await page.goto(`${STATIC_BASE}/`);
+    await expect(page.locator("#site")).toBeVisible();
+    await page.locator("#ctaDemo").click();
+    await expect(page).toHaveURL(new RegExp(`${STATIC_BASE}/demo/?$`));
+    // The demo is the same M17 app as the rest of this file — its editor
+    // booting is proof the move to /demo/ didn't break asset resolution.
+    await expect(page.locator("#editor .cm-content")).toBeVisible();
+  });
+
+  test("landing loads and the download CTA reaches /download.html", async ({ page }) => {
+    await page.goto(`${STATIC_BASE}/`);
+    await expect(page.locator("#site")).toBeVisible();
+    await page.locator("#ctaDownload").click();
+    await expect(page).toHaveURL(`${STATIC_BASE}/download.html`);
+    await expect(page.locator("#downloadTable")).toBeVisible();
+  });
+
+  test("theme toggled on the landing persists into the demo", async ({ page }) => {
+    // Deliberately not openStatic(): that helper's init script clears
+    // localStorage on every load, which would erase the very theme choice
+    // this test exists to prove survives a navigation (same origin, same
+    // "shelly-devroom.theme" key — web/shell/theme.ts).
+    await page.goto(`${STATIC_BASE}/`);
+    await page.evaluate(() => localStorage.removeItem("shelly-devroom.theme"));
+    const before = await page.evaluate(() => document.documentElement.dataset.theme);
+
+    await page.locator("#themeToggle").click();
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
+      .not.toBe(before);
+    const after = await page.evaluate(() => document.documentElement.dataset.theme);
+    await expect
+      .poll(() => page.evaluate(() => localStorage.getItem("shelly-devroom.theme")))
+      .toBe(after);
+
+    await page.goto(`${STATIC_BASE}/demo/`);
+    await expect(page.locator("#editor .cm-content")).toBeVisible();
+    expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe(after);
   });
 });

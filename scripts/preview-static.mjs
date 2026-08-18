@@ -32,13 +32,20 @@ const MIME = {
 function resolvePath(urlPath) {
   const decoded = decodeURIComponent(urlPath.split("?")[0]);
   // Strip a leading "/", collapse "..", then re-root under site/ — Pages-style
-  // "/" -> index.html, and any other extensionless path also falls back to it
-  // (there's no client-side router here, but this keeps a stray deep link
-  // from 404ing during manual testing).
+  // "/" -> index.html. Below that, `site/` has two more directories
+  // (`demo/`) that need the same fallback: a request for "/demo/" (or
+  // "/demo", no trailing slash) resolves to a directory, not a file, so
+  // without this it 404s instead of serving demo/index.html. This used to be
+  // claimed as "already handled" and wasn't — fixed here rather than in the
+  // build, since the directory-index fallback is a webserver concern, not a
+  // build-output one.
   let rel = normalize(decoded).replace(/^(\.\.[/\\])+/, "");
   if (rel === "/" || rel === "\\") rel = "/index.html";
-  const full = join(root, rel);
+  let full = join(root, rel);
   if (!full.startsWith(root)) return null; // path traversal guard
+  if (existsSync(full) && statSync(full).isDirectory()) {
+    full = join(full, "index.html");
+  }
   if (existsSync(full) && statSync(full).isFile()) return full;
   return null;
 }

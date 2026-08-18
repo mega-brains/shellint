@@ -39,6 +39,22 @@ export function Header(props: HeaderProps) {
       </div>
 
       {props.staticMode ? (
+        // Static build only: the app now lives at site/demo/, one level
+        // below the presentation site's landing page, so "back" is `../`.
+        // Relative, never root-absolute — `test-static-bundle.mjs` fails
+        // the build on a root-relative ref in shipped HTML.
+        <a
+          class="chip"
+          id="backToSite"
+          href="../"
+          title="Back to the DevRoom site"
+          aria-label="Back to the DevRoom site"
+        >
+          ← DevRoom
+        </a>
+      ) : null}
+
+      {props.staticMode ? (
         <span class="chip" id="staticNote">
           offline playground · no device
         </span>

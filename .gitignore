@@ -7,7 +7,9 @@ dist/
 # Fixture workspaces for the gate/e2e device builds (scripts/fixture-workspace.mjs)
 .tmp/
 web/dist/
-site/
+# Anchored: the build output is the repo-root site/ only. A bare `site/` would
+# also swallow web/site/, the presentation page *sources* (M26).
+/site/
 .devroom/
 .txiki/
 test-results/

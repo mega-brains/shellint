@@ -81,16 +81,24 @@ if (existsSync(join(ROOT, "web/dist/app.js"))) {
   }
 }
 
-// ---------------------------------------------------------------- site/ (M17.7)
+// ---------------------------------------------------------------- site/ (M17.7, moved M26)
 //
 // `npm run test` (scripts/test.mjs) never runs `build:static` — only this repo's
 // maintainer wires new test modules into that list, and `site/` is a separate,
 // optional build. So this section is a bonus assertion when `site/` happens to
 // exist (e.g. after a manual `npm run build:static`, or in CI right after it),
 // not a hard requirement of a plain `npm run test`.
+//
+// M26 moved the app one level down into `site/demo/` and put the presentation
+// site (landing + download) at the root; the deep checks live in
+// scripts/test-static-bundle.mjs, this stays the light budget guard.
 const siteDir = join(ROOT, "site");
+const demoDir = join(siteDir, "demo");
 if (existsSync(siteDir)) {
-  const SITE_REQUIRED = [
+  for (const f of ["index.html", "download.html", "site.js", "site.css", ".nojekyll"]) {
+    if (!existsSync(join(siteDir, f))) fail(`site/${f} missing`);
+  }
+  for (const f of [
     "index.html",
     "app.js",
     "pipeline.worker.js",
@@ -98,34 +106,38 @@ if (existsSync(siteDir)) {
     "api-docs.json",
     "sw.js",
     "manifest.webmanifest",
-    ".nojekyll",
-  ];
-  for (const f of SITE_REQUIRED) {
-    if (!existsSync(join(siteDir, f))) fail(`site/${f} missing`);
+  ]) {
+    if (!existsSync(join(demoDir, f))) fail(`site/demo/${f} missing`);
   }
 
   // No .br/.gz siblings here on purpose — see this file's header on why
   // build-static.mjs skips precompress() for site/ (GitHub Pages gzips itself
   // and won't serve ours).
   for (const suffix of [".br", ".gz"]) {
-    for (const base of ["app.js", "styles.css", "pipeline.worker.js"]) {
-      if (existsSync(join(siteDir, base + suffix))) {
-        fail(`site/${base}${suffix} present — build-static.mjs must not precompress site/`);
+    for (const [dir, base] of [
+      [demoDir, "app.js"],
+      [demoDir, "styles.css"],
+      [demoDir, "pipeline.worker.js"],
+      [siteDir, "site.js"],
+      [siteDir, "site.css"],
+    ]) {
+      if (existsSync(join(dir, base + suffix))) {
+        fail(`${base}${suffix} present — build-static.mjs must not precompress site/`);
       }
     }
   }
 
-  const appBytes = statSync(join(siteDir, "app.js")).size;
-  if (appBytes > 700_000) fail(`site/app.js is ${appBytes} B, over its 700000 B budget`);
+  const appBytes = statSync(join(demoDir, "app.js")).size;
+  if (appBytes > 700_000) fail(`site/demo/app.js is ${appBytes} B, over its 700000 B budget`);
 
-  const workerPath = join(siteDir, "pipeline.worker.js");
+  const workerPath = join(demoDir, "pipeline.worker.js");
   const workerBytes = statSync(workerPath).size;
   if (workerBytes > 5_000_000) {
-    fail(`site/pipeline.worker.js is ${workerBytes} B, over its 5000000 B raw budget`);
+    fail(`site/demo/pipeline.worker.js is ${workerBytes} B, over its 5000000 B raw budget`);
   }
   const workerGz = gzipSync(readFileSync(workerPath)).length;
   if (workerGz > 1_350_000) {
-    fail(`site/pipeline.worker.js gzips to ${workerGz} B, over its 1350000 B gz budget`);
+    fail(`site/demo/pipeline.worker.js gzips to ${workerGz} B, over its 1350000 B gz budget`);
   }
 
   // The worker (TypeScript + Terser + tier 3) must stay a separate chunk, not
@@ -134,13 +146,16 @@ if (existsSync(siteDir)) {
   // worker split (M17 plan §10). "Debug Failure." is one of TypeScript's own
   // internal assertion messages, present in any bundle that pulled in the
   // compiler; it has no reason to appear in the UI bundle otherwise.
-  const appSource = readFileSync(join(siteDir, "app.js"), "utf8");
+  const appSource = readFileSync(join(demoDir, "app.js"), "utf8");
   if (appSource.includes("Debug Failure.")) {
-    fail("site/app.js appears to contain the TypeScript compiler — pipeline.worker.ts got inlined instead of split out");
+    fail("site/demo/app.js appears to contain the TypeScript compiler — pipeline.worker.ts got inlined instead of split out");
   }
 
+  const siteBytes = statSync(join(siteDir, "site.js")).size;
+  if (siteBytes > 60_000) fail(`site/site.js is ${siteBytes} B, over its 60000 B budget`);
+
   console.log(
-    `OK: site/ present and within budget (app.js ${appBytes} B, worker ${workerBytes} B raw / ${workerGz} B gz)`,
+    `OK: site/ present and within budget (demo/app.js ${appBytes} B, worker ${workerBytes} B raw / ${workerGz} B gz, site.js ${siteBytes} B)`,
   );
 }
 

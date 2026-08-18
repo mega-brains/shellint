@@ -32,6 +32,8 @@ jobs:
       - run: npm ci
 
       - run: npm run build:static
+        env:
+          DEVROOM_REPO: ${{ github.repository }}
 
       - uses: actions/upload-pages-artifact@v3
         with:

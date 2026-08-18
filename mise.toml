@@ -47,11 +47,13 @@ description = "Fixture device build + web UI bundle — the build step of before
 depends = ["build:shelly:fixture", "build:web"]
 
 [tasks."build:static"]
-description = "Build the static/offline GitHub Pages bundle into site/ (M17)"
+description = "Build the GitHub Pages site into site/: landing + download at the root, the offline/device-less app under site/demo/ (M17, M26)"
+alias = "build:site"
 run = "npm run build:static"
 
 [tasks."preview:static"]
-description = "Serve site/ with a plain static file server — proves build:static needs no server (M17)"
+description = "Serve site/ with a plain static file server — / landing, /demo/ app, /download.html; proves build:static needs no server (M17, M26)"
+alias = "preview:site"
 depends = "build:static"
 run = "npm run preview:static -- \"$@\""
 
