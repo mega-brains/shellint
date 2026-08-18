@@ -7,7 +7,8 @@
  *   download.html         releases page                       (new, M26)
  *   site.js               landing+download Preact bundle       (new, M26)
  *   site.css              tokens.css + site-only layout CSS    (new, M26)
- *   devroom-header.png    hero screenshot, copied from repo root (new, M26)
+ *   devroom-header.png        hero screenshot, light  (from repo root, M26)
+ *   devroom-header-dark.png   hero screenshot, dark   (from repo root, M26)
  *   .nojekyll              stop Pages' Jekyll step from touching `_`-prefixed
  *                          paths — applies to the whole publish, stays at root
  *   demo/
@@ -282,14 +283,25 @@ await esbuild.build({
 copyFileSync(join(root, "web", "site", "index.html"), join(siteDir, "index.html"));
 copyFileSync(join(root, "web", "site", "download.html"), join(siteDir, "download.html"));
 
-// The one image the site ships (M26 plan §5) — the landing hero screenshot,
-// committed at the repo root rather than under web/ so it isn't mistaken for
-// something the app bundle needs.
-copyFileSync(join(root, "devroom-header.png"), join(siteDir, "devroom-header.png"));
+// The only images the site ships (M26 plan §5) — the landing hero screenshot
+// in both themes, since web/site/landing.tsx picks one off the visitor's
+// current theme. Committed at the repo root rather than under web/ so they
+// aren't mistaken for something the app bundle needs.
+for (const img of ["devroom-header.png", "devroom-header-dark.png"]) {
+  copyFileSync(join(root, img), join(siteDir, img));
+}
 
 // ------------------------------------------------------------------ report
 
-for (const f of ["index.html", "download.html", "site.js", "site.css", "devroom-header.png", ".nojekyll"]) {
+for (const f of [
+  "index.html",
+  "download.html",
+  "site.js",
+  "site.css",
+  "devroom-header.png",
+  "devroom-header-dark.png",
+  ".nojekyll",
+]) {
   const p = join(siteDir, f);
   if (!existsSync(p)) {
     console.error(`FAIL: build-static.mjs did not produce site/${f}`);

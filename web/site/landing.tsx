@@ -18,6 +18,35 @@ import { Group } from "../ui/measure";
 import { useTheme } from "../shell/theme";
 import { repoUrl } from "./release";
 
+/**
+ * The hero screenshot, in the theme the visitor is actually looking at — a
+ * light shot of the app on a dark page (or the reverse) reads as a screenshot
+ * of some *other* program.
+ *
+ * Driven off `useTheme()` rather than a `<picture>` with a
+ * `prefers-color-scheme` `<source>`: `<picture>` only ever sees the OS
+ * preference, so it would ignore the header's theme toggle. Swapping `src`
+ * also means the browser fetches one image, not both — two ~250 KB PNGs, one
+ * of them `display: none`, is still two downloads.
+ *
+ * Both files are 1620×908; the box crops the bottom (see `.hero-shot` in
+ * site.css), which is why the dashboard rail sits high in the frame.
+ */
+function HeroShot() {
+  const [theme] = useTheme();
+  return (
+    <div class="hero-shot" style={{ aspectRatio: "1620 / 660" }}>
+      <img
+        src={theme === "dark" ? "./devroom-header-dark.png" : "./devroom-header.png"}
+        width={1620}
+        height={908}
+        alt="DevRoom's editor, build dashboard and device dock"
+        loading="eager"
+      />
+    </div>
+  );
+}
+
 export function SiteHeader() {
   const [theme, toggle] = useTheme();
   const next = theme === "dark" ? "light" : "dark";
@@ -109,15 +138,7 @@ export function Landing() {
               Download
             </a>
           </div>
-          <div class="hero-shot" style={{ aspectRatio: "1600 / 520" }}>
-            <img
-              src="./devroom-header.png"
-              width={1600}
-              height={520}
-              alt="DevRoom's editor, dashboard and device dock"
-              loading="eager"
-            />
-          </div>
+          <HeroShot />
         </section>
 
         <section class="features">
