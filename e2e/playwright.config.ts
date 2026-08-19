@@ -58,18 +58,20 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      // Default: Playwright's bundled Chromium (`npx playwright install
-      // chromium`). Measured at roughly half the wall time of system Chrome on
-      // this suite — Chrome runs the full browser in headless mode, bundled
-      // Chromium the lighter build — and the design baselines match on both.
-      // `PW_CHANNEL=chrome` (or any other channel name) opts back into a
-      // system browser; that is the fallback when Chromium is not installed.
+      // Default: system Chrome, because it is the only engine every checkout
+      // is guaranteed to have — `npx playwright install chromium` needs to
+      // reach Google's CDN, which fails outright behind a TLS-inspecting proxy.
+      // `PW_CHANNEL=bundled` opts into Playwright's own Chromium, which runs
+      // this suite in roughly half the wall time (the headless shell is a
+      // lighter build than Chrome-in-headless-mode) and matches the design
+      // baselines; CI sets it, since no runner ships Chrome. Any other value is
+      // taken as a channel name.
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1440, height: 900 },
-        ...(process.env.PW_CHANNEL && process.env.PW_CHANNEL !== "bundled"
-          ? { channel: process.env.PW_CHANNEL as "chrome" }
-          : {}),
+        ...(process.env.PW_CHANNEL === "bundled"
+          ? {}
+          : { channel: (process.env.PW_CHANNEL as "chrome") || "chrome" }),
       },
     },
   ],
