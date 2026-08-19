@@ -32,8 +32,7 @@ export type DevicesFile = {
 };
 export type ActiveTarget = { device: DeviceRecord; slot: number; script: string };
 
-const DEVICES_DIR = STATE_DIR;
-const DEVICES_FILE = join(DEVICES_DIR, "devices.json");
+const DEVICES_FILE = join(STATE_DIR, "devices.json");
 
 export class NoDeviceError extends Error {
   constructor() {
@@ -62,10 +61,6 @@ function emptyFile(): DevicesFile {
   return { version: 1, active: null, devices: [] };
 }
 
-async function ensureDir(): Promise<void> {
-  await fs.mkdir(DEVICES_DIR, { recursive: true });
-}
-
 async function readRaw(): Promise<DevicesFile | null> {
   if (!(await fs.exists(DEVICES_FILE))) return null;
   try {
@@ -81,7 +76,7 @@ let writeQueue = Promise.resolve();
 
 function writeRaw(file: DevicesFile): Promise<void> {
   const write = writeQueue.catch(() => undefined).then(async () => {
-    await ensureDir();
+    await fs.mkdir(STATE_DIR, { recursive: true });
     await fs.atomicWriteText(DEVICES_FILE, JSON.stringify(file, null, 2) + "\n", {
       mode: 0o600,
     });
@@ -160,9 +155,7 @@ export async function loadDevices(): Promise<DevicesFile> {
   if (cache) return cache;
   if (loading) return loading;
   loading = (async () => {
-    // Before the first read, not on a schedule: every server and CLI path that
-    // touches a device comes through here, so this is the one place a renamed
-    // state dir can be picked up without each entry point remembering to.
+    // Every server and CLI path that touches a device comes through here.
     await migrateStateDir();
     const existing = await readRaw();
     if (existing) return existing;
