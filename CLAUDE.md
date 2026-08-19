@@ -19,6 +19,14 @@ build, test, then the e2e suite twice — once against the Node server, once
 against the txiki single-file executable, `e2e/playwright.txiki.config.ts`,
 which runs it on port 8797 via `SHELLINT_PORT` with one worker).
 
+Opt-in and deliberately outside that gate: `mise run test:e2e:lightpanda` runs
+the 11 of 31 tests that need neither layout nor screenshots against
+[Lightpanda](https://lightpanda.io) (`test:e2e:hybrid` splits the whole suite
+across it and Chromium). `scripts/install-lightpanda.mjs` pins one build —
+`1.0.0-nightly.8737+6acfc0357` — by numeric GitHub asset id plus sha256, because
+`nightly` is a rolling tag whose assets are replaced in place and one such swap
+already broke every `page.goto`; arm64 macOS and arm64/x64 Linux only.
+
 **No gate step touches `scripts/main.ts`** — that file is the user's live
 editor buffer, so its size, lint findings and even whether it compiles are
 outside the repo's control. Every gate step instead compiles
