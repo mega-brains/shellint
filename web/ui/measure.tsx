@@ -133,7 +133,13 @@ export function Group(props: GroupProps) {
         ) : null}
       </div>
       {collapsible && collapsed ? null : (
-        <div id={bodyId}>{props.children}</div>
+        // `display: contents` so the body's children stay direct flex items of
+        // `.group` and keep its 8px gap between them — a real box here collapses
+        // every multi-child group by one gap per child. The element exists only
+        // to give the toggle above an `aria-controls` target.
+        <div id={bodyId} style={{ display: "contents" }}>
+          {props.children}
+        </div>
       )}
     </section>
   );
