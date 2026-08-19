@@ -1,11 +1,11 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./helpers/test-base";
 import { openCheckTab } from "./helpers/check-tab";
 import { openApp } from "./helpers/open-app";
 
 test.describe("editor smoke", () => {
   test("boots with editor, sidebar, footer", async ({ page }) => {
     await openApp(page);
-    await expect(page).toHaveTitle("Shelly DevRoom");
+    await expect(page).toHaveTitle("shellint");
     await expect(page.locator("#editor")).toBeVisible();
     await expect(page.locator("#side")).toBeVisible();
     await expect(page.locator("#dock")).toBeVisible();
@@ -21,9 +21,9 @@ test.describe("editor smoke", () => {
     const text = await page.locator("#editor .cm-content").innerText();
     expect(text.length).toBeGreaterThan(40);
     // Markers of fixtures/device/main.ts — the script every e2e server is
-    // pointed at (DEVROOM_SCRIPT, see playwright.config.ts). Never the user's
+    // pointed at (SHELLINT_SCRIPT, see playwright.config.ts). Never user's
     // scripts/main.ts, whose contents the suite must not depend on.
-    expect(text).toMatch(/DevRoom test fixture|LOG_PREFIX|Shelly\.call|Timer\.set/);
+    expect(text).toMatch(/shellint test fixture|LOG_PREFIX|Shelly\.call|Timer\.set/);
   });
 
   test("Save PUTs /api/script", async ({ page }) => {
@@ -37,7 +37,7 @@ test.describe("editor smoke", () => {
     await expect(page.locator("#statusLine")).toContainText("saved");
   });
 
-  test("Build split menu opens and Check populates panel", async ({ page }) => {
+  test("Build split menu opens and Check populates panel", { tag: "@layout" }, async ({ page }) => {
     await openApp(page);
     await page.locator("#btnBuildMenu").click();
     await expect(page.locator("#buildMenu")).toBeVisible();

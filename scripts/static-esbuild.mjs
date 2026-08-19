@@ -81,7 +81,7 @@ export function staticEsbuildConfig(overrides = {}) {
 function localApiPlugin(root) {
   const target = path.join(root, "web", "static", "local-api.ts");
   return {
-    name: "devroom-local-api",
+    name: "shellint-local-api",
     setup(build) {
       build.onResolve({ filter: /^\.\.\/lib\/api$/ }, () => ({ path: target }));
     },

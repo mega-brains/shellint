@@ -204,7 +204,7 @@ function sizeText(s: SideSize): string {
   return `${s.chars} ch · ${s.bytes} B`;
 }
 
-const LAYOUT_KEY = "shelly-devroom.diff.unified";
+const LAYOUT_KEY = "shellint.diff.unified";
 
 function storedUnified(): boolean {
   try {

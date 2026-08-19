@@ -17,14 +17,14 @@ before assuming entrypoints exist.
 Pre-commit gate: `mise run beforeCommit` (line limit ≤500, typecheck shelly/server/web,
 build, test, then the e2e suite twice — once against the Node server, once
 against the txiki single-file executable, `e2e/playwright.txiki.config.ts`,
-which runs it on port 8797 via `DEVROOM_PORT` with one worker).
+which runs it on port 8797 via `SHELLINT_PORT` with one worker).
 
 **No gate step touches `scripts/main.ts`** — that file is the user's live
 editor buffer, so its size, lint findings and even whether it compiles are
 outside the repo's control. Every gate step instead compiles
 [`fixtures/device/main.ts`](./fixtures/device/main.ts), copied per runner into
 `.tmp/<name>/` by `scripts/fixture-workspace.mjs` and pointed at through
-`DEVROOM_SCRIPT` / `DEVROOM_DIST` (honoured by `server/core/paths.ts`,
+`SHELLINT_SCRIPT` / `SHELLINT_DIST` (honoured by `server/core/paths.ts`,
 `scripts/build-shelly.mjs` and both Playwright configs, whose servers run on
 their own ports — 8789 for Node, 8797 for txiki — and never reuse a dev server
 on 8787, since that one serves the live script). `npm run typecheck:script`
@@ -43,14 +43,14 @@ process-per-test, for when a failure smells like cross-test module state.
 
 | Layer | Choice |
 |---|---|
-| Runtime | Node 22 via mise by default; txiki.js v26.6.0 through conditional runtime and builder adapters. Both `tjs` binaries are vendored (gitignored `vendor/txiki/`) and pinned in `mise.toml`. `DEVROOM_TJS_BIN` is the slim `min` profile — no FFI, no TLS, ~2.0 MB — from the [`lukasMega/txiki.js-with-slim-builds`](https://github.com/lukasMega/txiki.js-with-slim-builds/releases/tag/slim-v26.6.0-6) release (tag `slim-v26.6.0-6`), not a locally built fork, because that binary is what `tjs compile` embeds in the shipped executable. It drops the `bundle`, `eval`, `serve`, `test` and `app` **subcommands** (the `tjs.serve` *API* is still there, which is all the capability probe needs), so `DEVROOM_TJS_BUNDLE_BIN` carries the full upstream `saghul/txiki.js` v26.6.0 build for the one `tjs bundle` step |
+| Runtime | Node 22 via mise by default; txiki.js v26.6.0 through conditional runtime and builder adapters. Both `tjs` binaries are vendored (gitignored `vendor/txiki/`) and pinned in `mise.toml`. `SHELLINT_TJS_BIN` is the slim `min` profile — no FFI, no TLS, ~2.0 MB — from the [`lukasMega/txiki.js-with-slim-builds`](https://github.com/lukasMega/txiki.js-with-slim-builds/releases/tag/slim-v26.6.0-6) release (tag `slim-v26.6.0-6`), not a locally built fork, because that binary is what `tjs compile` embeds in the shipped executable. It drops the `bundle`, `eval`, `serve`, `test` and `app` **subcommands** (the `tjs.serve` *API* is still there, which is all the capability probe needs), so `SHELLINT_TJS_BUNDLE_BIN` carries the full upstream `saghul/txiki.js` v26.6.0 build for the one `tjs bundle` step |
 | Task runner | mise (`start`/`dev`, `build`, `lint`, `test`, `beforeCommit`, `probe`, `clean`) |
 | Device compile | `tsc` → ES5, `module: none`, `noEmitHelpers`, `noLib` + `types: []` |
 | Env gating | `meta.env` DCE → `*.raw.js`; then Terser minify → `*.js`; prod also shortens log strings into `dist/prod.logmap.json`, which the logs panel re-expands (M13) |
 | Emit | Flat (no IIFE) → `dist/{debug,prod}.{raw.js,js,adv.js}` — `*.adv.js` is tier 3 (`espruino --minify`, chained after Terser) and is simply absent when that binary is not installed (M13) |
 | Types | `types/shelly.d.ts`, `types/espruino-lib.d.ts`, `types/meta.d.ts` — the whole stdlib for device code, since `noLib` drops `lib.es*` (M11) |
-| Config | `devroom.json` (`host`, `port`, `compiler`, `minify`); legacy `deviceIp`/`scriptId` are read only as a one-time migration fallback (M15) |
-| Multi-device | `.devroom/devices.json` (gitignored, `0600`) holds the device list + active `{device, slot, script}` selection — `server/device/devices.ts`. Digest auth (`server/device/auth-digest.ts`) retries a 401 challenge once. Header device/slot pickers (`web/device/device-select.tsx`, `web/device/slot-select.tsx`) switch via `POST /api/session/active`, which re-mirrors the switched-to device's cached profile/probe into the fixed `types/*` paths below and resets the log stream (a device with no cache of its own leaves the previous mirror standing rather than blanking it). The slot picker also creates/deletes slots and imports a slot's code into the editor as an unsaved buffer (`web/device/use-slot-import.tsx`). Per-script workspaces (`scriptKey`, always `"main"` today) are designed for but not built yet — see the M15 plan's §9 (M16) (M15) |
+| Config | `shellint.json` (`host`, `port`, `compiler`, `minify`); legacy `devroom.json` is fallback only when shellint config is absent |
+| Multi-device | `.shellint/devices.json` (gitignored, `0600`) holds device list and active `{device, slot, script}` selection — `server/device/devices.ts`. Digest auth retries a 401 challenge once. Header device/slot pickers switch via `POST /api/session/active`, re-mirroring selected device profile/probe into fixed `types/*` paths. |
 | Server / UI | Hono + CodeMirror 6 |
 | Web bundle | esbuild → `web/dist/{app.js,styles.css,api-docs.json}`, all minified and precompressed to `.br`/`.gz`; `server/core/static-assets.ts` negotiates on `Accept-Encoding`. Sourcemap is dev-only (`build:web:dev`); `npm run build:web` passes `--prod`. `web/editor/cm-setup.ts` replaces CodeMirror's `basicSetup` to keep `@codemirror/lint` out. Budgets enforced by `scripts/test-web-assets.mjs` (M14); the M18 redesign cut `styles.css` from 41.4 KB to ~35.4 KB and the budget with it |
 | Deploy | WS PutCode; mode debug/prod + artifact min/raw |
@@ -63,12 +63,12 @@ process-per-test, for when a failure smells like cross-test module state.
 | UI layout | `#app` is a grid: header 52 · readiness rail 38 · workspace 1fr · dock 46/300 (M18). Header carries the wordmark, device/slot chips, run-state chip and the toolbar (Save · Build split · Deploy split · Probe, driven by `web/ui/button.tsx`). The rail (`web/shell/readiness-rail.tsx` + `readiness.ts`) states the built/checked/probed gates and owns the one transient status line. The inspector is a tab strip — build / check / options, one pane visible, last tab in localStorage (`web/shell/inspector.tsx`), resizable via the surviving vertical splitter. The dock (`web/device/dock.tsx`) owns its own row, so it cannot overlap the workspace; it is resizable by a horizontal splitter (`--dock-h` on `#app`, 140px min, 220px min workspace, height in localStorage). Breakpoints: 1000px moves the inspector above the editor; the header sheds the Deploy detail at 1100px and the device IP + run-state word at 900px (both stay in `title`), stepping down to a smaller, narrower face (`--sans-narrow`) as it goes |
 | Data display | One measure-row grammar (`web/ui/measure.tsx`) for artifact sizes, caps and memory buckets, so bars compare down a column; colour only at ≥75% of a limit, or on the one artifact Deploy targets. Counters stay tiles; the estimate-vs-peak well is the only inset surface (M18) |
 | Theme | Dark by default, light behind `prefers-color-scheme`, overridable by the header toggle (`web/shell/theme.ts` writes `<html data-theme>` + localStorage) — all tokens in `web/shell/tokens.css`. CodeMirror is themed in `web/editor/cm-theme.ts` off the same custom properties (its own DOM is not stylesheet-friendly). Elevation exists only on the shared modal frame (`web/ui/modal.css`) (M18) |
-| Device profile | `types/device-profile.json` (`ListMethods` + components + gen/fw) drives Tier 4; refreshed when the device answers. Authoritative per-device copy lives at `.devroom/devices/<id>/profile.json`; `types/device-profile.json` is a mirror of whichever device is active, rewritten on switch (M15) |
+| Device profile | `types/device-profile.json` (`ListMethods` + components + gen/fw) drives Tier 4; refreshed when device answers. Authoritative per-device copy lives at `.shellint/devices/<id>/profile.json`; mirrored for active device. |
 | Capability probe | `mise run probe` → 104 `Script.Eval` expressions (`server/probe/probe-catalog.ts`) → `types/generated-probe.json` → `types/generated.d.ts`. Excluded from the device compile; absences surface as `probe-absent-api` (M13). Severity follows provenance: **error** when the probe came from the *active* device (a ReferenceError on the box the next Deploy writes to), **warn** when it came from another device or none is active. Same per-device-copy-plus-mirror scheme as the device profile (M15) |
 | Artifact preview | A chip strip above the editor (`source`, the built artifacts, and a `diff` dropdown) swaps in any built `dist` artifact read-only; `GET /api/artifacts` + `/api/artifact` serve a six-name allowlist (M13). Last entry is `diff · debug ↔ prod (raw)` — unified diff computed in browser (`web/diff/diff.ts`, hand-rolled LCS), tinted per +/- line |
-| Auth | None for the DevRoom UI itself. Digest auth (username `admin`, per-device password) is supported *to the Shelly device* — `.devroom/devices.json` stores the plaintext password, LAN-only tool, no login of its own (M15) |
+| Auth | None for shellint UI itself. Digest auth is supported *to Shelly device* — `.shellint/devices.json` stores plaintext password, LAN-only tool. |
 
-Default compiler is clean-room DevRoom (`compiler: "devroom"`). Setting
+Default compiler is clean-room shellint (`compiler: "shellint"`; legacy `"devroom"` accepted). Setting
 `compiler` to anything else prints `shelly-forge path not wired yet`.
 
 ## Commands
@@ -86,11 +86,11 @@ mise run bench            # minify-option benchmark over bench/*.ts
 mise run beforeCommit     # check:lines → typecheck → build:gate → test → e2e (node + txiki exe)
 mise run build:gate       # fixture device build + web bundle (what the gate builds)
 mise run typecheck:script # typecheck your live scripts/main.ts (outside the gate)
-mise run start            # DevRoom server (alias: mise run dev)
+mise run start            # shellint server (alias: mise run dev)
 mise run build:txiki      # bundle txiki server and CLI entries
 mise run start:txiki      # start the txiki server bundle
 mise run test:txiki       # capabilities and Node/txiki HTTP parity
-mise run test:e2e:txiki   # full e2e suite against .txiki/shelly-devroom
+mise run test:e2e:txiki   # full e2e suite against .txiki/shellint
 mise run deploy -- debug min   # MODE + MINIFY=min|raw
 mise run deploy:txiki -- --mode debug --minify min
 mise run probe
@@ -101,23 +101,23 @@ mise run clean
 ```
 
 Also available via `npm run …` (`build:shelly`, `build:web`, `dev`, `beforeCommit`, …).
-Set `DEVROOM_TJS_BIN` when `tjs` is not on `PATH` — it still overrides the
+Set `SHELLINT_TJS_BIN` when `tjs` is not on `PATH` — it still overrides the
 vendored default, and a repo-relative value is resolved against the repo root
 (`scripts/txiki-test-util.mjs`), so moving the checkout does not break it.
-`DEVROOM_TJS_VERSION` is asserted against `--version` for *every* bin used, the
+`SHELLINT_TJS_VERSION` is asserted against `--version` for *every* bin used, the
 bundler included. `tjs bundle` fetches esbuild into `~/.tjs/` on first use, so
 that step wants network and the TLS-capable full build. txiki needs bundles under
 `.txiki/`; npm installation, TypeScript, and Playwright stay on Node.
 Build config: `tsconfig.shelly.base.json` (device compiler options; extended by
 `tsconfig.shelly.script.json` for `scripts/main.ts`, `tsconfig.shelly.fixture.json`
 for the gate's fixture, and by the config `build-shelly.mjs` generates for a
-`DEVROOM_SCRIPT` workspace) / `tsconfig.server.json` / `tsconfig.web.json`.
+`SHELLINT_SCRIPT` workspace) / `tsconfig.server.json` / `tsconfig.web.json`.
 Entry: `scripts/main.ts`. Pipeline:
 `scripts/build-shelly.mjs`.
 
 ## What this project is
 
-**Shelly DevRoom** — a local development playground for authoring
+**shellint** — local development playground for authoring
 [Shelly Gen2 device scripts](https://shelly-api-docs.shelly.cloud/gen2/Scripts/Overview).
 
 Planned shape (from `README.md`):

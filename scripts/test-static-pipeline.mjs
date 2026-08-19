@@ -4,7 +4,7 @@
  *
  *  a) Byte-identity: transpileDevice (web/static/transpile.ts) +
  *     transformVariant (shared/device-pipeline.mjs), run over scripts/main.ts
- *     with devroom.json's actual minify config, reproduce the committed
+ *     with shellint.json's actual minify config, reproduce committed
  *     dist/{debug,prod}.{raw.js,js} byte for byte, and dist/prod.logmap.json
  *     where the config shortens logs. This is what actually proves the
  *     worker ships the same bytes `npm run build:shelly` does — the whole
@@ -59,7 +59,7 @@ function byteLen(s) {
 }
 
 function loadMinifyConfig() {
-  const raw = JSON.parse(readFileSync(path.join(ROOT, "devroom.json"), "utf8"));
+  const raw = JSON.parse(readFileSync(path.join(ROOT, "shellint.json"), "utf8"));
   const src =
     raw.minify && typeof raw.minify === "object" && !Array.isArray(raw.minify)
       ? raw.minify
@@ -142,7 +142,7 @@ async function checkByteIdentity() {
     for (const [text, id] of sharedIds) map[id] = text;
     const logMapPath = path.join(DIST, "prod.logmap.json");
     if (!existsSync(logMapPath)) {
-      fail("expected dist/prod.logmap.json — devroom.json's minify config shortens logs");
+      fail("expected dist/prod.logmap.json — shellint.json minify config shortens logs");
     }
     const committedMap = JSON.parse(readFileSync(logMapPath, "utf8"));
     assert.deepStrictEqual(map, committedMap, "log map diverges from dist/prod.logmap.json");
@@ -176,7 +176,7 @@ const KNOWN_GUARDED_PROCESS_PROPS = new Set([
 ]);
 
 async function checkBundleability() {
-  const outDir = mkdtempSync(path.join(tmpdir(), "devroom-static-pipeline-"));
+  const outDir = mkdtempSync(path.join(tmpdir(), "shellint-static-pipeline-"));
   try {
     const outfile = path.join(outDir, "pipeline.worker.js");
     // Same config scripts/test-static-check.mjs and (M17.7) build:static use —

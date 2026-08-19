@@ -1,4 +1,4 @@
-import { runtime } from "#devroom/runtime";
+import { runtime } from "#shellint/runtime";
 
 /**
  * Shelly Gen2 digest auth (https://shelly-api-docs.shelly.cloud/gen2/General/Authentication).

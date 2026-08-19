@@ -106,7 +106,7 @@ export function resolveVariantOptions(minifyOpts, variantName) {
 
 /**
  * Size minify on already-env-substituted code.
- * Options mirror `devroom.json` `minify.*` Terser knobs. `opts` must already
+ * Options mirror `shellint.json` `minify.*` Terser knobs. `opts` must already
  * be resolved per-variant (see `resolveVariantOptions`) — this function does
  * not know or care which variant it's minifying.
  */
@@ -130,7 +130,7 @@ export async function minifyPass(code, opts) {
     if (keepFnames) compressOpt.keep_fnames = true;
     // Prod-only by construction: opts is already scope-resolved, so
     // dropConsole reads as false here on every debug build regardless of
-    // devroom.json — the debug artifact exists to be logged.
+    // shellint.json — debug artifact exists to be logged.
     if (dropConsole) compressOpt.drop_console = true;
     if (passes) compressOpt.passes = 3;
     if (hoistProps) compressOpt.hoist_props = true;

@@ -7,7 +7,7 @@ import type { SparkPoint } from "./spark";
  */
 export const WINDOW_MS = 5 * 60 * 1000;
 
-const PREFIX = "shelly-devroom.history.";
+const PREFIX = "shellint.history.";
 
 export type MetricHistory = {
   read(now?: number): SparkPoint[];

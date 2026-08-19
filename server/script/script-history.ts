@@ -1,5 +1,5 @@
-import runtime from "#devroom/runtime";
-import { ROOT } from "../core/paths.ts";
+import runtime from "#shellint/runtime";
+import { STATE_DIR } from "../core/paths.ts";
 
 export type ScriptHistoryRow = {
   id: string;
@@ -7,7 +7,7 @@ export type ScriptHistoryRow = {
   bytes: number;
 };
 
-const DIR = runtime.path.join(ROOT, ".devroom");
+const DIR = STATE_DIR;
 const FILE = runtime.path.join(DIR, "script-history.jsonl");
 const MAX_ROWS = 10;
 /** Autosave snapshots within this long of the last row are coalesced away. */

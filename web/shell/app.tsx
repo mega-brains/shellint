@@ -27,7 +27,7 @@ import { useInitialLoad } from "./use-initial-load";
 import { useDeviceSection } from "./device-section";
 import { StaticFileControls } from "./static-file-controls";
 import { applyCheckFixes } from "../check/apply-check-fixes";
-const AUTO_KEY = "shelly-devroom.autoBuildCheck";
+const AUTO_KEY = "shellint.autoBuildCheck";
 
 export function App() {
   const [status, setStatusMsg] = useState("ready");

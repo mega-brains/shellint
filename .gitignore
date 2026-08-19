@@ -10,6 +10,7 @@ web/dist/
 # Anchored: the build output is the repo-root site/ only. A bare `site/` would
 # also swallow web/site/, the presentation page *sources* (M26).
 /site/
+.shellint/
 .devroom/
 .txiki/
 # Vendored txiki.js binaries (see the Runtime row in CLAUDE.md) — multi-MB
@@ -19,3 +20,4 @@ test-results/
 playwright-report/
 blob-report/
 e2e/.cache/
+.tools/

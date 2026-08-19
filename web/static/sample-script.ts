@@ -4,7 +4,7 @@
  * (ES5, no arrows/classes/template literals) so the very first Check comes
  * back green and the very first Build produces a meaningful debug/prod diff.
  */
-export const SAMPLE_SCRIPT = `// Shelly DevRoom — static playground.
+export const SAMPLE_SCRIPT = `// shellint — static playground.
 // Open your own .js/.ts file, or edit this one.
 
 var TICK_MS = 10000;

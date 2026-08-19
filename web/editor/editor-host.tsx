@@ -4,7 +4,7 @@ import { EditorView } from "@codemirror/view";
 import { javascript } from "@codemirror/lang-javascript";
 import { EditorState } from "@codemirror/state";
 import { basicSetup } from "./cm-setup";
-import { devroomTheme } from "./cm-theme";
+import { shellintTheme } from "./cm-theme";
 import { findingGutter } from "./finding-gutter";
 import { dirtyGutter } from "./dirty-gutter";
 import { statLineHighlight } from "./line-highlight";
@@ -91,7 +91,7 @@ export function EditorHost(props: EditorHostProps) {
           diffHighlight,
           shellyHover,
           buildErrorGutter,
-          devroomTheme,
+          shellintTheme,
           EditorView.lineWrapping,
           EditorView.updateListener.of((u) => {
             if (u.docChanged) onDocChange.current();

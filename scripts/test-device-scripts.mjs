@@ -19,8 +19,8 @@ import { _resetCache, addDevice, loadDevices, setActive } from "../server/device
 import { deploy } from "../server/device/deploy.ts";
 import { GENERATED_DTS_PATH } from "../server/probe/probe-typings.ts";
 
-const DEVROOM_JSON = join(ROOT, "devroom.json");
-const DEVICES_DIR = join(ROOT, ".devroom");
+const SHELLINT_JSON = join(ROOT, "shellint.json");
+const DEVICES_DIR = join(ROOT, ".shellint");
 const DEVICES_FILE = join(DEVICES_DIR, "devices.json");
 const ARTIFACT = join(DIST_DIR, "prod.js");
 
@@ -29,7 +29,7 @@ function fail(msg) {
   process.exit(1);
 }
 
-const originalDevroom = existsSync(DEVROOM_JSON) ? readFileSync(DEVROOM_JSON, "utf8") : null;
+const originalShellint = existsSync(SHELLINT_JSON) ? readFileSync(SHELLINT_JSON, "utf8") : null;
 const originalDevices = existsSync(DEVICES_FILE) ? readFileSync(DEVICES_FILE, "utf8") : null;
 const originalArtifact = existsSync(ARTIFACT) ? readFileSync(ARTIFACT) : null;
 // setActive() re-mirrors these fixed paths for whichever device is active —
@@ -43,7 +43,7 @@ const originalGeneratedDts = existsSync(GENERATED_DTS_PATH)
   : null;
 
 function restore() {
-  if (originalDevroom !== null) writeFileSync(DEVROOM_JSON, originalDevroom, "utf8");
+  if (originalShellint !== null) writeFileSync(SHELLINT_JSON, originalShellint, "utf8");
   if (originalDevices !== null) {
     mkdirSync(DEVICES_DIR, { recursive: true });
     writeFileSync(DEVICES_FILE, originalDevices, "utf8");
@@ -91,7 +91,7 @@ try {
       if (method === "Script.List") {
         return {
           scripts: [
-            { id: 1, name: "devroom", enable: true },
+            { id: 1, name: "shellint", enable: true },
             { id: 2, name: "other", enable: false },
           ],
         };
@@ -165,7 +165,7 @@ try {
 
     mkdirSync(DEVICES_DIR, { recursive: true });
     writeFileSync(DEVICES_FILE, JSON.stringify({ version: 1, active: null, devices: [] }), "utf8");
-    writeFileSync(DEVROOM_JSON, "{}", "utf8");
+    writeFileSync(SHELLINT_JSON, "{}", "utf8");
     _resetCache();
     const device = await addDevice({ ip: "10.0.2.1", label: "Bench" }, () => ({
       async connect() {

@@ -1,5 +1,5 @@
 import type { Context } from "hono";
-import { runtime } from "#devroom/runtime";
+import { runtime } from "#shellint/runtime";
 import { ROOT, WEB_DIR } from "./paths.ts";
 
 const { join, normalize, relative } = runtime.path;

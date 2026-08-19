@@ -23,7 +23,7 @@ export function Layout(props: LayoutProps) {
   onResize.current = props.onResize;
 
   useSplitter(mainRef, splitRef, sideRef, {
-    storageKey: "shelly-devroom.side.width",
+    storageKey: "shellint.side.width",
     cssVar: "--side-w",
     minPanel: 300,
     minEditor: 360,

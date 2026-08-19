@@ -1,4 +1,4 @@
-import { loadConfig, assertDevroomCompiler } from "../core/config.ts";
+import { loadConfig, assertShellintCompiler } from "../core/config.ts";
 import { readDeviceProfile } from "./device-profile.ts";
 import { requireActive, toDeviceInfo, touchDeviceInfo } from "./devices.ts";
 import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
@@ -112,7 +112,7 @@ async function softCall(
 
 export async function fetchDeviceStatus(): Promise<DeviceStatus> {
   const cfg = await loadConfig();
-  assertDevroomCompiler(cfg);
+  assertShellintCompiler(cfg);
   const target = await requireActive();
   const scriptId = target.slot;
 
@@ -288,7 +288,7 @@ export async function applyEcoMode(
  * decides whether to warn, and must not pay for a full status poll. */
 export async function fetchEcoMode(): Promise<{ eco_mode: boolean | null }> {
   const cfg = await loadConfig();
-  assertDevroomCompiler(cfg);
+  assertShellintCompiler(cfg);
   const target = await requireActive();
 
   const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
@@ -302,7 +302,7 @@ export async function fetchEcoMode(): Promise<{ eco_mode: boolean | null }> {
 
 export async function setEcoMode(eco_mode: boolean): Promise<EcoResult> {
   const cfg = await loadConfig();
-  assertDevroomCompiler(cfg);
+  assertShellintCompiler(cfg);
   const target = await requireActive();
 
   const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
@@ -325,7 +325,7 @@ export async function setScriptRunning(
   running: boolean,
 ): Promise<ScriptRunResult> {
   const cfg = await loadConfig();
-  assertDevroomCompiler(cfg);
+  assertShellintCompiler(cfg);
   const target = await requireActive();
   const scriptId = target.slot;
 
@@ -349,7 +349,7 @@ export async function setScriptRunning(
  */
 export async function rebootDevice(): Promise<void> {
   const cfg = await loadConfig();
-  assertDevroomCompiler(cfg);
+  assertShellintCompiler(cfg);
   const target = await requireActive();
 
   const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });

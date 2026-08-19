@@ -4,7 +4,7 @@
  * Nothing under `npm run test` / `npm run test:e2e` may read or write
  * `scripts/main.ts`: it is the buffer the user is editing, so its size, its
  * lint findings and even whether it compiles are all outside the repo's
- * control. Every gate step instead points `DEVROOM_SCRIPT` / `DEVROOM_DIST`
+ * control. Every gate step instead points `SHELLINT_SCRIPT` / `SHELLINT_DIST`
  * (honoured by `server/core/paths.ts` and `scripts/build-shelly.mjs`) at a
  * scratch copy of `fixtures/device/main.ts` — a copy, not the fixture itself,
  * because tests and the e2e save flow write to it.
@@ -25,12 +25,12 @@ function fromEnv(name, fallback) {
 
 /** The script the current process builds/checks — fixture copy under the gate. */
 export function scriptPath() {
-  return fromEnv("DEVROOM_SCRIPT", path.join(ROOT, "scripts", "main.ts"));
+  return fromEnv("SHELLINT_SCRIPT", path.join(ROOT, "scripts", "main.ts"));
 }
 
 /** The dist/ the current process reads — a scratch dir under the gate. */
 export function distDir() {
-  return fromEnv("DEVROOM_DIST", path.join(ROOT, "dist"));
+  return fromEnv("SHELLINT_DIST", path.join(ROOT, "dist"));
 }
 
 /**
@@ -57,7 +57,7 @@ export function useFixtureWorkspace(name) {
   rmSync(dir, { recursive: true, force: true });
   mkdirSync(dir, { recursive: true });
   copyFileSync(FIXTURE_SCRIPT, script);
-  process.env.DEVROOM_SCRIPT = script;
-  process.env.DEVROOM_DIST = dist;
+  process.env.SHELLINT_SCRIPT = script;
+  process.env.SHELLINT_DIST = dist;
   return { dir, script, dist };
 }

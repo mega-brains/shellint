@@ -8,7 +8,7 @@ import { cmHost, cmRender } from "./cm-host";
  * the buffer on screen is decided by the artifact view, since that is what
  * owns whether the editor shows the source or a built artifact.
  */
-export const FINDINGS_EVENT = "devroom:findings";
+export const FINDINGS_EVENT = "shellint:findings";
 
 const setFindings = StateEffect.define<Finding[]>();
 

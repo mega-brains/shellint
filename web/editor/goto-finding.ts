@@ -7,7 +7,7 @@ import { EditorView } from "@codemirror/view";
  */
 export type FindingLocation = { file: string; line: number };
 
-export const SHOW_FILE_EVENT = "devroom:show-file";
+export const SHOW_FILE_EVENT = "shellint:show-file";
 
 /** Selects the whole line, so the jump target is visibly highlighted. */
 export function revealLine(view: EditorView, line: number): void {

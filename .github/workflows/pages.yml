@@ -1,6 +1,6 @@
-name: Deploy static DevRoom to GitHub Pages
+name: Deploy shellint static site
 
-# M17.8 — builds the offline/device-less DevRoom (scripts/build-static.mjs)
+# M17.8 — builds offline device-less shellint (scripts/build-static.mjs)
 # and publishes site/ to GitHub Pages. Independent of the server build; this
 # workflow never touches web/dist/ or dist/.
 on:
@@ -33,7 +33,7 @@ jobs:
 
       - run: npm run build:static
         env:
-          DEVROOM_REPO: ${{ github.repository }}
+          SHELLINT_REPO: ${{ github.repository }}
 
       - uses: actions/upload-pages-artifact@v3
         with:

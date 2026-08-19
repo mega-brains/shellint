@@ -27,9 +27,9 @@ try {
   checks["tjs:hashing"] =
     createHash("sha256").update("abc").digest() ===
     "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
-  const joined = path.join("devroom", "probe");
+  const joined = path.join("shellint", "probe");
   checks["tjs:path"] = path.basename(joined) === "probe" &&
-    path.basename(path.dirname(joined)) === "devroom";
+    path.basename(path.dirname(joined)) === "shellint";
 } catch {
   checks["tjs:hashing"] = false;
   checks["tjs:path"] = false;

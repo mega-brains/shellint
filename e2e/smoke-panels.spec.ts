@@ -1,7 +1,7 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./helpers/test-base";
 import { openApp } from "./helpers/open-app";
 
-/** A successful `PATCH /api/config` reply — i.e. devroom.json is written. */
+/** Successful `PATCH /api/config` reply means shellint.json is written. */
 function patchResponse(page: Page) {
   return page.waitForResponse(
     (r) =>
@@ -12,7 +12,7 @@ function patchResponse(page: Page) {
 }
 
 test.describe("panels smoke", () => {
-  test("inspector tabs are mutually exclusive and persist", async ({ page }) => {
+  test("inspector tabs are mutually exclusive and persist", { tag: "@layout" }, async ({ page }) => {
     await openApp(page);
     await expect(page.locator("#pane-build")).toBeVisible();
     await expect(page.locator("#pane-check")).toBeHidden();
@@ -25,7 +25,7 @@ test.describe("panels smoke", () => {
     // The choice is remembered, unlike the old accordions. (A reload cannot be
     // asserted here: openApp clears localStorage on every navigation.)
     const stored = await page.evaluate(() =>
-      localStorage.getItem("shelly-devroom.inspectorTab"),
+      localStorage.getItem("shellint.inspectorTab"),
     );
     expect(stored).toBe("check");
   });
@@ -38,7 +38,7 @@ test.describe("panels smoke", () => {
     await expect(page.locator("#pane-build")).toBeVisible();
   });
 
-  test("options panel PATCHes minify config", async ({ page }) => {
+  test("options panel PATCHes minify config", { tag: "@layout" }, async ({ page }) => {
     await openApp(page);
     await expect(page.locator("#pane-options")).toBeHidden();
     await page.getByTestId("tab-options").click();
@@ -53,10 +53,10 @@ test.describe("panels smoke", () => {
       timeout: 15_000,
     });
 
-    // devroom.json owns the defaults, so assert the flip rather than a value.
+    // shellint.json owns defaults, so assert flip rather than value.
     const toplevel = page.getByTestId("opt-toplevel");
     const before = await toplevel.isChecked();
-    // Wait for the *response*: the route writes devroom.json before replying,
+    // Wait for response: route writes shellint.json before replying,
     // and waiting on the request alone can end the test — and with it the
     // webServer — before the write lands.
     const patch = patchResponse(page);
@@ -75,7 +75,7 @@ test.describe("panels smoke", () => {
     await expect(toplevel).toBeChecked({ checked: before });
   });
 
-  test("option tip stays inside the viewport on the last option", async ({
+  test("option tip stays inside the viewport on the last option", { tag: "@layout" }, async ({
     page,
   }) => {
     await openApp(page);
@@ -97,7 +97,7 @@ test.describe("panels smoke", () => {
     expect(box!.y + box!.height).toBeLessThanOrEqual(vh);
   });
 
-  test("device panel shows mocked mem/cpu; logs show mocked lines", async ({
+  test("device panel shows mocked mem/cpu; logs show mocked lines", { tag: "@layout" }, async ({
     page,
   }) => {
     await openApp(page);
@@ -113,7 +113,7 @@ test.describe("panels smoke", () => {
     await expect(page.locator("#logsPeek")).toContainText("lines");
   });
 
-  test("header children never overlap or spill at narrow widths", async ({ page }) => {
+  test("header children never overlap or spill at narrow widths", { tag: "@layout" }, async ({ page }) => {
     await openApp(page);
     for (const width of [1440, 1100, 900, 780, 640]) {
       await page.setViewportSize({ width, height: 700 });
@@ -137,7 +137,7 @@ test.describe("panels smoke", () => {
     }
   });
 
-  test("dock splitter resizes the dock and persists", async ({ page }) => {
+  test("dock splitter resizes the dock and persists", { tag: "@layout" }, async ({ page }) => {
     await openApp(page);
     const dock = page.locator("#dock");
     const handle = page.locator("#dockSplitter");
@@ -164,7 +164,7 @@ test.describe("panels smoke", () => {
     // Persisted for the next session (openApp clears storage on every
     // navigation, so assert the write rather than a reload).
     const stored = await page.evaluate(() =>
-      localStorage.getItem("shelly-devroom.dock.height"),
+      localStorage.getItem("shellint.dock.height"),
     );
     expect(Math.abs(Number(stored) - after)).toBeLessThan(3);
 
@@ -174,7 +174,7 @@ test.describe("panels smoke", () => {
     expect((await dock.boundingBox())!.height).toBeCloseTo(300, 0);
   });
 
-  test("device overflow menu shows Reboot device", async ({ page }) => {
+  test("device overflow menu shows Reboot device", { tag: "@layout" }, async ({ page }) => {
     await openApp(page);
     await expect(page.getByTestId("device-menu-btn")).toBeVisible();
     await page.getByTestId("device-menu-btn").click();
@@ -184,7 +184,7 @@ test.describe("panels smoke", () => {
     await expect(item).toBeEnabled();
   });
 
-  test("stat tip portals to body and stays left of #side", async ({ page }) => {
+  test("stat tip portals to body and stays left of #side", { tag: "@layout" }, async ({ page }) => {
     await openApp(page);
     // Need badge stats — Build once if the panel is still empty.
     const empty = page.locator("#statBadges .stats-bars-empty");

@@ -2,7 +2,7 @@
  * Download page (`site/download.html`, M26 plan §6.3). The visual thesis is
  * the size claim — the txiki single-file executable rendered with the same
  * MeasureRow grammar the app uses for artifact sizes, so "one file, no Node,
- * under 5 MB" is shown the way DevRoom shows every other size, not just
+ * under 5 MB" is shown how shellint shows every other size, not just
  * asserted in prose.
  *
  * The release table is honest about where the project actually is:
@@ -15,14 +15,14 @@ import { MeasureRow, MeasureList, Group } from "../ui/measure";
 import { SiteHeader, SiteFooter } from "./landing";
 import { releaseAssetUrl, releasesUrl } from "./release";
 
-/* Local .txiki/shelly-devroom, macOS arm64, measured 2026-08-18 (M26 plan §2.4). */
+/* Local .txiki/shellint, macOS arm64, measured 2026-08-18 (M26 plan §2.4). */
 const BINARY_BYTES = 4_194_304; // 4.0 MB (MiB) as reported by `ls -lh`
 const CAP_BYTES = 5 * 1024 * 1024;
 
 const PLATFORMS: { label: string; asset: string }[] = [
-  { label: "macOS arm64", asset: "shelly-devroom-macos-arm64" },
-  { label: "macOS x64", asset: "shelly-devroom-macos-x64" },
-  { label: "Linux x64", asset: "shelly-devroom-linux-x64" },
+  { label: "macOS arm64", asset: "shellint-macos-arm64" },
+  { label: "macOS x64", asset: "shellint-macos-x64" },
+  { label: "Linux x64", asset: "shellint-linux-x64" },
 ];
 
 const LOCAL_ADDS = [
@@ -42,7 +42,7 @@ export function Download() {
         <section class="hero hero-download">
           <h1>One file. No Node. Under 5 MB.</h1>
           <p class="hero-sub">
-            <code>shelly-devroom</code> is a single txiki.js executable — the
+            <code>shellint</code> is a single txiki.js executable — the
             whole server, UI and CLI in one binary, no Node install and no{" "}
             <code>npm install</code> required.
           </p>
@@ -50,13 +50,13 @@ export function Download() {
           <Group title="Binary size" id="sizeGroup" caption="actual vs. 5 MB cap">
             <MeasureList labelWidth={104}>
               <MeasureRow
-                label="shelly-devroom"
+                label="shellint"
                 value={fmtBytes(BINARY_BYTES)}
                 fraction={BINARY_BYTES / CAP_BYTES}
                 tone="accent"
                 soft
                 title={`${fmtBytes(BINARY_BYTES)} of a 5 MB advisory cap (macOS arm64)`}
-                ariaLabel={`shelly-devroom binary, ${fmtBytes(BINARY_BYTES)} of a 5 megabyte cap`}
+                ariaLabel={`shellint binary, ${fmtBytes(BINARY_BYTES)} of a 5 megabyte cap`}
               />
             </MeasureList>
           </Group>
@@ -101,17 +101,17 @@ export function Download() {
             <ol>
               <li>Download the binary for your platform</li>
               <li>
-                <code>chmod +x shelly-devroom</code>
+                <code>chmod +x shellint</code>
               </li>
               <li>
-                <code>./shelly-devroom</code>
+                <code>./shellint</code>
               </li>
               <li>
                 Open <code>http://localhost:8787</code>
               </li>
             </ol>
             <pre class="curl-line">
-              <code>curl -fsSL -o shelly-devroom {releaseAssetUrl("shelly-devroom-macos-arm64")}{"\n"}chmod +x shelly-devroom && ./shelly-devroom</code>
+              <code>curl -fsSL -o shellint {releaseAssetUrl("shellint-macos-arm64")}{"\n"}chmod +x shellint && ./shellint</code>
             </pre>
           </Group>
         </section>
@@ -122,7 +122,7 @@ export function Download() {
               <code>mise run build:txiki:executable</code> compiles the
               single-file executable for your host platform. If <code>tjs</code>{" "}
               is not on <code>PATH</code>, point{" "}
-              <code>DEVROOM_TJS_BIN</code> at a txiki.js build first.
+              <code>SHELLINT_TJS_BIN</code> at a txiki.js build first.
             </p>
           </Group>
         </section>

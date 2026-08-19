@@ -35,7 +35,7 @@ export function Header(props: HeaderProps) {
     <header class="top">
       <div class="wordmark">
         <span class="wordmark-dot" aria-hidden="true" />
-        <h1>DevRoom</h1>
+        <h1>shellint</h1>
       </div>
 
       {props.staticMode ? (
@@ -47,10 +47,10 @@ export function Header(props: HeaderProps) {
           class="chip"
           id="backToSite"
           href="../"
-          title="Back to the DevRoom site"
-          aria-label="Back to the DevRoom site"
+          title="Back to shellint site"
+          aria-label="Back to shellint site"
         >
-          ← DevRoom
+          ← shellint
         </a>
       ) : null}
 

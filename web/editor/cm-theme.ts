@@ -77,4 +77,4 @@ const highlight = HighlightStyle.define([
   { tag: t.invalid, color: "var(--danger)" },
 ]);
 
-export const devroomTheme: Extension = [theme, syntaxHighlighting(highlight)];
+export const shellintTheme: Extension = [theme, syntaxHighlighting(highlight)];

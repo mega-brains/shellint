@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./helpers/test-base";
 import { mockDeviceApis } from "./helpers/mock-api";
 
 async function openApp(page: Page) {
@@ -15,7 +15,7 @@ async function openApp(page: Page) {
 }
 
 test.describe("device switch", () => {
-  test("switching device repoints the deploy label and wipes the log panel", async ({
+  test("switching device repoints the deploy label and wipes the log panel", { tag: "@layout" }, async ({
     page,
   }) => {
     await openApp(page);
@@ -51,7 +51,7 @@ test.describe("device switch", () => {
     await expect(page.locator("#logsList li")).toHaveCount(0);
   });
 
-  test("importing a slot loads device code as an unsaved buffer", async ({ page }) => {
+  test("importing a slot loads device code as an unsaved buffer", { tag: "@browser-api" }, async ({ page }) => {
     await openApp(page);
     const editor = page.locator("#editor .cm-content");
     await expect(editor).not.toContainText("hello from the device slot");

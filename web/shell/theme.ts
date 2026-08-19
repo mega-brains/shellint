@@ -2,7 +2,7 @@ import { useEffect, useState } from "preact/hooks";
 
 export type Theme = "dark" | "light";
 
-const KEY = "shelly-devroom.theme";
+const KEY = "shellint.theme";
 
 function systemTheme(): Theme {
   try {

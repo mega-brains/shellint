@@ -1,5 +1,7 @@
 import { createApp } from "./app.ts";
 import { loadConfig } from "./core/config.ts";
+import { ensureMainScript } from "./core/ensure-main-script.ts";
+import { migrateStateDir } from "./core/migrate-state-dir.ts";
 import { requireActive } from "./device/devices.ts";
 
 async function activeSummary(): Promise<string> {
@@ -12,6 +14,11 @@ async function activeSummary(): Promise<string> {
 }
 
 export async function prepareStartup() {
+  // First, and before anything can create `.shellint/` for another purpose:
+  // the move only runs into a missing target, so a history write that got there
+  // first would strand the device list in `.devroom/`.
+  await migrateStateDir();
+  await ensureMainScript();
   const [config, summary] = await Promise.all([loadConfig(), activeSummary()]);
   return { app: createApp(), config, summary };
 }

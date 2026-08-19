@@ -16,7 +16,7 @@ function runNode(entry) {
   return result.stdout.trim();
 }
 
-const dir = mkdtempSync(join(tmpdir(), "devroom-txiki-conditions-"));
+const dir = mkdtempSync(join(tmpdir(), "shellint-txiki-conditions-"));
 try {
   const entry = join(dir, "entry.js");
   const bundle = join(dir, "entry.bundle.js");
@@ -55,4 +55,3 @@ try {
 } finally {
   rmSync(dir, { recursive: true, force: true });
 }
-

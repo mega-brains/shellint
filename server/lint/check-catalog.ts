@@ -1,5 +1,5 @@
 /**
- * The catalog of every compliance check the DevRoom can run, with a one-line
+ * Catalog of every compliance check shellint can run, with one-line
  * rationale each. It exists so the UI can show a permanent, complete list of
  * checks — including the ones that found nothing or could not run — instead of
  * only the findings of the last run.

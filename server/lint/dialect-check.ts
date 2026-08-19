@@ -1,4 +1,4 @@
-import { runtime } from "#devroom/runtime";
+import { runtime } from "#shellint/runtime";
 import ts from "typescript";
 import { DIST_DIR } from "../core/paths.ts";
 import { calleeName, definesAccessor, hasUnicodeEscape } from "./lint-util.ts";

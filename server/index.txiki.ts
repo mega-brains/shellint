@@ -8,7 +8,7 @@ const server = tjs.serve({
 });
 
 const host = cfg.host === "0.0.0.0" ? "127.0.0.1" : cfg.host;
-console.log(`Shelly DevRoom listening on http://${host}:${server.port}`);
+console.log(`shellint listening on http://${host}:${server.port}`);
 console.log(
   `  bind ${cfg.host}:${server.port} · ${summary} · compiler ${cfg.compiler} · runtime txiki.js`,
 );

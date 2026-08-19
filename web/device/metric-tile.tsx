@@ -3,7 +3,7 @@ import { MiniBars } from "../charts/mini-bars";
 import { WARN_SHARE } from "./device-format";
 import type { Metric } from "./use-device-status";
 
-const PREFIX = "shelly-devroom.metric.";
+const PREFIX = "shellint.metric.";
 
 function stored(name: string): boolean {
   try {

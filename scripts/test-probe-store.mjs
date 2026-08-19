@@ -2,7 +2,7 @@
  * Per-(device, firmware) probe capture store: verKey sanitization, the §3.4
  * legacy migration, capture CRUD, `probeState`'s truth table, and
  * `mirrorActiveDevice`'s firmware-aware fallback. Touches the real
- * `.devroom/devices.json` and `types/` mirrors, so both are backed up and
+ * `.shellint/devices.json` and `types/` mirrors, so both are backed up and
  * restored — same pattern as `test-devices.mjs`, scoped to fake device ids
  * that never collide with a real one.
  * Usage: node --import tsx scripts/test-probe-store.mjs
@@ -35,7 +35,7 @@ import {
   writeCapture,
 } from "../server/probe/probe-store.ts";
 
-const DEVICES_DIR = join(ROOT, ".devroom");
+const DEVICES_DIR = join(ROOT, ".shellint");
 const DEVICES_FILE = join(DEVICES_DIR, "devices.json");
 const FAKE_IDS = ["probe-store-test-a", "probe-store-test-b"];
 

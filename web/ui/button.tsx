@@ -107,7 +107,7 @@ export function ButtonDropdown(props: ButtonDropdownProps) {
   );
 }
 
-export const CLOSE_MENUS_EVENT = "devroom:close-menus";
+export const CLOSE_MENUS_EVENT = "shellint:close-menus";
 
 export function closeAllMenus(): void {
   document.dispatchEvent(new Event(CLOSE_MENUS_EVENT));

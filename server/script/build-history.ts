@@ -1,5 +1,5 @@
-import runtime from "#devroom/runtime";
-import { ROOT } from "../core/paths.ts";
+import runtime from "#shellint/runtime";
+import { STATE_DIR } from "../core/paths.ts";
 import type { BuildSizes } from "./build.ts";
 import type { ScriptStats } from "./script-stats.ts";
 
@@ -18,7 +18,7 @@ export type BuildHistoryRow = {
   memEstimate?: number;
 };
 
-const DIR = runtime.path.join(ROOT, ".devroom");
+const DIR = STATE_DIR;
 const FILE = runtime.path.join(DIR, "build-history.jsonl");
 const MAX_ROWS = 200;
 let writes: Promise<void> = Promise.resolve();

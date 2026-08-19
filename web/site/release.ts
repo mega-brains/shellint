@@ -2,14 +2,14 @@
  * The presentation site (landing + download pages) needs to link at GitHub
  * without knowing the repo slug at authoring time — the repo is not public
  * yet (M26 plan §2.3). `build-static.mjs` injects the real slug via esbuild's
- * `define` as `__DEVROOM_REPO__` (from a `DEVROOM_REPO` env var, so CI can set
+ * `define` as `__SHELLINT_REPO__` (from `SHELLINT_REPO`, so CI can set
  * it once the repo exists); the `typeof` guard below is what keeps `tsc` and
  * an unbundled dev load from crashing on the undefined global.
  */
-declare const __DEVROOM_REPO__: string;
+declare const __SHELLINT_REPO__: string;
 
 export const REPO: string =
-  typeof __DEVROOM_REPO__ !== "undefined" ? __DEVROOM_REPO__ : "OWNER/shelly-devroom";
+  typeof __SHELLINT_REPO__ !== "undefined" ? __SHELLINT_REPO__ : "OWNER/shellint";
 
 /** The repo's GitHub landing page. */
 export function repoUrl(): string {

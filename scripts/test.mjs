@@ -7,8 +7,8 @@
  * *this* process rather than spawned: `node --import tsx` costs ~750 ms of
  * transpile before a single line of test code runs, and paying that 14 times
  * was ~7.5 s of the suite's ~9.9 s. Same process, same order, same on-disk
- * effects — the modules that mutate repo files (devroom.json, scripts/main.ts,
- * .devroom/) already restore in a `finally`, which they had to do under
+ * effects — modules mutating repo files (shellint.json, scripts/main.ts,
+ * .shellint/) already restore in `finally`, which they had to do under
  * spawning too.
  *
  * `--isolated` restores the old process-per-test behaviour. Reach for it when
@@ -27,7 +27,10 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 // further down, since server/core/paths.ts reads the env at module load: the
 // suite compiles fixtures/device/main.ts in a scratch workspace, never the
 // user's scripts/main.ts, and writes its artifacts outside dist/.
-const { dist: DIST } = useFixtureWorkspace("test");
+const { script: FIXTURE_SCRIPT, dist: DIST } = useFixtureWorkspace("test");
+if (FIXTURE_SCRIPT === join(ROOT, "scripts", "main.ts")) {
+  throw new Error("gate fixture path must never equal scripts/main.ts");
+}
 
 const argv = process.argv.slice(2);
 const isolated = argv.includes("--isolated");
@@ -35,8 +38,10 @@ const filters = argv.filter((a) => !a.startsWith("--"));
 
 /** Order is load-bearing: artifact readers run after the builds that write dist/. */
 const TESTS = [
+  "test-config-paths",
+  "test-ensure-main",
   // Parity first: both compare against the dist/ this file just built, before
-  // any later module rewrites devroom.json or scripts/main.ts underneath them.
+  // any later module rewrites shellint.json or scripts/main.ts underneath them.
   "test-transpile-parity",
   "test-pipeline-parity",
   "test-static-pipeline",

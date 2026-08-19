@@ -1,6 +1,6 @@
-import { runtime } from "#devroom/runtime";
+import { runtime } from "#shellint/runtime";
 import type { RuntimeWebSocket, RuntimeWebSocketMessage } from "../runtime/types.ts";
-import { loadConfig, assertDevroomCompiler } from "../core/config.ts";
+import { loadConfig, assertShellintCompiler } from "../core/config.ts";
 import { requireActive } from "./devices.ts";
 import { AuthNotSupportedError, ShellyRpc, type RpcTarget } from "./rpc.ts";
 
@@ -185,7 +185,7 @@ async function begin(): Promise<LogStreamStart> {
   let target: RpcTarget;
   try {
     const cfg = await loadConfig();
-    assertDevroomCompiler(cfg);
+    assertShellintCompiler(cfg);
     const active = await requireActive();
     target = { ip: active.device.ip, auth: active.device.auth };
   } catch (e) {

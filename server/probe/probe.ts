@@ -1,4 +1,4 @@
-import { loadConfig, assertDevroomCompiler } from "../core/config.ts";
+import { loadConfig, assertShellintCompiler } from "../core/config.ts";
 import {
   clearProbeSkip,
   mirrorActiveDevice,
@@ -22,7 +22,7 @@ export function getProbeProgress(): { done: number; total: number } {
 }
 
 /** Temporary slot created by the probe. Only ever a freshly created id. */
-const SCRATCH_NAME = "devroom-probe";
+const SCRATCH_NAME = "shellint-probe";
 /** A registered handler guarantees the slot stays `running` while we evaluate. */
 const SCRATCH_CODE = "Shelly.addStatusHandler(function () {});\n";
 
@@ -255,7 +255,7 @@ export async function disableEcoForProbe(
  */
 export async function runProbe(opts: RunProbeOptions = {}): Promise<ProbeReport> {
   const cfg = await loadConfig();
-  assertDevroomCompiler(cfg);
+  assertShellintCompiler(cfg);
   const target = await requireActive();
 
   const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
@@ -271,7 +271,7 @@ export async function runProbe(opts: RunProbeOptions = {}): Promise<ProbeReport>
       string,
       unknown
     >;
-    // The report's `deviceId` must match the `.devroom/devices.json` key it is
+    // Report deviceId must match `.shellint/devices.json` key it is
     // filed under (not necessarily `info.id`) — a device added while offline
     // keeps its fallback slug id even after it later answers with its own,
     // and every downstream match (mirrorActiveDevice, lintProbe) compares

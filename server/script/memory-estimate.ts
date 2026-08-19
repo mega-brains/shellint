@@ -1,4 +1,4 @@
-import runtime from "#devroom/runtime";
+import runtime from "#shellint/runtime";
 import ts from "typescript";
 import { calleeName, parseSource } from "../lint/lint-util.ts";
 import { SCRIPT_LABEL, SCRIPT_PATH } from "../core/paths.ts";

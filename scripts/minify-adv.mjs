@@ -33,7 +33,7 @@ export async function minifyAdvanced(code, options = {}) {
     return { ok: false, reason: "espruino not installed" };
   }
 
-  const dir = mkdtempSync(path.join(tmpdir(), "devroom-tier3-"));
+  const dir = mkdtempSync(path.join(tmpdir(), "shellint-tier3-"));
   const inPath = path.join(dir, "in.js");
   const outPath = path.join(dir, "out.js");
   try {

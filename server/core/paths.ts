@@ -1,4 +1,4 @@
-import { runtime } from "#devroom/runtime";
+import { runtime } from "#shellint/runtime";
 
 const { join } = runtime.path;
 
@@ -17,8 +17,8 @@ function fromEnv(name: string, fallback: string): string {
   return runtime.path.isAbsolute(raw) ? raw : join(ROOT, raw);
 }
 
-export const SCRIPT_PATH = fromEnv("DEVROOM_SCRIPT", join(ROOT, "scripts", "main.ts"));
-export const DIST_DIR = fromEnv("DEVROOM_DIST", join(ROOT, "dist"));
+export const SCRIPT_PATH = fromEnv("SHELLINT_SCRIPT", join(ROOT, "scripts", "main.ts"));
+export const DIST_DIR = fromEnv("SHELLINT_DIST", join(ROOT, "dist"));
 
 /**
  * How the script is named in findings and check-pane copy. Relative to ROOT
@@ -32,7 +32,17 @@ export const SCRIPT_LABEL = (() => {
 export const WEB_DIR = join(ROOT, "web");
 export const PROBE_PATH = join(ROOT, "types", "generated-probe.json");
 export const DEVICE_PROFILE_PATH = join(ROOT, "types", "device-profile.json");
-export const DEVROOM_JSON = join(ROOT, "devroom.json");
+export const SHELLINT_JSON = join(ROOT, "shellint.json");
+export const LEGACY_CONFIG_JSON = join(ROOT, "devroom.json");
+
+/**
+ * Local state dir: the device list with its plaintext passwords (`0600`), the
+ * per-device profile/probe caches and the build/script history. Never tracked.
+ * `LEGACY_STATE_DIR` is the pre-rename name, moved across once by
+ * `migrateStateDir()` — orphaning it would lose the user's devices.
+ */
+export const STATE_DIR = join(ROOT, ".shellint");
+export const LEGACY_STATE_DIR = join(ROOT, ".devroom");
 
 /**
  * Per-device state dir — the authoritative copy of a device's capability
@@ -42,7 +52,7 @@ export const DEVROOM_JSON = join(ROOT, "devroom.json");
  * `probesDir` holds one capture per firmware (`<verKey>.json`, M16 §3.1).
  */
 export function devicePaths(id: string): { profile: string; probe: string; probesDir: string } {
-  const dir = join(ROOT, ".devroom", "devices", id);
+  const dir = join(STATE_DIR, "devices", id);
   return {
     profile: join(dir, "profile.json"),
     probe: join(dir, "probe.json"),

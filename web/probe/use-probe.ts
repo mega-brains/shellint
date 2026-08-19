@@ -32,7 +32,7 @@ type StoredCapture = {
  *
  * The results are also read back from the stored capture on mount and on every
  * device/slot switch, so a page reload does not empty the probe log — the run
- * itself is persisted server-side under `.devroom/devices/<id>/probes/`.
+ * itself is persisted server-side under `.shellint/devices/<id>/probes/`.
  */
 export function useProbe(
   setStatus: (msg: string, isError?: boolean) => void,

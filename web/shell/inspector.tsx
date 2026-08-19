@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "preact/hooks";
 
 export type InspectorTab = "build" | "check" | "options";
 
-const KEY = "shelly-devroom.inspectorTab";
+const KEY = "shellint.inspectorTab";
 
 const TABS: { id: InspectorTab; label: string; title: string }[] = [
   { id: "build", label: "build", title: "Sizes, counters, caps and the RAM estimate" },

@@ -17,22 +17,29 @@ export const STATIC_PORT = 8788;
 /**
  * The device script under test: a fresh copy of `fixtures/device/main.ts`,
  * built into its own dist. `scripts/build-fixture.mjs` (first command of the
- * webServer below) creates it; `DEVROOM_SCRIPT`/`DEVROOM_DIST` point the
+ * webServer below) creates it; `SHELLINT_SCRIPT`/`SHELLINT_DIST` point the
  * server, its builder and its Check at it. Nothing in the suite reads or
  * writes the user's `scripts/main.ts` — specs save to the editor, and that
  * write lands here.
  */
 export const FIXTURE_ENV = {
-  DEVROOM_SCRIPT: ".tmp/e2e/main.ts",
-  DEVROOM_DIST: ".tmp/e2e/dist",
+  SHELLINT_SCRIPT: ".tmp/e2e/main.ts",
+  SHELLINT_DIST: ".tmp/e2e/dist",
 };
 const STATIC_BASE = `http://127.0.0.1:${STATIC_PORT}`;
 
 export default defineConfig({
   testDir: ".",
-  fullyParallel: false,
+  // Per-test, not per-file: with file granularity the whole run waits on the
+  // longest single file (smoke-panels, ~26s of the 38s wall). Every spec boots
+  // its own page through openApp() and mocks its own device APIs, so no test
+  // depends on another's state — the one exception writes shellint.json and
+  // restores it, and nothing else reads the field it flips.
+  fullyParallel: true,
   forbidOnly: !!process.env.CI,
   retries: process.env.CI ? 1 : 0,
+  // 4, not more: the suite is CPU-bound on browser work, so 6 and 8 workers
+  // both measured *slower* than 4 on an 8-thread / 4-perf-core machine.
   workers: process.env.CI ? 1 : 4,
   reporter: [["dot"]],
   timeout: 60_000,
@@ -51,14 +58,18 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      // Default: system Chrome. Set PW_CHANNEL=bundled after
-      // `npx playwright install chromium` to use Playwright's browser.
+      // Default: Playwright's bundled Chromium (`npx playwright install
+      // chromium`). Measured at roughly half the wall time of system Chrome on
+      // this suite — Chrome runs the full browser in headless mode, bundled
+      // Chromium the lighter build — and the design baselines match on both.
+      // `PW_CHANNEL=chrome` (or any other channel name) opts back into a
+      // system browser; that is the fallback when Chromium is not installed.
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1440, height: 900 },
-        ...(process.env.PW_CHANNEL === "bundled"
-          ? {}
-          : { channel: (process.env.PW_CHANNEL as "chrome") || "chrome" }),
+        ...(process.env.PW_CHANNEL && process.env.PW_CHANNEL !== "bundled"
+          ? { channel: process.env.PW_CHANNEL as "chrome" }
+          : {}),
       },
     },
   ],
@@ -71,9 +82,11 @@ export default defineConfig({
         "node scripts/build-fixture.mjs e2e && npm run build:web && node --import tsx server/index.ts",
       cwd: ROOT,
       url: BASE,
-      env: { ...FIXTURE_ENV, DEVROOM_PORT: String(PORT) },
+      env: { ...FIXTURE_ENV, SHELLINT_PORT: String(PORT) },
       // Never reuse: a server already on this port may be pointed at another
       // script, which is exactly the dependency this suite must not have.
+      // (scripts/e2e-hybrid.mjs runs its Lightpanda pass against a server of
+      // its own on another port rather than weakening this.)
       reuseExistingServer: false,
       timeout: 120_000,
     },

@@ -1,15 +1,15 @@
 /**
  * The same e2e suite, against the txiki.js **single-file executable**
- * (`.txiki/shelly-devroom`, scripts/compile-txiki.mjs) instead of the Node
+ * (`.txiki/shellint`, scripts/compile-txiki.mjs) instead of Node
  * server.
  *
- * The two runtimes share every route but not their builder: `#devroom/builder`
+ * Two runtimes share routes but not builder: `#shellint/builder`
  * resolves to `node-builder-entry.ts` (shells out to `tsc`) under Node and to
  * `txiki-builder-entry.ts` (type-checks in process) under txiki, so a UI
  * behaviour that reads a build/check payload can pass on one and fail on the
  * other. Running the whole suite twice is what catches that.
  *
- * Own port (`DEVROOM_PORT`, server/core/config.ts) so it never reuses — or
+ * Own port (`SHELLINT_PORT`, server/core/config.ts) so it never reuses — or
  * fights — a dev server on the default 8787. `reuseExistingServer: false`:
  * silently testing something already listening would defeat the point.
  */
@@ -47,13 +47,13 @@ export default defineConfig({
       // compile step that produces the executable under test. Its own fixture
       // workspace, so it can run back to back with the Node suite.
       command:
-        "node scripts/build-fixture.mjs e2e-txiki && npm run build:web && npm run build:txiki:executable && ./.txiki/shelly-devroom",
+        "node scripts/build-fixture.mjs e2e-txiki && npm run build:web && npm run build:txiki:executable && ./.txiki/shellint",
       cwd: ROOT,
       url: BASE,
       env: {
-        DEVROOM_PORT: String(PORT),
-        DEVROOM_SCRIPT: ".tmp/e2e-txiki/main.ts",
-        DEVROOM_DIST: ".tmp/e2e-txiki/dist",
+        SHELLINT_PORT: String(PORT),
+        SHELLINT_SCRIPT: ".tmp/e2e-txiki/main.ts",
+        SHELLINT_DIST: ".tmp/e2e-txiki/dist",
       },
       reuseExistingServer: false,
       timeout: 300_000,

@@ -8,7 +8,7 @@
  * whose `file` is `scripts/main.ts`), identically on Node, txiki, the txiki
  * single-file executable and the static build — all four share this module.
  */
-import { runtime } from "#devroom/runtime";
+import { runtime } from "#shellint/runtime";
 import ts from "typescript";
 import { DEVICE_COMPILER_OPTIONS } from "../../web/static/transpile.ts";
 import { ROOT, SCRIPT_LABEL, SCRIPT_PATH } from "../core/paths.ts";

@@ -1,7 +1,7 @@
 /**
  * M17.1 extraction lock: shared/device-pipeline.mjs's `transformVariant` must
  * reproduce the committed dist/{debug,prod}.{raw.js,js} byte for byte, for
- * the `minify` options currently in devroom.json. This is the parity test
+ * minify options currently in shellint.json. This is parity test
  * the plan promises to guard the scripts/build-shelly.mjs → shared/
  * device-pipeline.mjs move — a silent divergence here would mean the browser
  * build (a later milestone) ships different bytes than the server does.
@@ -34,7 +34,7 @@ function fail(msg) {
 }
 
 function loadMinifyConfig() {
-  const configPath = join(ROOT, "devroom.json");
+  const configPath = join(ROOT, "shellint.json");
   if (!existsSync(configPath)) return { ...DEFAULT_MINIFY };
   const raw = JSON.parse(readFileSync(configPath, "utf8"));
   const src =
@@ -57,7 +57,7 @@ for (const f of ["debug.raw.js", "debug.js", "prod.raw.js", "prod.js"]) {
   }
 }
 
-const outDir = mkdtempSync(join(tmpdir(), "devroom-parity-"));
+const outDir = mkdtempSync(join(tmpdir(), "shellint-parity-"));
 let tscJs;
 try {
   const tsc = spawnSync(

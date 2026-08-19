@@ -1,6 +1,6 @@
 /**
- * `.devroom/devices.json` load/migration/CRUD + digest auth math.
- * Touches the real `devroom.json` and `.devroom/devices.json`, so both are
+ * `.shellint/devices.json` load/migration/CRUD + digest auth math.
+ * Touches real shellint config and state, so both are
  * backed up and restored — migration is driven off a fixture, never the
  * user's real device IPs.
  * Usage: node --import tsx scripts/test-devices.mjs
@@ -29,9 +29,11 @@ import {
 import { resetForDeviceSwitch, readLogs } from "../server/device/debug-log.ts";
 import { GENERATED_DTS_PATH } from "../server/probe/probe-typings.ts";
 import { createApp } from "../server/app.ts";
+import { loadConfig, patchMinifyConfig } from "../server/core/config.ts";
 
-const DEVROOM_JSON = join(ROOT, "devroom.json");
-const DEVICES_DIR = join(ROOT, ".devroom");
+const SHELLINT_JSON = join(ROOT, "shellint.json");
+const LEGACY_CONFIG_JSON = join(ROOT, "devroom.json");
+const DEVICES_DIR = join(ROOT, ".shellint");
 const DEVICES_FILE = join(DEVICES_DIR, "devices.json");
 
 function fail(msg) {
@@ -39,7 +41,10 @@ function fail(msg) {
   process.exit(1);
 }
 
-const originalDevroom = existsSync(DEVROOM_JSON) ? readFileSync(DEVROOM_JSON, "utf8") : null;
+const originalShellint = existsSync(SHELLINT_JSON) ? readFileSync(SHELLINT_JSON, "utf8") : null;
+const originalLegacy = existsSync(LEGACY_CONFIG_JSON)
+  ? readFileSync(LEGACY_CONFIG_JSON, "utf8")
+  : null;
 const originalDevices = existsSync(DEVICES_FILE) ? readFileSync(DEVICES_FILE, "utf8") : null;
 const originalProfileMirror = existsSync(DEVICE_PROFILE_PATH)
   ? readFileSync(DEVICE_PROFILE_PATH, "utf8")
@@ -56,7 +61,10 @@ const originalDevicesSubdirExisted = existsSync(devicesSubdir);
 const originalDeviceDirs = originalDevicesSubdirExisted ? readdirSync(devicesSubdir) : [];
 
 function restore() {
-  if (originalDevroom !== null) writeFileSync(DEVROOM_JSON, originalDevroom, "utf8");
+  if (originalShellint !== null) writeFileSync(SHELLINT_JSON, originalShellint, "utf8");
+  else rmSync(SHELLINT_JSON, { force: true });
+  if (originalLegacy !== null) writeFileSync(LEGACY_CONFIG_JSON, originalLegacy, "utf8");
+  else rmSync(LEGACY_CONFIG_JSON, { force: true });
   if (originalDevices !== null) {
     mkdirSync(DEVICES_DIR, { recursive: true });
     writeFileSync(DEVICES_FILE, originalDevices, "utf8");
@@ -90,8 +98,8 @@ function restore() {
   _resetCache();
 }
 
-function setDevroom(obj) {
-  writeFileSync(DEVROOM_JSON, JSON.stringify(obj, null, 2) + "\n", "utf8");
+function setShellint(obj) {
+  writeFileSync(SHELLINT_JSON, JSON.stringify(obj, null, 2) + "\n", "utf8");
 }
 
 function setDevicesFile(obj) {
@@ -117,9 +125,18 @@ function fakeRpcFactory({ failConnect = false, info = {} } = {}) {
 }
 
 try {
+  // Primary config wins over legacy, and PATCH always writes primary.
+  writeFileSync(LEGACY_CONFIG_JSON, '{"port":9999}\n', "utf8");
+  setShellint({ port: 8788 });
+  if ((await loadConfig()).port !== 8788) fail("shellint.json must win over legacy config");
+  await patchMinifyConfig({ advanced: true });
+  const patchedConfig = JSON.parse(readFileSync(SHELLINT_JSON, "utf8"));
+  if (patchedConfig.minify?.advanced !== true) fail("config PATCH must write shellint.json");
+  rmSync(LEGACY_CONFIG_JSON, { force: true });
+
   // --- absent devices.json, absent legacy config -> empty, no throw ---
   setDevicesFile(null);
-  setDevroom({});
+  setShellint({});
   _resetCache();
   let file = await loadDevices();
   if (file.devices.length !== 0 || file.active !== null) {
@@ -128,7 +145,7 @@ try {
 
   // --- corrupt devices.json tolerated, never throws at startup ---
   setDevicesFile("{ not json");
-  setDevroom({});
+  setShellint({});
   _resetCache();
   file = await loadDevices();
   if (file.devices.length !== 0 || file.active !== null) {
@@ -150,14 +167,15 @@ try {
     JSON.stringify({ probed: true, at: "t", deviceIp: "192.0.2.10", scriptId: 1, results: [] }),
     "utf8",
   );
-  setDevroom({
+  rmSync(SHELLINT_JSON, { force: true });
+  writeFileSync(LEGACY_CONFIG_JSON, JSON.stringify({
     deviceIp: "192.0.2.10",
     deviceIp2: "192.0.2.20",
     scriptId: 3,
     host: "0.0.0.0",
     port: 8787,
-    compiler: "devroom",
-  });
+    compiler: "shellint",
+  }, null, 2) + "\n", "utf8");
   _resetCache();
   file = await loadDevices();
   if (file.devices.length !== 2) {
@@ -179,6 +197,8 @@ try {
   _resetCache();
   const reloaded = await loadDevices();
   if (reloaded.devices.length !== 2) fail("re-loading migrated devices.json should be a no-op");
+  rmSync(LEGACY_CONFIG_JSON, { force: true });
+  setShellint({});
 
   // --- resolveTarget() with no devices throws NoDeviceError ---
   setDevicesFile({ version: 1, active: null, devices: [] });

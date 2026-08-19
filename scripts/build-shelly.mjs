@@ -39,7 +39,8 @@ export { envPass, minifyPass, resolveVariantOptions, transformVariant };
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const root = path.resolve(__dirname, "..");
 
-const CONFIG_PATH = path.join(root, "devroom.json");
+const CONFIG_PATH = path.join(root, "shellint.json");
+const LEGACY_CONFIG_PATH = path.join(root, "devroom.json");
 const DEVICE_PROFILE_ENV = "types/device-profile.json";
 
 /** Absolute-or-root-relative env override — see server/core/paths.ts. */
@@ -53,8 +54,8 @@ function fromEnv(name, fallback) {
 // workspace) instead of the user's live scripts/main.ts, and writes its
 // artifacts elsewhere so a test run can never leave dist/ holding bytes the
 // next Deploy would ship. See scripts/fixture-workspace.mjs.
-const MAIN_TS = fromEnv("DEVROOM_SCRIPT", path.join(root, "scripts", "main.ts"));
-const DIST_DIR = fromEnv("DEVROOM_DIST", path.join(root, "dist"));
+const MAIN_TS = fromEnv("SHELLINT_SCRIPT", path.join(root, "scripts", "main.ts"));
+const DIST_DIR = fromEnv("SHELLINT_DIST", path.join(root, "dist"));
 const IS_DEFAULT_SCRIPT = MAIN_TS === path.join(root, "scripts", "main.ts");
 const TSC_OUT_DIR = IS_DEFAULT_SCRIPT
   ? path.join(root, ".tsc-out")
@@ -66,11 +67,17 @@ const TSC_OUT_JS = path.join(
 const TSCONFIG = path.join(root, "tsconfig.shelly.script.json");
 const DEVICE_PROFILE_PATH = path.join(root, DEVICE_PROFILE_ENV);
 
-function loadConfig() {
-  if (!existsSync(CONFIG_PATH)) {
-    return { compiler: "devroom", minify: { ...DEFAULT_MINIFY } };
+export function loadConfig() {
+  const configPath = existsSync(CONFIG_PATH)
+    ? CONFIG_PATH
+    : existsSync(LEGACY_CONFIG_PATH)
+      ? LEGACY_CONFIG_PATH
+      : null;
+  if (!configPath) return { compiler: "shellint", minify: { ...DEFAULT_MINIFY } };
+  if (configPath === LEGACY_CONFIG_PATH) {
+    console.warn("shellint: using legacy devroom.json; rename it to shellint.json");
   }
-  const raw = JSON.parse(readFileSync(CONFIG_PATH, "utf8"));
+  const raw = JSON.parse(readFileSync(configPath, "utf8"));
   const src =
     raw.minify && typeof raw.minify === "object" && !Array.isArray(raw.minify)
       ? raw.minify
@@ -120,7 +127,7 @@ export function deviceGlobalDefs(profilePath = DEVICE_PROFILE_PATH) {
 /**
  * tsconfig for a script outside scripts/ (the fixture workspace). Generated
  * rather than committed so the entry, its rootDir and the emit dir always
- * agree with DEVROOM_SCRIPT/DEVROOM_DIST; compiler options still come from the
+ * agree with SHELLINT_SCRIPT/SHELLINT_DIST; compiler options still come from
  * one committed base, so fixture and live script compile identically.
  */
 function writeGeneratedTsconfig() {
@@ -197,9 +204,9 @@ async function buildVariant(tscJs, name, flags, minifyOpts, logMapState, deviceD
 
 async function main() {
   const config = loadConfig();
-  const compiler = config.compiler ?? "devroom";
+  const compiler = config.compiler ?? "shellint";
 
-  if (compiler !== "devroom") {
+  if (compiler !== "shellint" && compiler !== "devroom") {
     console.error("shelly-forge path not wired yet");
     process.exit(1);
   }
@@ -320,7 +327,7 @@ async function main() {
 
 // Guarded so tests can `import` the pure functions above (envPass, minifyPass,
 // resolveVariantOptions, deviceGlobalDefs) without triggering a real build
-// against the live devroom.json as a side effect of the import.
+// against live shellint.json as a side effect of importing it.
 const isMain = process.argv[1] === fileURLToPath(import.meta.url);
 if (isMain) {
   main().catch((err) => {

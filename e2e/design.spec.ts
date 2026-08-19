@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from "@playwright/test";
+import { expect, test, type Locator, type Page } from "./helpers/test-base";
 import { mockBuildApis, mockDeviceApis } from "./helpers/mock-api";
 
 const VOLATILE = [
@@ -99,10 +99,13 @@ function masks(page: Page): Locator[] {
   return VOLATILE.map((sel) => page.locator(sel));
 }
 
+// Every test here is a pixel baseline or a hit-testing check, so all of them
+// carry `@layout` — the tag scripts/e2e-hybrid.mjs and the Lightpanda config
+// use to mean "needs a rendering engine, Chromium only".
 test.describe("design baselines", () => {
   test.use({ viewport: { width: 1440, height: 900 } });
 
-  test("full workspace default", async ({ page }) => {
+  test("full workspace default", { tag: "@layout" }, async ({ page }) => {
     await openSettled(page);
     await expect(page).toHaveScreenshot("workspace-default.png", {
       fullPage: true,
@@ -110,7 +113,7 @@ test.describe("design baselines", () => {
     });
   });
 
-  test("build split menu open", async ({ page }) => {
+  test("build split menu open", { tag: "@layout" }, async ({ page }) => {
     await openSettled(page);
     const toggle = page.locator("#btnBuildMenu");
     const menu = page.locator("#buildMenu");
@@ -123,7 +126,7 @@ test.describe("design baselines", () => {
     });
   });
 
-  test("build menu stays clickable below header", async ({ page }) => {
+  test("build menu stays clickable below header", { tag: "@layout" }, async ({ page }) => {
     await page.setViewportSize({ width: 1012, height: 647 });
     await openSettled(page);
     await page.locator("#btnBuildMenu").click();
@@ -145,7 +148,7 @@ test.describe("design baselines", () => {
     expect(reachable).toBe(true);
   });
 
-  test("dock expanded, device then logs", async ({ page }) => {
+  test("dock expanded, device then logs", { tag: "@layout" }, async ({ page }) => {
     await openSettled(page);
     await page.locator("#dockToggle").click();
     await expect(page.locator("#dock")).toHaveClass(/open/);

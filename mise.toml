@@ -2,21 +2,21 @@
 node = "22"
 
 [env]
-DEVROOM_TJS_VERSION = "26.6.0"
-# DEVROOM_TJS_BIN ships as the final executable, so it is the slim `min`
+SHELLINT_TJS_VERSION = "26.6.0"
+# SHELLINT_TJS_BIN ships as the final executable, so it is the slim `min`
 # build (no FFI, no TLS) from the lukasMega/txiki.js-with-slim-builds release
 # `slim-v26.6.0-6`; that build has no `tjs bundle` (esbuild) support, so
-# DEVROOM_TJS_BUNDLE_BIN carries the full upstream build for that one step.
+# SHELLINT_TJS_BUNDLE_BIN carries the full upstream build for that one step.
 # Both paths are repo-relative and gitignored — see /vendor/ in .gitignore.
-DEVROOM_TJS_BIN = "vendor/txiki/tjs"
-DEVROOM_TJS_BUNDLE_BIN = "vendor/txiki/tjs-bundle"
+SHELLINT_TJS_BIN = "vendor/txiki/tjs"
+SHELLINT_TJS_BUNDLE_BIN = "vendor/txiki/tjs-bundle"
 
 [tasks.install]
 description = "Install npm dependencies"
 run = "npm install"
 
 [tasks.start]
-description = "Start DevRoom server (host/port from devroom.json)"
+description = "Start shellint server (host/port from shellint.json)"
 alias = "dev"
 run = "npm run dev"
 
@@ -116,12 +116,20 @@ description = "Shelly DCE/minify asserts + web bundle + server smoke"
 run = "npm run test"
 
 [tasks."test:e2e"]
-description = "Playwright e2e (Chromium) against local DevRoom UI"
+description = "Playwright e2e (Chromium) against local shellint UI"
 run = "npm run test:e2e"
 
 [tasks."test:e2e:txiki"]
 description = "Playwright e2e against the txiki single-file executable"
 run = "npm run test:e2e:txiki"
+
+[tasks."test:e2e:lightpanda"]
+description = "Playwright e2e against the Lightpanda browser (partial: no layout, no screenshots — see e2e/playwright.lightpanda.config.ts)"
+run = "npm run test:e2e:lightpanda"
+
+[tasks."test:e2e:hybrid"]
+description = "Full e2e coverage split across Lightpanda shards + Chromium (measured slower than test:e2e — see scripts/e2e-hybrid.mjs)"
+run = "npm run test:e2e:hybrid -- \"$@\""
 
 [tasks."test:txiki"]
 description = "Typecheck and verify txiki parity"

@@ -1,6 +1,6 @@
 /**
  * Shelly Gen2+ in-script ambient globals.
- * Basics for DevRoom samples — not a full RPC dump.
+ * Basics for shellint samples — not a full RPC dump.
  * Timer API: Timer.set / Timer.clear (not browser setTimeout).
  */
 

@@ -109,7 +109,7 @@ export function DeviceManagerModal(props: DeviceManagerModalProps) {
           />
         </label>
         <p class="device-manager-hint">
-          Stored in plaintext under <code>.devroom/</code> — this is a
+          Stored in plaintext under <code>.shellint/</code> — this is a
           LAN-only tool with no login of its own.
         </p>
         {error ? <p class="device-manager-error">{error}</p> : null}

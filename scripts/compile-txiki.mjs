@@ -6,7 +6,7 @@ const input = join(ROOT, ".txiki", "server.js");
 const output = join(
   ROOT,
   ".txiki",
-  process.platform === "win32" ? "shelly-devroom.exe" : "shelly-devroom",
+  process.platform === "win32" ? "shellint.exe" : "shellint",
 );
 
 const result = runTjs(["compile", input, output]);

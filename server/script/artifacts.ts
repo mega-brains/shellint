@@ -1,4 +1,4 @@
-import runtime from "#devroom/runtime";
+import runtime from "#shellint/runtime";
 import { DIST_DIR } from "../core/paths.ts";
 
 export type ArtifactInfo = { name: string; bytes: number; mtime: string };

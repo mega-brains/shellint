@@ -1,4 +1,4 @@
-import runtime from "#devroom/runtime";
+import runtime from "#shellint/runtime";
 import { DIST_DIR } from "../core/paths.ts";
 
 /** Written by the prod build next to the artifact it describes. */

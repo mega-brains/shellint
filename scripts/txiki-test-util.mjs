@@ -31,7 +31,7 @@ function pathCandidates(name) {
   return dirs.flatMap((dir) => withSuffixes(join(dir, name)));
 }
 
-export function resolveTjsBin(envVar = "DEVROOM_TJS_BIN") {
+export function resolveTjsBin(envVar = "SHELLINT_TJS_BIN") {
   const override = process.env[envVar]?.trim();
   if (override) {
     // A path-shaped override still needs the platform suffix: the checked-in
@@ -47,26 +47,26 @@ export function resolveTjsBin(envVar = "DEVROOM_TJS_BIN") {
     throw new Error(`${envVar} is not executable: ${override}`);
   }
 
-  if (envVar !== "DEVROOM_TJS_BIN") return resolveTjsBin();
+  if (envVar !== "SHELLINT_TJS_BIN") return resolveTjsBin();
 
   const found = pathCandidates("tjs").find(executable);
   if (found) return found;
   throw new Error(
-    "txiki.js executable missing; set DEVROOM_TJS_BIN or add tjs to PATH",
+    "txiki.js executable missing; set SHELLINT_TJS_BIN or add tjs to PATH",
   );
 }
 
 // Size-optimized tjs builds may drop the esbuild-backed `bundle` subcommand.
-// DEVROOM_TJS_BUNDLE_BIN lets bundling use a full-featured build while
-// DEVROOM_TJS_BIN stays the slim one that ships as the final executable.
+// SHELLINT_TJS_BUNDLE_BIN lets bundling use full-featured build while
+// SHELLINT_TJS_BIN stays slim one shipped as final executable.
 export function resolveTjsBundleBin() {
-  return process.env.DEVROOM_TJS_BUNDLE_BIN
-    ? resolveTjsBin("DEVROOM_TJS_BUNDLE_BIN")
+  return process.env.SHELLINT_TJS_BUNDLE_BIN
+    ? resolveTjsBin("SHELLINT_TJS_BUNDLE_BIN")
     : resolveTjsBin();
 }
 
 function validateTjsVersion(bin) {
-  const expected = process.env.DEVROOM_TJS_VERSION?.trim();
+  const expected = process.env.SHELLINT_TJS_VERSION?.trim();
   if (!expected) return;
   const key = `${bin}\0${expected}`;
   if (checkedVersionKey === key) return;

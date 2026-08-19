@@ -88,7 +88,7 @@ function assertParity(name, sourceFileAbs, rootDirAbs, outDirAbs, options) {
   console.log(`  ${name}: ${Buffer.byteLength(tscOutput, "utf8")} B, byte-identical`);
 }
 
-const outDir = mkdtempSync(path.join(tmpdir(), "devroom-transpile-parity-"));
+const outDir = mkdtempSync(path.join(tmpdir(), "shellint-transpile-parity-"));
 try {
   assertParity(
     "fixtures/device/main.ts",

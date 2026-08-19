@@ -1,4 +1,4 @@
-import { expect, type Page } from "@playwright/test";
+import { expect, type Page } from "./test-base";
 import { mockDeviceApis } from "./mock-api";
 
 /** Boot the UI with mocked device APIs and wait until the real script is in. */

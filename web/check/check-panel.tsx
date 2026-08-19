@@ -125,7 +125,7 @@ export function CheckPanel(props: CheckPanelProps) {
         title="rule tiers"
         id="tiersBlock"
         caption="pass / warn / skipped"
-        collapseKey="shelly-devroom.tiersBlock.collapsed"
+        collapseKey="shellint.tiersBlock.collapsed"
         defaultCollapsed
       >
         <CheckRules catalog={props.catalog} rows={view.rows} />

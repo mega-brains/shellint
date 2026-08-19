@@ -214,10 +214,16 @@ async function loadMinify(
   input?: Partial<MinifyConfig>,
 ): Promise<MinifyConfig> {
   if (input) return mergeMinify(input);
-  const path = joinPath(root, "devroom.json");
-  if (!(await adapter.exists(path))) return mergeMinify();
+  const shellintPath = joinPath(root, "shellint.json");
+  const legacyPath = joinPath(root, "devroom.json");
+  const path = (await adapter.exists(shellintPath))
+    ? shellintPath
+    : (await adapter.exists(legacyPath))
+      ? legacyPath
+      : null;
+  if (!path) return mergeMinify();
   const raw = JSON.parse(await adapter.readText(path)) as Record<string, unknown>;
-  if (raw.compiler != null && raw.compiler !== "devroom") {
+  if (raw.compiler != null && raw.compiler !== "shellint" && raw.compiler !== "devroom") {
     throw new Error(`compiler ${JSON.stringify(raw.compiler)} is unsupported`);
   }
   const value = raw.minify;

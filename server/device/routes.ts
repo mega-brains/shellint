@@ -1,5 +1,5 @@
 import type { Context, Hono } from "hono";
-import { runtime } from "#devroom/runtime";
+import { runtime } from "#shellint/runtime";
 import { CompilerNotWiredError } from "../core/config.ts";
 import {
   addDevice,

@@ -1,4 +1,4 @@
-import { runtime } from "#devroom/runtime";
+import { runtime } from "#shellint/runtime";
 import { DIST_DIR, SCRIPT_LABEL, SCRIPT_PATH } from "../core/paths.ts";
 import { lintScriptFile } from "./lint-source.ts";
 import { lintSemanticsFile } from "./lint-semantics.ts";
