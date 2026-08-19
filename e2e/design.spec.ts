@@ -76,7 +76,13 @@ async function openSettled(page: Page) {
   await expect(page.locator("#btnBuildMenu")).toBeEnabled();
   // Device poll paints mocked gauges before we snapshot.
   await expect(page.locator("#dCpu")).toHaveText("18%", { timeout: 10_000 });
-  await expect(page.locator("#checkRules")).not.toBeEmpty({ timeout: 15_000 });
+  // The check pane has painted. Not `#checkRules`: that table lives inside the
+  // pane's "rule tiers" group, which starts collapsed and therefore absent from
+  // the DOM (`web/ui/measure.tsx`), so reaching it means selecting the check tab
+  // (`helpers/check-tab.ts`) — and every baseline below is shot on the build
+  // tab. `#checkNote` renders unconditionally and leaves "—" on the same
+  // catalog fetch that fills the rows.
+  await expect(page.locator("#checkNote")).not.toHaveText("—", { timeout: 15_000 });
   // Quiet check on boot fills the readiness rail — wait so snapshots do not
   // race catalog-pending vs report-complete paint.
   await expect(page.getByTestId("gate-checked")).not.toContainText("not checked", {
@@ -100,16 +106,6 @@ test.describe("design baselines", () => {
     await openSettled(page);
     await expect(page).toHaveScreenshot("workspace-default.png", {
       fullPage: true,
-      mask: masks(page),
-    });
-  });
-
-  test.skip("check tab", async ({ page }) => {
-    await openSettled(page);
-    await page.getByTestId("tab-check").click();
-    await expect(page.locator("#pane-check")).toBeVisible();
-    await expect(page.locator("#checkRules")).not.toBeEmpty();
-    await expect(page.locator("#side")).toHaveScreenshot("check-panel.png", {
       mask: masks(page),
     });
   });

@@ -1,4 +1,5 @@
 import { expect, test } from "@playwright/test";
+import { openCheckTab } from "./helpers/check-tab";
 import { openApp } from "./helpers/open-app";
 
 test.describe("editor smoke", () => {
@@ -48,6 +49,7 @@ test.describe("editor smoke", () => {
     await expect(page.locator("#checkNote")).not.toHaveText("—", {
       timeout: 45_000,
     });
+    await openCheckTab(page);
     await expect(page.locator("#checkRules")).not.toBeEmpty();
     // #checkNote/#checkRules are filled by the catalog at boot, so they say
     // nothing about the run. The gate is the first thing the report itself

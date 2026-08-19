@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { openCheckTab } from "./helpers/check-tab";
 import { STATIC_PORT } from "./playwright.config";
 
 /**
@@ -66,6 +67,7 @@ async function runFullCycle(page: Page, name: string, source: string) {
   await page.locator("#btnBuildMenu").click();
   await page.locator('#buildMenu button[data-action="check"]').click();
   await expect(page.locator("#checkNote")).toContainText("device profile", { timeout: 45_000 });
+  await openCheckTab(page);
   const componentExists = page.locator("#checkRules .check", {
     has: page.locator(".check-rule-name", { hasText: "component-exists" }),
   });
