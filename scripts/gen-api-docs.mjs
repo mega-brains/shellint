@@ -121,5 +121,16 @@ function walkFile(path) {
 walkFile(join(typesDir, "shelly.d.ts"));
 walkFile(join(typesDir, "espruino-lib.d.ts"));
 
-writeFileSync(outfile, JSON.stringify({ entries, byBareName }, null, 2) + "\n");
-console.log(`api docs → ${outfile} (${Object.keys(entries).length} entries)`);
+const rendered = JSON.stringify({ entries, byBareName }, null, 2) + "\n";
+// Only write on a real change: build-web.mjs's freshness check keys off this
+// file's mtime, and an unconditional rewrite would invalidate it every run.
+let unchanged = false;
+try {
+  unchanged = readFileSync(outfile, "utf8") === rendered;
+} catch {
+  /* first run — no file yet */
+}
+if (!unchanged) writeFileSync(outfile, rendered);
+console.log(
+  `api docs → ${outfile} (${Object.keys(entries).length} entries${unchanged ? ", unchanged" : ""})`,
+);

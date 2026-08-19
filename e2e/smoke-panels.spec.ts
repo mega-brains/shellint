@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./helpers/test-base";
 import { openApp } from "./helpers/open-app";
 
 /** Successful `PATCH /api/config` reply means shellint.json is written. */
@@ -12,7 +12,7 @@ function patchResponse(page: Page) {
 }
 
 test.describe("panels smoke", () => {
-  test("inspector tabs are mutually exclusive and persist", async ({ page }) => {
+  test("inspector tabs are mutually exclusive and persist", { tag: "@layout" }, async ({ page }) => {
     await openApp(page);
     await expect(page.locator("#pane-build")).toBeVisible();
     await expect(page.locator("#pane-check")).toBeHidden();
@@ -38,7 +38,7 @@ test.describe("panels smoke", () => {
     await expect(page.locator("#pane-build")).toBeVisible();
   });
 
-  test("options panel PATCHes minify config", async ({ page }) => {
+  test("options panel PATCHes minify config", { tag: "@layout" }, async ({ page }) => {
     await openApp(page);
     await expect(page.locator("#pane-options")).toBeHidden();
     await page.getByTestId("tab-options").click();
@@ -75,7 +75,7 @@ test.describe("panels smoke", () => {
     await expect(toplevel).toBeChecked({ checked: before });
   });
 
-  test("option tip stays inside the viewport on the last option", async ({
+  test("option tip stays inside the viewport on the last option", { tag: "@layout" }, async ({
     page,
   }) => {
     await openApp(page);
@@ -97,7 +97,7 @@ test.describe("panels smoke", () => {
     expect(box!.y + box!.height).toBeLessThanOrEqual(vh);
   });
 
-  test("device panel shows mocked mem/cpu; logs show mocked lines", async ({
+  test("device panel shows mocked mem/cpu; logs show mocked lines", { tag: "@layout" }, async ({
     page,
   }) => {
     await openApp(page);
@@ -113,7 +113,7 @@ test.describe("panels smoke", () => {
     await expect(page.locator("#logsPeek")).toContainText("lines");
   });
 
-  test("header children never overlap or spill at narrow widths", async ({ page }) => {
+  test("header children never overlap or spill at narrow widths", { tag: "@layout" }, async ({ page }) => {
     await openApp(page);
     for (const width of [1440, 1100, 900, 780, 640]) {
       await page.setViewportSize({ width, height: 700 });
@@ -137,7 +137,7 @@ test.describe("panels smoke", () => {
     }
   });
 
-  test("dock splitter resizes the dock and persists", async ({ page }) => {
+  test("dock splitter resizes the dock and persists", { tag: "@layout" }, async ({ page }) => {
     await openApp(page);
     const dock = page.locator("#dock");
     const handle = page.locator("#dockSplitter");
@@ -174,7 +174,7 @@ test.describe("panels smoke", () => {
     expect((await dock.boundingBox())!.height).toBeCloseTo(300, 0);
   });
 
-  test("device overflow menu shows Reboot device", async ({ page }) => {
+  test("device overflow menu shows Reboot device", { tag: "@layout" }, async ({ page }) => {
     await openApp(page);
     await expect(page.getByTestId("device-menu-btn")).toBeVisible();
     await page.getByTestId("device-menu-btn").click();
@@ -184,7 +184,7 @@ test.describe("panels smoke", () => {
     await expect(item).toBeEnabled();
   });
 
-  test("stat tip portals to body and stays left of #side", async ({ page }) => {
+  test("stat tip portals to body and stays left of #side", { tag: "@layout" }, async ({ page }) => {
     await openApp(page);
     // Need badge stats — Build once if the panel is still empty.
     const empty = page.locator("#statBadges .stats-bars-empty");

@@ -121,6 +121,14 @@ run = "npm run test:e2e"
 description = "Playwright e2e against the txiki single-file executable"
 run = "npm run test:e2e:txiki"
 
+[tasks."test:e2e:lightpanda"]
+description = "Playwright e2e against the Lightpanda browser (partial: no layout, no screenshots — see e2e/playwright.lightpanda.config.ts)"
+run = "npm run test:e2e:lightpanda"
+
+[tasks."test:e2e:hybrid"]
+description = "Full e2e coverage split across Lightpanda shards + Chromium (measured slower than test:e2e — see scripts/e2e-hybrid.mjs)"
+run = "npm run test:e2e:hybrid -- \"$@\""
+
 [tasks."test:txiki"]
 description = "Typecheck and verify txiki parity"
 run = "npm run test:txiki"

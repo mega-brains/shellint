@@ -1,4 +1,4 @@
-import { expect, test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "./helpers/test-base";
 import { STATIC_PORT } from "./playwright.config";
 
 /**
@@ -103,11 +103,11 @@ async function runFullCycle(page: Page, name: string, source: string) {
 }
 
 test.describe("static/offline build (M17)", () => {
-  test("full cycle with a .js file", async ({ page }) => {
+  test("full cycle with a .js file", { tag: "@browser-api" }, async ({ page }) => {
     await runFullCycle(page, "sample.js", JS_SAMPLE);
   });
 
-  test("full cycle with a .ts file", async ({ page }) => {
+  test("full cycle with a .ts file", { tag: "@browser-api" }, async ({ page }) => {
     await runFullCycle(page, "sample.ts", TS_SAMPLE);
   });
 
@@ -130,7 +130,7 @@ test.describe("static/offline build (M17)", () => {
     await expect(page.locator("#btnHistory")).toBeVisible();
   });
 
-  test("checkpoint and history round-trip offline", async ({ page }) => {
+  test("checkpoint and history round-trip offline", { tag: "@browser-api" }, async ({ page }) => {
     await openStatic(page);
     // Opening a file writes it through `PUT /api/script`, which snapshots what
     // it replaces — so this alone seeds a history row.
@@ -149,7 +149,7 @@ test.describe("static/offline build (M17)", () => {
     });
   });
 
-  test("boots and builds after going offline", async ({ page, context }) => {
+  test("boots and builds after going offline", { tag: "@browser-api" }, async ({ page, context }) => {
     await openStatic(page);
 
     // One full cycle online first, so the service worker's install event has
@@ -201,7 +201,7 @@ test.describe("presentation site (M26)", () => {
     await expect(page.locator("#downloadTable")).toBeVisible();
   });
 
-  test("theme toggled on the landing persists into the demo", async ({ page }) => {
+  test("theme toggled on the landing persists into the demo", { tag: "@browser-api" }, async ({ page }) => {
     // Deliberately not openStatic(): that helper's init script clears
     // localStorage on every load, which would erase the very theme choice
     // this test exists to prove survives a navigation (same origin, same

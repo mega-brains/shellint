@@ -48,6 +48,9 @@
     "test": "node --import tsx scripts/test.mjs",
     "test:e2e": "playwright test -c e2e/playwright.config.ts",
     "test:e2e:txiki": "playwright test -c e2e/playwright.txiki.config.ts",
+    "test:e2e:lightpanda": "playwright test -c e2e/playwright.lightpanda.config.ts",
+    "test:e2e:hybrid": "node scripts/e2e-hybrid.mjs",
+    "install:lightpanda": "node scripts/install-lightpanda.mjs",
     "test:txiki": "npm run typecheck:txiki && npm run build:web && node scripts/test-txiki-runtime.mjs",
     "beforeCommit": "npm run check:lines && npm run typecheck && npm run build:gate && npm run build:static && npm run test && npm run test:e2e && npm run test:e2e:txiki"
   },

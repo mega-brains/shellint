@@ -1,4 +1,4 @@
-import { expect, test } from "@playwright/test";
+import { expect, test } from "./helpers/test-base";
 import { openApp } from "./helpers/open-app";
 
 test.describe("editor smoke", () => {
@@ -36,7 +36,7 @@ test.describe("editor smoke", () => {
     await expect(page.locator("#statusLine")).toContainText("saved");
   });
 
-  test("Build split menu opens and Check populates panel", async ({ page }) => {
+  test("Build split menu opens and Check populates panel", { tag: "@layout" }, async ({ page }) => {
     await openApp(page);
     await page.locator("#btnBuildMenu").click();
     await expect(page.locator("#buildMenu")).toBeVisible();
