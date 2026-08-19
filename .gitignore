@@ -12,6 +12,9 @@ web/dist/
 /site/
 .devroom/
 .txiki/
+# Vendored txiki.js binaries (see the Runtime row in CLAUDE.md) — multi-MB
+# prebuilt executables, fetched from a release, never committed.
+/vendor/
 test-results/
 playwright-report/
 blob-report/

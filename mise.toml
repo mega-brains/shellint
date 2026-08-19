@@ -3,11 +3,13 @@ node = "22"
 
 [env]
 DEVROOM_TJS_VERSION = "26.6.0"
-# DEVROOM_TJS_BIN ships as the final executable; build-smallest-compressed
-# has no `tjs bundle` (esbuild) support, so DEVROOM_TJS_BUNDLE_BIN carries
-# the full build for that one step.
-DEVROOM_TJS_BIN = "../../txiki.js/build-smallest-compressed/tjs"
-DEVROOM_TJS_BUNDLE_BIN = "../../txiki.js/build/tjs"
+# DEVROOM_TJS_BIN ships as the final executable, so it is the slim `min`
+# build (no FFI, no TLS) from the lukasMega/txiki.js-with-slim-builds release
+# `slim-v26.6.0-6`; that build has no `tjs bundle` (esbuild) support, so
+# DEVROOM_TJS_BUNDLE_BIN carries the full upstream build for that one step.
+# Both paths are repo-relative and gitignored — see /vendor/ in .gitignore.
+DEVROOM_TJS_BIN = "vendor/txiki/tjs"
+DEVROOM_TJS_BUNDLE_BIN = "vendor/txiki/tjs-bundle"
 
 [tasks.install]
 description = "Install npm dependencies"

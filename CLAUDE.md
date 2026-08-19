@@ -43,7 +43,7 @@ process-per-test, for when a failure smells like cross-test module state.
 
 | Layer | Choice |
 |---|---|
-| Runtime | Node 22 via mise by default; txiki.js v26.6.0 through conditional runtime and builder adapters |
+| Runtime | Node 22 via mise by default; txiki.js v26.6.0 through conditional runtime and builder adapters. Both `tjs` binaries are vendored (gitignored `vendor/txiki/`) and pinned in `mise.toml`. `DEVROOM_TJS_BIN` is the slim `min` profile — no FFI, no TLS, ~2.0 MB — from the [`lukasMega/txiki.js-with-slim-builds`](https://github.com/lukasMega/txiki.js-with-slim-builds/releases/tag/slim-v26.6.0-6) release (tag `slim-v26.6.0-6`), not a locally built fork, because that binary is what `tjs compile` embeds in the shipped executable. It drops the `bundle`, `eval`, `serve`, `test` and `app` **subcommands** (the `tjs.serve` *API* is still there, which is all the capability probe needs), so `DEVROOM_TJS_BUNDLE_BIN` carries the full upstream `saghul/txiki.js` v26.6.0 build for the one `tjs bundle` step |
 | Task runner | mise (`start`/`dev`, `build`, `lint`, `test`, `beforeCommit`, `probe`, `clean`) |
 | Device compile | `tsc` → ES5, `module: none`, `noEmitHelpers`, `noLib` + `types: []` |
 | Env gating | `meta.env` DCE → `*.raw.js`; then Terser minify → `*.js`; prod also shortens log strings into `dist/prod.logmap.json`, which the logs panel re-expands (M13) |
@@ -101,7 +101,12 @@ mise run clean
 ```
 
 Also available via `npm run …` (`build:shelly`, `build:web`, `dev`, `beforeCommit`, …).
-Set `DEVROOM_TJS_BIN` when `tjs` is not on `PATH`. txiki needs bundles under
+Set `DEVROOM_TJS_BIN` when `tjs` is not on `PATH` — it still overrides the
+vendored default, and a repo-relative value is resolved against the repo root
+(`scripts/txiki-test-util.mjs`), so moving the checkout does not break it.
+`DEVROOM_TJS_VERSION` is asserted against `--version` for *every* bin used, the
+bundler included. `tjs bundle` fetches esbuild into `~/.tjs/` on first use, so
+that step wants network and the TLS-capable full build. txiki needs bundles under
 `.txiki/`; npm installation, TypeScript, and Playwright stay on Node.
 Build config: `tsconfig.shelly.base.json` (device compiler options; extended by
 `tsconfig.shelly.script.json` for `scripts/main.ts`, `tsconfig.shelly.fixture.json`
