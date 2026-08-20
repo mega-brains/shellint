@@ -71,6 +71,37 @@ export type ToolbarProps = {
   deployTarget?: string;
 };
 
+function deployTitleOf(choice: { mode: Mode; minify: Minify }, ready: boolean) {
+  const { mode, minify } = choice;
+  const file = minify === "raw" ? `dist/${mode}.raw.js` : `dist/${mode}.js`;
+  const base = `Upload ${file} (${mode}, ${minifyLabel(minify)}) to the Shelly script slot over WebSocket RPC`;
+  return ready
+    ? base
+    : `${base} — disabled until Build + Check succeed and the active device is probed (or skipped)`;
+}
+
+function buildTitleOf(action: BuildAction) {
+  if (action === "check") {
+    return "Shelly/Espruino compliance check of scripts/main.ts (and dist artifacts when present). Works offline; adds device capability checks when the device answers.";
+  }
+  if (action === "build") {
+    return "Compile TypeScript to ES5 and emit debug/prod raw + minified artifacts under dist/";
+  }
+  return "Build, then run the compliance check over the fresh artifacts";
+}
+
+function visibleProbes(
+  results: ProbeResult[],
+  filter: string,
+  failOnly: boolean,
+) {
+  const needle = filter.trim().toLowerCase();
+  const matched = needle
+    ? results.filter((r) => r.id.toLowerCase().includes(needle))
+    : results;
+  return failOnly ? matched.filter((r) => !probeAvailable(r)) : matched;
+}
+
 export function Toolbar(props: ToolbarProps) {
   const [saveOpen, setSaveOpen] = useState(false);
   const [buildOpen, setBuildOpen] = useState(false);
@@ -97,27 +128,10 @@ export function Toolbar(props: ToolbarProps) {
   const saveDisabled = props.busy || props.previewing;
   const deployDisabled = props.busy || !props.deployReady;
   const { mode, minify } = props.deployChoice;
-  const deployFile =
-    minify === "raw" ? `dist/${mode}.raw.js` : `dist/${mode}.js`;
-  const deployBase = `Upload ${deployFile} (${mode}, ${minifyLabel(minify)}) to the Shelly script slot over WebSocket RPC`;
-  const deployTitle = props.deployReady
-    ? deployBase
-    : `${deployBase} — disabled until Build + Check succeed and the active device is probed (or skipped)`;
-
-  const buildTitle =
-    props.buildAction === "check"
-      ? "Shelly/Espruino compliance check of scripts/main.ts (and dist artifacts when present). Works offline; adds device capability checks when the device answers."
-      : props.buildAction === "build"
-        ? "Compile TypeScript to ES5 and emit debug/prod raw + minified artifacts under dist/"
-        : "Build, then run the compliance check over the fresh artifacts";
-
+  const deployTitle = deployTitleOf(props.deployChoice, props.deployReady);
+  const buildTitle = buildTitleOf(props.buildAction);
   const results = props.probeResults ?? [];
-  let shown = probeFilter.trim()
-    ? results.filter((r) =>
-        r.id.toLowerCase().includes(probeFilter.trim().toLowerCase()),
-      )
-    : results;
-  if (probeFailOnly) shown = shown.filter((r) => !probeAvailable(r));
+  const shown = visibleProbes(results, probeFilter, probeFailOnly);
 
   return (
     <div class="toolbar">

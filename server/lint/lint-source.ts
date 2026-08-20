@@ -6,6 +6,8 @@ import {
   calleeName,
   definesAccessor,
   hasUnicodeEscape,
+  isFunctionLike,
+  isNamedCallee,
   stringArg,
   type Finding,
   type FindingFix,
@@ -49,6 +51,137 @@ const MAX_RPC_NAME_CHARS = 32;
 
 type RegistrationSite = { conditional: boolean };
 
+type Tier1Rule = {
+  rule: string;
+  severity: "error" | "warn";
+  message: string;
+  match: (node: ts.Node, sf: ts.SourceFile) => boolean;
+  fix?: (node: ts.Node, sf: ts.SourceFile) => FindingFix;
+};
+
+/**
+ * One entry per construct, applied in order to every node — the order is the
+ * order findings come out in, which the check pane and its tests rely on.
+ */
+const TIER1_RULES: Tier1Rule[] = [
+  {
+    rule: "no-regexp",
+    severity: "error",
+    message: "RegExp literal not supported on device",
+    match: (n) => ts.isRegularExpressionLiteral(n),
+  },
+  {
+    rule: "no-regexp",
+    severity: "error",
+    message: "new RegExp() not supported on device",
+    match: (n) => ts.isNewExpression(n) && isNamedCallee(n, "RegExp"),
+  },
+  {
+    rule: "no-regexp",
+    severity: "error",
+    message: "RegExp() not supported on device",
+    match: (n) => ts.isCallExpression(n) && isNamedCallee(n, "RegExp"),
+  },
+  {
+    rule: "no-async",
+    severity: "error",
+    message: "Promise is not available on device",
+    match: (n) =>
+      ts.isIdentifier(n) &&
+      n.text === "Promise" &&
+      !(ts.isPropertyAccessExpression(n.parent) && n.parent.name === n),
+  },
+  {
+    rule: "no-async",
+    severity: "error",
+    message: "await not supported",
+    match: (n) => ts.isAwaitExpression(n),
+  },
+  {
+    // A device object defining its own `then` is conceivable, so this is the
+    // repo's unverified-⇒-warn case rather than an error.
+    rule: "no-async",
+    severity: "warn",
+    message:
+      ".then() is a Promise idiom and the device has no Promise — device APIs take a callback argument",
+    match: (n) =>
+      ts.isCallExpression(n) &&
+      ts.isPropertyAccessExpression(n.expression) &&
+      n.expression.name.text === "then",
+  },
+  {
+    rule: "no-async",
+    severity: "error",
+    message: "async functions not supported",
+    match: (n) =>
+      (isFunctionLike(n) || ts.isArrowFunction(n)) &&
+      ts.canHaveModifiers(n) &&
+      !!ts.getModifiers(n)?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword),
+  },
+  {
+    rule: "no-generators",
+    severity: "error",
+    message: "generator functions not supported",
+    match: (n) => isFunctionLike(n) && !!n.asteriskToken,
+  },
+  {
+    rule: "no-generators",
+    severity: "error",
+    message: "yield not supported",
+    match: (n) => ts.isYieldExpression(n),
+  },
+  {
+    rule: "no-accessors",
+    severity: "error",
+    message: "get/set accessors not supported",
+    match: (n) =>
+      ts.isGetAccessorDeclaration(n) || ts.isSetAccessorDeclaration(n),
+  },
+  {
+    rule: "no-accessors",
+    severity: "error",
+    message:
+      "Object.defineProperty with a get/set descriptor defines an accessor",
+    match: (n) => ts.isCallExpression(n) && definesAccessor(n),
+  },
+  {
+    rule: "no-modules",
+    severity: "error",
+    message: "ES modules not supported — output must be one flat script",
+    match: (n) => ts.isImportDeclaration(n) || ts.isExportDeclaration(n),
+  },
+  {
+    rule: "no-modules",
+    severity: "error",
+    message: "require() not supported on device",
+    match: (n) => ts.isCallExpression(n) && isNamedCallee(n, "require"),
+  },
+  {
+    rule: "no-labeled-statements",
+    severity: "warn",
+    message: "labeled statement unverified on device",
+    match: (n) => ts.isLabeledStatement(n),
+  },
+  {
+    rule: "no-with",
+    severity: "warn",
+    message: "with statement unverified on device",
+    match: (n) => ts.isWithStatement(n),
+  },
+  {
+    rule: "no-unicode-escapes",
+    severity: "warn",
+    message: "only \\xHH escapes are supported in device strings",
+    match: (n, sf) => ts.isStringLiteral(n) && hasUnicodeEscape(n.getText(sf)),
+    fix: (n, sf) => ({
+      title: "Replace Unicode escape with raw UTF-8 text",
+      start: n.getStart(sf),
+      end: n.getEnd(),
+      text: JSON.stringify((n as ts.StringLiteral).text),
+    }),
+  },
+];
+
 export function lintSource(
   source: string,
   fileName = SCRIPT_LABEL,
@@ -86,113 +219,10 @@ export function lintSource(
   };
 
   const checkTier1 = (node: ts.Node) => {
-    if (ts.isRegularExpressionLiteral(node)) {
-      add(node, "no-regexp", "error", "RegExp literal not supported on device");
-    }
-    if (
-      ts.isNewExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      node.expression.text === "RegExp"
-    ) {
-      add(node, "no-regexp", "error", "new RegExp() not supported on device");
-    }
-    if (
-      ts.isCallExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      node.expression.text === "RegExp"
-    ) {
-      add(node, "no-regexp", "error", "RegExp() not supported on device");
-    }
-    if (
-      ts.isIdentifier(node) &&
-      node.text === "Promise" &&
-      !(ts.isPropertyAccessExpression(node.parent) && node.parent.name === node)
-    ) {
-      add(node, "no-async", "error", "Promise is not available on device");
-    }
-    if (ts.isAwaitExpression(node)) {
-      add(node, "no-async", "error", "await not supported");
-    }
-    // A device object defining its own `then` is conceivable, so this is the
-    // repo's unverified-⇒-warn case rather than an error.
-    if (
-      ts.isCallExpression(node) &&
-      ts.isPropertyAccessExpression(node.expression) &&
-      node.expression.name.text === "then"
-    ) {
-      add(
-        node,
-        "no-async",
-        "warn",
-        ".then() is a Promise idiom and the device has no Promise — device APIs take a callback argument",
-      );
-    }
-    if (
-      (ts.isFunctionDeclaration(node) ||
-        ts.isFunctionExpression(node) ||
-        ts.isArrowFunction(node) ||
-        ts.isMethodDeclaration(node)) &&
-      ts.canHaveModifiers(node) &&
-      ts.getModifiers(node)?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword)
-    ) {
-      add(node, "no-async", "error", "async functions not supported");
-    }
-    if (
-      (ts.isFunctionDeclaration(node) ||
-        ts.isFunctionExpression(node) ||
-        ts.isMethodDeclaration(node)) &&
-      node.asteriskToken
-    ) {
-      add(node, "no-generators", "error", "generator functions not supported");
-    }
-    if (ts.isYieldExpression(node)) {
-      add(node, "no-generators", "error", "yield not supported");
-    }
-    if (ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node)) {
-      add(node, "no-accessors", "error", "get/set accessors not supported");
-    }
-    if (ts.isCallExpression(node) && definesAccessor(node)) {
-      add(
-        node,
-        "no-accessors",
-        "error",
-        "Object.defineProperty with a get/set descriptor defines an accessor",
-      );
-    }
-    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
-      add(
-        node,
-        "no-modules",
-        "error",
-        "ES modules not supported — output must be one flat script",
-      );
-    }
-    if (
-      ts.isCallExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      node.expression.text === "require"
-    ) {
-      add(node, "no-modules", "error", "require() not supported on device");
-    }
-    if (ts.isLabeledStatement(node)) {
-      add(node, "no-labeled-statements", "warn", "labeled statement unverified on device");
-    }
-    if (ts.isWithStatement(node)) {
-      add(node, "no-with", "warn", "with statement unverified on device");
-    }
-    if (ts.isStringLiteral(node) && hasUnicodeEscape(node.getText(sf))) {
-      add(
-        node,
-        "no-unicode-escapes",
-        "warn",
-        "only \\xHH escapes are supported in device strings",
-        {
-          title: "Replace Unicode escape with raw UTF-8 text",
-          start: node.getStart(sf),
-          end: node.getEnd(),
-          text: JSON.stringify(node.text),
-        },
-      );
+    for (const r of TIER1_RULES) {
+      if (r.match(node, sf)) {
+        add(node, r.rule, r.severity, r.message, r.fix?.(node, sf));
+      }
     }
   };
 

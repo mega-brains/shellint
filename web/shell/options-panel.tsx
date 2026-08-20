@@ -57,7 +57,7 @@ export function OptionsPanel(props: OptionsPanelProps) {
         const data = await api<{ config: { minify?: MinifyOptions } }>(
           "/api/config",
         );
-        setOpts({ ...DEFAULTS, ...(data.config.minify ?? {}) });
+        setOpts({ ...DEFAULTS, ...data.config.minify });
       } catch {
         onStatus.current?.("minify options unavailable", true);
       } finally {
@@ -95,7 +95,7 @@ export function OptionsPanel(props: OptionsPanelProps) {
 
   const onToggle = (key: keyof MinifyOptions, value: boolean) => {
     setOpts((prev) => ({ ...prev, [key]: value }));
-    pending.current = { ...(pending.current ?? {}), [key]: value };
+    pending.current = { ...pending.current, [key]: value };
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       saveTimer.current = null;

@@ -56,7 +56,7 @@ if (emitted('var s = "' + "Timer.set(".repeat(6) + '";').has("max-timers")) {
   throw new Error("dialect guard counted Timer.set inside a string literal");
 }
 
-const stats = await analyzeScriptFile();
+await analyzeScriptFile();
 const timerSample = analyzeSource("Timer.set(1000, false, function () {});", "sample.ts");
 if (!timerSample.apis["Timer.set"]) throw new Error("expected Timer.set in sample stats");
 const bleSample = analyzeSource(

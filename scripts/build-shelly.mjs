@@ -202,7 +202,7 @@ async function buildVariant(tscJs, name, flags, minifyOpts, logMapState, deviceD
   };
 }
 
-async function main() {
+function preflight() {
   const config = loadConfig();
   const compiler = config.compiler ?? "shellint";
 
@@ -222,6 +222,11 @@ async function main() {
     process.exit(1);
   }
 
+  return { config, tscBin };
+}
+
+/** @param {string} tscBin */
+function runTsc(tscBin) {
   rmSync(TSC_OUT_DIR, { recursive: true, force: true });
   mkdirSync(TSC_OUT_DIR, { recursive: true });
 
@@ -249,7 +254,49 @@ async function main() {
     process.exit(1);
   }
 
-  const tscJs = readFileSync(TSC_OUT_JS, "utf8");
+  return readFileSync(TSC_OUT_JS, "utf8");
+}
+
+function report(debug, prod, minifyOpts, deviceDefs) {
+  const sizes = (v) => {
+    const out = { raw: v.rawBytes, min: v.minBytes };
+    if (v.advBytes != null) out.adv = v.advBytes;
+    return out;
+  };
+  console.log(
+    JSON.stringify({ debug: sizes(debug), prod: sizes(prod) }, null, 2),
+  );
+  const d = path.relative(root, DIST_DIR) || "dist";
+  const advText = (v) =>
+    v.advBytes != null
+      ? `${d}/${v.name}.adv.js ${v.advBytes} B`
+      : `tier 3 skipped (${v.advSkipped})`;
+  console.log(
+    `${d}/debug.raw.js ${debug.rawBytes} B  ${d}/debug.js ${debug.minBytes} B  ${advText(debug)}`,
+  );
+  console.log(
+    `${d}/prod.raw.js  ${prod.rawBytes} B  ${d}/prod.js  ${prod.minBytes} B  ${advText(prod)}`,
+  );
+
+  if (minifyOpts.internStrings === true) {
+    console.log(
+      `internStrings: debug ${debug.interned} string(s) interned (${debug.internedBytes} B saved), prod ${prod.interned} string(s) interned (${prod.internedBytes} B saved)`,
+    );
+  }
+
+  if (minifyOpts.deviceDCE === true) {
+    const fields = Object.keys(deviceDefs).map((k) => k.split(".")[2]);
+    console.log(
+      fields.length
+        ? `deviceDCE: substituted meta.device.{${fields.join(", ")}} from ${path.relative(root, DEVICE_PROFILE_PATH)} — these artifacts are device-specific (see warnings above for any field left un-substituted)`
+        : `deviceDCE: on, but no meta.device.* field was substituted (see warning above) — artifacts are the same as deviceDCE off`,
+    );
+  }
+}
+
+async function main() {
+  const { config, tscBin } = preflight();
+  const tscJs = runTsc(tscBin);
   mkdirSync(DIST_DIR, { recursive: true });
   const minifyOpts = config.minify ?? DEFAULT_MINIFY;
 
@@ -289,40 +336,7 @@ async function main() {
     writeLogMap({});
   }
 
-  const sizes = (v) => {
-    const out = { raw: v.rawBytes, min: v.minBytes };
-    if (v.advBytes != null) out.adv = v.advBytes;
-    return out;
-  };
-  console.log(
-    JSON.stringify({ debug: sizes(debug), prod: sizes(prod) }, null, 2),
-  );
-  const d = path.relative(root, DIST_DIR) || "dist";
-  const advText = (v) =>
-    v.advBytes != null
-      ? `${d}/${v.name}.adv.js ${v.advBytes} B`
-      : `tier 3 skipped (${v.advSkipped})`;
-  console.log(
-    `${d}/debug.raw.js ${debug.rawBytes} B  ${d}/debug.js ${debug.minBytes} B  ${advText(debug)}`,
-  );
-  console.log(
-    `${d}/prod.raw.js  ${prod.rawBytes} B  ${d}/prod.js  ${prod.minBytes} B  ${advText(prod)}`,
-  );
-
-  if (minifyOpts.internStrings === true) {
-    console.log(
-      `internStrings: debug ${debug.interned} string(s) interned (${debug.internedBytes} B saved), prod ${prod.interned} string(s) interned (${prod.internedBytes} B saved)`,
-    );
-  }
-
-  if (minifyOpts.deviceDCE === true) {
-    const fields = Object.keys(deviceDefs).map((k) => k.split(".")[2]);
-    console.log(
-      fields.length
-        ? `deviceDCE: substituted meta.device.{${fields.join(", ")}} from ${path.relative(root, DEVICE_PROFILE_PATH)} — these artifacts are device-specific (see warnings above for any field left un-substituted)`
-        : `deviceDCE: on, but no meta.device.* field was substituted (see warning above) — artifacts are the same as deviceDCE off`,
-    );
-  }
+  report(debug, prod, minifyOpts, deviceDefs);
 }
 
 // Guarded so tests can `import` the pure functions above (envPass, minifyPass,

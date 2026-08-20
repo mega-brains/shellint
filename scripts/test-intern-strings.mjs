@@ -38,7 +38,7 @@ const eq = (got, want, what) => {
   const { code, interned, savedBytes } = internStrings(src);
   if (interned !== 1) fail(`expected exactly 1 interned group, got ${interned}`);
   if (savedBytes <= 0) fail(`expected positive savedBytes, got ${savedBytes}`);
-  if (!/^var V1="Shelly\.GetStatus";/.test(code)) {
+  if (!code.startsWith('var V1="Shelly.GetStatus";')) {
     fail(`expected a leading declaration, got: ${code}`);
   }
   if ((code.match(/Shelly\.call\(V1, /g) ?? []).length !== 3) {

@@ -52,15 +52,15 @@ if (called.size === 0) fail("found no /api/ call sites in web/ — the grep is b
 
 const router = readFileSync(join(ROOT, "web", "static", "local-api.ts"), "utf8");
 
-/** `case "/api/x":` entries. */
+/** `"/api/x": handler` entries in the ROUTES table. */
 const handled = new Set(
   [
-    ...router.matchAll(/case\s+"([^"]+)"/g),
+    ...router.matchAll(/^\s*"(\/api\/[a-z/]+)":/gm),
     ...router.matchAll(/path !== "(\/api\/[a-z/]+)"/g),
   ].map((m) => m[1]),
 );
 /** The device-prefix rejection list, plus routes handled by a prefix match
- *  (`/api/script/history/<iso>`, whose id can't be a case label). */
+ *  (`/api/script/history/<iso>`, whose id can't be a table key). */
 const prefixes = [
   ...[...router.matchAll(/"(\/api\/[a-z/]+)",/g)].map((m) => m[1]),
   ...[...router.matchAll(/startsWith\("(\/api\/[a-z/]+)"\)/g)].map((m) => m[1]),

@@ -128,7 +128,7 @@ export function App() {
       }
       if (showProgress) setCheckProgress(null);
       try {
-        const report = showProgress
+        const next = showProgress
           ? await apiStream<CheckReport>(
               "/api/check/stream",
               {
@@ -143,22 +143,22 @@ export function App() {
                 body: JSON.stringify({ connected: deviceSection.deviceOnline }),
               })
             ).report;
-        setReport(report);
+        setReport(next);
         setDialectFindings(null);
-        setCheckFailed(!report.ok);
-        deployGate.setCheckOk(report.ok);
+        setCheckFailed(!next.ok);
+        deployGate.setCheckOk(next.ok);
         syncDeployReady();
         if (quiet) return;
-        const scope = report.artifacts.length
-          ? `scripts/main.ts + ${report.artifacts.join(", ")}`
+        const scope = next.artifacts.length
+          ? `scripts/main.ts + ${next.artifacts.join(", ")}`
           : "scripts/main.ts (no build artifacts)";
-        const p = report.profile;
+        const p = next.profile;
         const device = p
           ? ` · device ${p.model ?? p.deviceIp} fw ${p.ver ?? "?"} (${p.source})`
           : " · no device profile";
         setStatus(
-          `check ${summarize(report.counts)} · ${scope}${device}`,
-          !report.ok,
+          `check ${summarize(next.counts)} · ${scope}${device}`,
+          !next.ok,
         );
       } finally {
         if (showProgress) setCheckProgress(null);

@@ -1,7 +1,13 @@
 import { runtime } from "#shellint/runtime";
 import ts from "typescript";
 import { DIST_DIR } from "../core/paths.ts";
-import { calleeName, definesAccessor, hasUnicodeEscape } from "./lint-util.ts";
+import {
+  calleeName,
+  definesAccessor,
+  hasUnicodeEscape,
+  isFunctionLike,
+  isNamedCallee,
+} from "./lint-util.ts";
 
 export type DialectFinding = {
   rule: string;
@@ -28,6 +34,143 @@ const EMIT_CAPS: Record<string, { rule: string; limit: number }> = {
   "HTTPServer.registerEndpoint": { rule: "max-http-endpoints", limit: 5 },
   "Script.addRpcHandler": { rule: "max-rpc-handlers", limit: 5 },
 };
+
+type NodeRule = {
+  rule: string;
+  severity: "error" | "warn";
+  message: string;
+  match: (node: ts.Node, sf: ts.SourceFile) => boolean;
+};
+
+/**
+ * One entry per banned construct, applied in order to every node — the order is
+ * the order findings come out in, which the artifact tests compare against.
+ */
+const NODE_RULES: NodeRule[] = [
+  {
+    rule: "no-regexp",
+    severity: "error",
+    message: "RegExp literal not supported on device",
+    match: (n) => ts.isRegularExpressionLiteral(n),
+  },
+  {
+    rule: "no-regexp",
+    severity: "error",
+    message: "new RegExp() not supported on device",
+    match: (n) => ts.isNewExpression(n) && isNamedCallee(n, "RegExp"),
+  },
+  {
+    rule: "no-regexp",
+    severity: "error",
+    message: "RegExp() not supported on device",
+    match: (n) => ts.isCallExpression(n) && isNamedCallee(n, "RegExp"),
+  },
+  {
+    rule: "no-arrow-functions",
+    severity: "error",
+    message: "arrow functions not supported",
+    match: (n) => ts.isArrowFunction(n),
+  },
+  {
+    rule: "no-classes",
+    severity: "error",
+    message: "classes not supported",
+    match: (n) => ts.isClassDeclaration(n) || ts.isClassExpression(n),
+  },
+  {
+    // tsc usually rewrites these; flag if any survive
+    rule: "no-template-literals",
+    severity: "error",
+    message: "template literals not supported",
+    match: (n) =>
+      ts.isTemplateExpression(n) || ts.isNoSubstitutionTemplateLiteral(n),
+  },
+  {
+    rule: "no-async",
+    severity: "error",
+    message: "await not supported",
+    match: (n) => ts.isAwaitExpression(n),
+  },
+  {
+    rule: "no-async",
+    severity: "error",
+    message: "async functions not supported",
+    match: (n) =>
+      isFunctionLike(n) &&
+      !!n.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword),
+  },
+  {
+    rule: "no-generators",
+    severity: "error",
+    message: "generator functions not supported",
+    match: (n) => isFunctionLike(n) && !!n.asteriskToken,
+  },
+  {
+    rule: "no-generators",
+    severity: "error",
+    message: "yield not supported",
+    match: (n) => ts.isYieldExpression(n),
+  },
+  {
+    rule: "no-accessors",
+    severity: "error",
+    message: "get/set accessors not supported",
+    match: (n) =>
+      ts.isGetAccessorDeclaration(n) || ts.isSetAccessorDeclaration(n),
+  },
+  {
+    // The shape a class getter takes once tsc has down-levelled it to ES5 —
+    // the one accessor form the guard can actually expect to meet.
+    rule: "no-accessors",
+    severity: "error",
+    message:
+      "Object.defineProperty with a get/set descriptor defines an accessor",
+    match: (n) => ts.isCallExpression(n) && definesAccessor(n),
+  },
+  {
+    rule: "no-labeled-statements",
+    severity: "warn",
+    message: "labeled statement unverified on device",
+    match: (n) => ts.isLabeledStatement(n),
+  },
+  {
+    rule: "no-with",
+    severity: "warn",
+    message: "with statement unverified on device",
+    match: (n) => ts.isWithStatement(n),
+  },
+  {
+    rule: "no-unicode-escapes",
+    severity: "warn",
+    message: "only \\xHH escapes are supported in device strings",
+    match: (n, sf) => ts.isStringLiteral(n) && hasUnicodeEscape(n.getText(sf)),
+  },
+  {
+    rule: "no-destructuring",
+    severity: "error",
+    message: "destructuring not supported",
+    match: (n) =>
+      ts.isObjectBindingPattern(n) || ts.isArrayBindingPattern(n),
+  },
+  {
+    rule: "no-spread-rest",
+    severity: "error",
+    message: "spread not supported",
+    match: (n) => ts.isSpreadElement(n) || ts.isSpreadAssignment(n),
+  },
+  {
+    rule: "no-spread-rest",
+    severity: "error",
+    message: "rest element not supported",
+    match: (n) => ts.isBindingElement(n) && !!n.dotDotDotToken,
+  },
+  {
+    rule: "no-modules",
+    severity: "error",
+    message: "ES modules not supported on device",
+    match: (n) => ts.isImportDeclaration(n) || ts.isExportDeclaration(n),
+  },
+];
 
 /**
  * Post-compile dialect guard on emitted ES5 (Tier 1 subset).
@@ -58,93 +201,8 @@ export function checkDialectSource(
   };
 
   const visit = (node: ts.Node) => {
-    if (ts.isRegularExpressionLiteral(node)) {
-      add(node, "no-regexp", "error", "RegExp literal not supported on device");
-    }
-    if (
-      ts.isNewExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      node.expression.text === "RegExp"
-    ) {
-      add(node, "no-regexp", "error", "new RegExp() not supported on device");
-    }
-    if (
-      ts.isCallExpression(node) &&
-      ts.isIdentifier(node.expression) &&
-      node.expression.text === "RegExp"
-    ) {
-      add(node, "no-regexp", "error", "RegExp() not supported on device");
-    }
-    if (ts.isArrowFunction(node)) {
-      add(node, "no-arrow-functions", "error", "arrow functions not supported");
-    }
-    if (ts.isClassDeclaration(node) || ts.isClassExpression(node)) {
-      add(node, "no-classes", "error", "classes not supported");
-    }
-    if (ts.isTemplateExpression(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
-      // tsc usually rewrites these; flag if any survive
-      add(node, "no-template-literals", "error", "template literals not supported");
-    }
-    if (ts.isAwaitExpression(node)) {
-      add(node, "no-async", "error", "await not supported");
-    }
-    if (
-      (ts.isFunctionDeclaration(node) ||
-        ts.isFunctionExpression(node) ||
-        ts.isMethodDeclaration(node)) &&
-      node.modifiers?.some((m) => m.kind === ts.SyntaxKind.AsyncKeyword)
-    ) {
-      add(node, "no-async", "error", "async functions not supported");
-    }
-    if (
-      (ts.isFunctionDeclaration(node) ||
-        ts.isFunctionExpression(node) ||
-        ts.isMethodDeclaration(node)) &&
-      node.asteriskToken
-    ) {
-      add(node, "no-generators", "error", "generator functions not supported");
-    }
-    if (ts.isYieldExpression(node)) {
-      add(node, "no-generators", "error", "yield not supported");
-    }
-    if (ts.isGetAccessorDeclaration(node) || ts.isSetAccessorDeclaration(node)) {
-      add(node, "no-accessors", "error", "get/set accessors not supported");
-    }
-    // The shape a class getter takes once tsc has down-levelled it to ES5 —
-    // the one accessor form the guard can actually expect to meet.
-    if (ts.isCallExpression(node) && definesAccessor(node)) {
-      add(
-        node,
-        "no-accessors",
-        "error",
-        "Object.defineProperty with a get/set descriptor defines an accessor",
-      );
-    }
-    if (ts.isLabeledStatement(node)) {
-      add(node, "no-labeled-statements", "warn", "labeled statement unverified on device");
-    }
-    if (ts.isWithStatement(node)) {
-      add(node, "no-with", "warn", "with statement unverified on device");
-    }
-    if (ts.isStringLiteral(node) && hasUnicodeEscape(node.getText(sf))) {
-      add(
-        node,
-        "no-unicode-escapes",
-        "warn",
-        "only \\xHH escapes are supported in device strings",
-      );
-    }
-    if (ts.isObjectBindingPattern(node) || ts.isArrayBindingPattern(node)) {
-      add(node, "no-destructuring", "error", "destructuring not supported");
-    }
-    if (ts.isSpreadElement(node) || ts.isSpreadAssignment(node)) {
-      add(node, "no-spread-rest", "error", "spread not supported");
-    }
-    if (ts.isBindingElement(node) && node.dotDotDotToken) {
-      add(node, "no-spread-rest", "error", "rest element not supported");
-    }
-    if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
-      add(node, "no-modules", "error", "ES modules not supported on device");
+    for (const r of NODE_RULES) {
+      if (r.match(node, sf)) add(node, r.rule, r.severity, r.message);
     }
 
     // Resource counts on emitted code (warn)

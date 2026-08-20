@@ -43,16 +43,16 @@ depends = "vendor:txiki"
 run = "npm run build:txiki:executable"
 
 [tasks.build]
-description = "Build Shelly dual artifacts + web UI bundle (parallel)"
-depends = ["build:shelly", "build:web"]
+description = "oxlint project source + build Shelly dual artifacts + web UI bundle (parallel)"
+depends = ["oxlint", "build:shelly", "build:web"]
 
 [tasks."build:shelly:fixture"]
 description = "Build the device fixture (fixtures/device/main.ts) into its own scratch dist — the gate's device build"
 run = "npm run build:shelly:fixture"
 
 [tasks."build:gate"]
-description = "Fixture device build + web UI bundle — the build step of beforeCommit, independent of scripts/main.ts"
-depends = ["build:shelly:fixture", "build:web"]
+description = "oxlint + fixture device build + web UI bundle — the build step of beforeCommit, independent of scripts/main.ts"
+depends = ["oxlint", "build:shelly:fixture", "build:web"]
 
 [tasks."build:static"]
 description = "Build the GitHub Pages site into site/: landing + download at the root, the offline/device-less app under site/demo/ (M17, M26)"
@@ -83,6 +83,10 @@ npm run deploy -- --mode "$mode" --minify "$minify"
 [tasks."deploy:txiki"]
 description = "Build and deploy through txiki"
 run = "npm run deploy:txiki -- \"$@\""
+
+[tasks.oxlint]
+description = "oxlint over shellint's own source (server/web/scripts/shared/e2e) — never Shelly device code, which server/lint/ covers"
+run = "npm run oxlint"
 
 [tasks.lint]
 description = "Typecheck Shelly script + server + web"
@@ -143,8 +147,8 @@ run = "npm run test:txiki"
 
 [tasks.b]
 alias="beforeCommit"
-description = "Pre-commit gate: line limit + typecheck + fixture build run in parallel, then static build, test, then e2e on Node and on the txiki executable"
-depends = ["check:lines", "typecheck", "build:gate"]
+description = "Pre-commit gate: oxlint + line limit + typecheck + fixture build run in parallel, then static build, test, then e2e on Node and on the txiki executable"
+depends = ["oxlint", "check:lines", "typecheck", "build:gate"]
 run = """
 npm run build:static
 npm run test && npm run test:e2e && npm run test:e2e:txiki

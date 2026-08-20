@@ -13,8 +13,7 @@ import {
   utimesSync,
   writeFileSync,
 } from "node:fs";
-import { join, dirname } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join } from "node:path";
 import {
   snapshotBeforeWrite,
   checkpointNow,

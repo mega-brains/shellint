@@ -38,11 +38,9 @@ import { transpileDevice } from "./transpile";
 import { vfsReset, vfsWrite } from "./vfs";
 import type {
   BuildRequest,
-  BuildResponse,
   BuildResult,
   CheckProgressResponse,
   CheckRequest,
-  CheckResponse,
   PipelineRequest,
   PipelineResponse,
   StatsRequest,

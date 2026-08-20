@@ -1,5 +1,11 @@
 /**
- * Fail if any source file exceeds MAX lines.
+ * Fail if any source file exceeds MAX lines. This is the *only* mechanism that
+ * enforces the limit — `.oxlintrc.json` deliberately leaves `max-lines` off,
+ * because this scan also reaches .css and the device code oxlint ignores.
+ *
+ * Raw lines: blanks and comments count, since a 900-line file is hard to read
+ * however it is filled.
+ *
  * Scans .ts .tsx .js .mjs .mts .css under the repo (skips build/vendor dirs).
  *
  * Usage: node scripts/check-line-limit.mjs
@@ -19,6 +25,19 @@ const SKIP_DIRS = new Set([
   ".shellint",
   ".git",
   ".idea",
+  // Vendored, not authored: the txiki binaries under vendor/ and the Espruino
+  // UMD bundles under web/static/vendor/.
+  "vendor",
+  // Fixture workspaces scripts/fixture-workspace.mjs copies per test runner,
+  // plus scratch configs — generated, and every one is a copy of a file that
+  // is already checked at its real path.
+  ".tmp",
+  // Playwright output.
+  "test-results",
+  "playwright-report",
+  ".playwright-mcp",
+  // Agent notes and plans.
+  ".claude",
   // Minify benchmark inputs, not app source: they need bulk to be
   // representative, and nothing imports them. See bench/README.md.
   "bench",
@@ -33,11 +52,17 @@ const SKIP_DIRS = new Set([
 // Device script authored by the user in the editor — not app source, can't
 // use imports (compiles module:none/noLib) so it can't be split like the rest.
 const SKIP_FILES = new Set(["scripts/main.ts"]);
+// Written by `mise run probe` off whatever the device answers, so its size is
+// the device's business, not ours.
+const SKIP_PREFIXES = ["types/generated"];
+
+function skipped(rel) {
+  return SKIP_FILES.has(rel) || SKIP_PREFIXES.some((p) => rel.startsWith(p));
+}
 
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
     if (SKIP_DIRS.has(name)) continue;
-    // Also skip web/dist even if named oddly nested
     const path = join(dir, name);
     let st;
     try {
@@ -46,7 +71,6 @@ function walk(dir, out = []) {
       continue;
     }
     if (st.isDirectory()) {
-      if (name === "dist") continue;
       walk(path, out);
     } else if (st.isFile() && EXTS.has(extname(name))) {
       out.push(path);
@@ -60,12 +84,13 @@ function lineCount(text) {
   return text.replace(/\n$/, "").split("\n").length;
 }
 
-const files = walk(ROOT);
 const offenders = [];
+let checked = 0;
 
-for (const file of files) {
+for (const file of walk(ROOT)) {
   const rel = relative(ROOT, file);
-  if (SKIP_FILES.has(rel)) continue;
+  if (skipped(rel)) continue;
+  checked += 1;
   const n = lineCount(readFileSync(file, "utf8"));
   if (n > MAX) offenders.push({ file: rel, lines: n });
 }
@@ -78,4 +103,4 @@ if (offenders.length) {
   process.exit(1);
 }
 
-console.log(`OK: ${files.length} source file(s) ≤ ${MAX} lines`);
+console.log(`OK: ${checked} source file(s) ≤ ${MAX} lines`);

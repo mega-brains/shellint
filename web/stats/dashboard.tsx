@@ -1,5 +1,5 @@
 import { flashClass, useChangeFlash } from "../ui/use-flash";
-import { Group, MeasureList, MeasureRow } from "../ui/measure";
+import { Group, MeasureList } from "../ui/measure";
 import { StatBadges } from "./stats-badges";
 import { CapMeasures } from "../charts/stats-chart";
 import { MemMeasures, MemWell } from "../charts/mem-chart";

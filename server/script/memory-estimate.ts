@@ -130,10 +130,7 @@ export function estimateMemory(
     counted.identifiers += 1;
   };
 
-  const visit = (node: ts.Node) => {
-    // Types are erased before the device ever sees the script.
-    if (ts.isTypeNode(node) || ts.isTypeAliasDeclaration(node)) return;
-
+  const chargeNames = (node: ts.Node) => {
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
       addName(node.name.text, isFunctionValue(node.initializer));
     } else if (ts.isParameter(node) && ts.isIdentifier(node.name)) {
@@ -151,7 +148,9 @@ export function estimateMemory(
     } else if (ts.isShorthandPropertyAssignment(node)) {
       addName(node.name.text, false);
     }
+  };
 
+  const chargeLiterals = (node: ts.Node) => {
     // Only the container base is charged here; members are charged when the
     // walk reaches them, which also covers nested literals.
     if (ts.isObjectLiteralExpression(node) || ts.isArrayLiteralExpression(node)) {
@@ -168,18 +167,27 @@ export function estimateMemory(
       breakdown.numbers += numberCost(node.text);
       counted.numbers += 1;
     }
+  };
 
-    if (ts.isCallExpression(node)) {
-      const name = calleeName(node.expression);
-      if (name && LOG_METHODS.includes(name)) {
-        breakdown.logging += MEMORY_COSTS.consoleLog;
-        counted.consoleLog += 1;
-      }
-      if (name === "print") {
-        breakdown.logging += MEMORY_COSTS.print;
-        counted.print += 1;
-      }
+  const chargeLogging = (node: ts.CallExpression) => {
+    const name = calleeName(node.expression);
+    if (name && LOG_METHODS.includes(name)) {
+      breakdown.logging += MEMORY_COSTS.consoleLog;
+      counted.consoleLog += 1;
     }
+    if (name === "print") {
+      breakdown.logging += MEMORY_COSTS.print;
+      counted.print += 1;
+    }
+  };
+
+  const visit = (node: ts.Node) => {
+    // Types are erased before the device ever sees the script.
+    if (ts.isTypeNode(node) || ts.isTypeAliasDeclaration(node)) return;
+
+    chargeNames(node);
+    chargeLiterals(node);
+    if (ts.isCallExpression(node)) chargeLogging(node);
 
     ts.forEachChild(node, visit);
   };

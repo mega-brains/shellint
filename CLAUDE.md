@@ -14,10 +14,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 Prefer **mise** tasks ([`mise.toml`](./mise.toml)). Verify with `ls` / `mise tasks`
 before assuming entrypoints exist.
 
-Pre-commit gate: `mise run beforeCommit` (line limit ≤500, typecheck shelly/server/web,
-build, test, then the e2e suite twice — once against the Node server, once
-against the txiki single-file executable, `e2e/playwright.txiki.config.ts`,
-which runs it on port 8797 via `SHELLINT_PORT` with one worker).
+Pre-commit gate: `mise run beforeCommit` (oxlint, line limit ≤500, typecheck
+shelly/server/web, build, test, then the e2e suite twice — once against the Node
+server, once against the txiki single-file executable,
+`e2e/playwright.txiki.config.ts`, which runs it on port 8797 via `SHELLINT_PORT`
+with one worker). The oxlint step lints **shellint's own source only** —
+`server/`, `web/`, `scripts/`, `shared/`, `e2e/` — and **never Shelly device
+code**, which has its own five-tier engine in `server/lint/`; see the
+Project-source lint row below. It also caps cyclomatic complexity at 20;
+`check:lines` is the one place the 500-line limit lives.
 
 Opt-in and deliberately outside that gate: `mise run test:e2e:lightpanda` runs
 the 11 of 31 tests that need neither layout nor screenshots against
@@ -41,6 +46,17 @@ build:shelly` and the UI's Build button still build it as before. The fixture
 must stay lint-clean on all five tiers — `test-smoke.mjs` asserts it — and
 changing it changes the e2e design baselines.
 
+**Verification never targets the live device** — differential and golden-capture
+runs go through that same fixture workspace, never the device configured in
+[`.shellint/devices.json`](./.shellint/devices.json). A deploy, `/api/device/eco`,
+`/api/device/script` or `mise run probe` fired while recording a baseline writes
+to real hardware: on 2026-08-20 an M22 Hono-removal capture overwrote slot 1 with
+a 574-byte fixture build, turned eco mode on and started it — the slot's
+3,623-byte source was unrecoverable. Separately,
+[`types/device-profile.json`](./types/device-profile.json) re-dirties with a fresh
+`at` timestamp on any gate run made while the device answers; a dirty `types/`
+afterwards is environmental, not a change to commit.
+
 `scripts/test.mjs` runs the two builds in parallel, then **imports** each test
 module into its own process instead of spawning one `node --import tsx` per
 file — that startup is ~750 ms each and was most of the suite's runtime.
@@ -52,14 +68,14 @@ process-per-test, for when a failure smells like cross-test module state.
 | Layer | Choice |
 |---|---|
 | Runtime | Node 22 via mise by default; txiki.js v26.6.0 through conditional runtime and builder adapters. Both `tjs` binaries are vendored (gitignored `vendor/txiki/`) and pinned in `mise.toml`. `SHELLINT_TJS_BIN` is the slim `min` profile — no FFI, no TLS, ~2.0 MB — from the [`lukasMega/txiki.js-with-slim-builds`](https://github.com/lukasMega/txiki.js-with-slim-builds/releases/tag/slim-v26.6.0-6) release (tag `slim-v26.6.0-6`), not a locally built fork, because that binary is what `tjs compile` embeds in the shipped executable. It drops the `bundle`, `eval`, `serve`, `test` and `app` **subcommands** (the `tjs.serve` *API* is still there, which is all the capability probe needs), so `SHELLINT_TJS_BUNDLE_BIN` carries the full upstream `saghul/txiki.js` v26.6.0 build for the one `tjs bundle` step |
-| Task runner | mise (`start`/`dev`, `build`, `lint`, `test`, `beforeCommit`, `probe`, `clean`) |
+| Task runner | mise (`start`/`dev`, `build`, `oxlint`, `lint`, `test`, `beforeCommit`, `probe`, `clean`) |
 | Device compile | `tsc` → ES5, `module: none`, `noEmitHelpers`, `noLib` + `types: []` |
 | Env gating | `meta.env` DCE → `*.raw.js`; then Terser minify → `*.js`; prod also shortens log strings into `dist/prod.logmap.json`, which the logs panel re-expands (M13) |
 | Emit | Flat (no IIFE) → `dist/{debug,prod}.{raw.js,js,adv.js}` — `*.adv.js` is tier 3 (`espruino --minify`, chained after Terser) and is simply absent when that binary is not installed (M13) |
 | Types | `types/shelly.d.ts`, `types/espruino-lib.d.ts`, `types/meta.d.ts` — the whole stdlib for device code, since `noLib` drops `lib.es*` (M11) |
 | Config | `shellint.json` (`host`, `port`, `compiler`, `minify`); legacy `devroom.json` is fallback only when shellint config is absent |
 | Multi-device | `.shellint/devices.json` (gitignored, `0600`) holds device list and active `{device, slot, script}` selection — `server/device/devices.ts`. Digest auth retries a 401 challenge once. Header device/slot pickers switch via `POST /api/session/active`, re-mirroring selected device profile/probe into fixed `types/*` paths. |
-| Server / UI | Hono + CodeMirror 6 |
+| Server / UI | Hand-rolled router + CodeMirror 6. **No web framework** — `server/core/router.ts` (patterns, specificity precedence, dispatch) and `server/core/context.ts` (`c.json`/`c.text`/`c.html`/`c.body`, `c.req.*`) replaced Hono in M22; `server/core/node-server.ts` is the `node:http` → `fetch` adapter that replaced `@hono/node-server`, while txiki keeps using `tjs.serve({ fetch })`. Route modules take a `Router`; unmatched path *or method* is `404 Not Found`, never 405 |
 | Web bundle | esbuild → `web/dist/{app.js,styles.css,api-docs.json}`, all minified and precompressed to `.br`/`.gz`; `server/core/static-assets.ts` negotiates on `Accept-Encoding`. Sourcemap is dev-only (`build:web:dev`); `npm run build:web` passes `--prod`. `web/editor/cm-setup.ts` replaces CodeMirror's `basicSetup` to keep `@codemirror/lint` out. Budgets enforced by `scripts/test-web-assets.mjs` (M14); the M18 redesign cut `styles.css` from 41.4 KB to ~35.4 KB and the budget with it |
 | Deploy | WS PutCode; mode debug/prod + artifact min/raw |
 | Static build | `mise run build:static` → `site/` for GitHub Pages: no server, no device, works offline. Same UI — `scripts/static-esbuild.mjs` swaps `web/lib/api.ts` for `web/static/local-api.ts`, a fake router over the same route strings, so no component changed. Build/check/stats run in `web/static/pipeline.worker.ts` (`ts.transpileModule` — byte-identical to `tsc -p`, locked by `test-transpile-parity` — then the *same* `shared/device-pipeline.mjs` the server uses). `server/lint/check.ts` runs unmodified over an in-memory VFS (`web/static/vfs.ts` + `node-shims/`); the 14 rules needing a device profile/probe/`types.d.ts` report `skipped`, never a false `pass`. Device UI gated off by `static: true` (`web/shell/device-section.tsx`) (M17) |
@@ -68,6 +84,9 @@ process-per-test, for when a failure smells like cross-test module state.
 | Debug logs | `GET`/`POST /api/device/logs` — server holds the one `/debug/log` socket, browser polls; `print("#m <series> <value>")` charts numerically (M12) |
 | Charts | Hand-rolled inline SVG (`web/charts/spark.ts`). **No uPlot** — deliberately dependency-free |
 | Compliance | `POST /api/check` — source lint Tier 1–5 + post-compile dialect guard (M8–M10). `server/lint/check-catalog.ts` names all 66 checks — including `syntax-error` and `type-error` (`server/lint/lint-types.ts`), so a script that does not parse or does not type-check reports in the check pane and on the editor gutter instead of passing over a recovered AST; a parse failure marks every other rule `skipped`; each run reports pass/warn/fail/**skipped** per rule, and `GET /api/checks` serves the catalog alone |
+| Project-source lint | `mise run oxlint` → [oxlint](https://oxc.rs) 1.79.0 (pinned exact) over `server/ web/ scripts/ shared/ e2e/`, categories `correctness` + `suspicious` as errors plus `complexity` capped at 20, config in [`.oxlintrc.json`](./.oxlintrc.json). This is plain hygiene lint of the *tool's own* Node/browser TypeScript and is **not** related to the device checks: `scripts/main.ts`, `fixtures/`, `bench/`, `templates/`, `types/`, `web/static/vendor/` and every build output are in `ignorePatterns`, because device code is ES5/`noLib`/`types: []` Espruino and a general linter can only be wrong there. Six style-only rules are off with a reason each in the config; runs in ~60 ms, so it fronts both `build` and `beforeCommit` |
+| Cyclomatic complexity | `complexity: ["error", { "max": 20 }]`, `variant: classic`. The rule sits in oxlint's `restriction` category, which is *not* enabled wholesale, so it is named explicitly. The ten functions that breached it were split by extraction or turned into dispatch tables — `server/lint/{dialect-check,lint-source}.ts` (one entry per banned construct, and **the table order is the finding order** the artifact tests compare), `server/script/script-stats.ts` (`CALL_COUNTERS`/`MARKED_CALLS`), `web/static/local-api.ts` (`ROUTES`, mirroring `server/core/router.ts`; `scripts/test-local-api.mjs` greps those keys) and `web/device/status-metrics.ts` (one builder per dock tile). No suppressions, no raised threshold |
+| Line limit | `mise run check:lines` → [`scripts/check-line-limit.mjs`](./scripts/check-line-limit.mjs) is the **single** authority: ≤500 **raw** lines (blanks and comments count) over `.ts .tsx .mts .mjs .js` **and** `.css`, everywhere but its skip list — build output, `vendor/` (both the txiki binaries and `web/static/vendor/`), `.tmp/` fixture workspaces, `bench/`, `site/`, `design/`, `.claude/`, `types/generated*` and `scripts/main.ts`. oxlint's `max-lines` is deliberately left **off**: two overlapping half-checks would disagree, and this scan reaches `.css` and device code that oxlint ignores |
 | UI layout | `#app` is a grid: header 52 · readiness rail 38 · workspace 1fr · dock 46/300 (M18). Header carries the wordmark, device/slot chips, run-state chip and the toolbar (Save · Build split · Deploy split · Probe, driven by `web/ui/button.tsx`). The rail (`web/shell/readiness-rail.tsx` + `readiness.ts`) states the built/checked/probed gates and owns the one transient status line. The inspector is a tab strip — build / check / options, one pane visible, last tab in localStorage (`web/shell/inspector.tsx`), resizable via the surviving vertical splitter. The dock (`web/device/dock.tsx`) owns its own row, so it cannot overlap the workspace; it is resizable by a horizontal splitter (`--dock-h` on `#app`, 140px min, 220px min workspace, height in localStorage). Breakpoints: 1000px moves the inspector above the editor; the header sheds the Deploy detail at 1100px and the device IP + run-state word at 900px (both stay in `title`), stepping down to a smaller, narrower face (`--sans-narrow`) as it goes |
 | Data display | One measure-row grammar (`web/ui/measure.tsx`) for artifact sizes, caps and memory buckets, so bars compare down a column; colour only at ≥75% of a limit, or on the one artifact Deploy targets. Counters stay tiles; the estimate-vs-peak well is the only inset surface (M18) |
 | Theme | Dark by default, light behind `prefers-color-scheme`, overridable by the header toggle (`web/shell/theme.ts` writes `<html data-theme>` + localStorage) — all tokens in `web/shell/tokens.css`. CodeMirror is themed in `web/editor/cm-theme.ts` off the same custom properties (its own DOM is not stylesheet-friendly). Elevation exists only on the shared modal frame (`web/ui/modal.css`) (M18) |
@@ -84,15 +103,16 @@ Default compiler is clean-room shellint (`compiler: "shellint"`; legacy `"devroo
 ```bash
 mise install
 mise run install          # npm install
-mise run build            # Shelly dual artifacts + web bundle
-mise run lint             # typecheck shelly + server + web
+mise run build            # oxlint + Shelly dual artifacts + web bundle
+mise run oxlint           # oxlint shellint's own source — never device code
+mise run lint             # typecheck shelly + server + web (typecheck only, not oxlint)
 mise run typecheck        # same as lint
-mise run check:lines      # source files ≤ 500 lines
+mise run check:lines      # source files ≤ 500 raw lines (the authoritative check)
 mise run test             # DCE/minify asserts + web + server smoke
                           # accepts a name filter and `--isolated` (see below)
 mise run bench            # minify-option benchmark over bench/*.ts
-mise run beforeCommit     # check:lines → typecheck → build:gate → test → e2e (node + txiki exe)
-mise run build:gate       # fixture device build + web bundle (what the gate builds)
+mise run beforeCommit     # oxlint → check:lines → typecheck → build:gate → test → e2e (node + txiki exe)
+mise run build:gate       # oxlint + fixture device build + web bundle (what the gate builds)
 mise run typecheck:script # typecheck your live scripts/main.ts (outside the gate)
 mise run start            # shellint server (alias: mise run dev)
 mise run vendor:txiki     # fetch/verify the pinned vendor/txiki pair (--force, --check)

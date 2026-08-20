@@ -1,0 +1,90 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  // Hygiene lint for shellint's *own* source — the server, the web UI, the
+  // build scripts, the shared pipeline and the e2e suite. Shelly device code is
+  // deliberately out of scope: it has its own five-tier engine in server/lint/
+  // and compiles as ES5 / module:none / noLib / types:[] against the Espruino
+  // dialect, so a general JS/TS linter can only produce wrong findings there.
+  //
+  // `mise run oxlint` passes the in-scope roots explicitly; the ignore list
+  // below repeats the exclusions so a bare `oxlint` (editor, LSP) sees the
+  // same file set the gate does.
+  //
+  // The 500-line cap is *not* here: `max-lines` stays off because
+  // scripts/check-line-limit.mjs owns that limit, and it reaches files oxlint
+  // deliberately ignores (device code, .css). One mechanism, not two.
+  "categories": {
+    "correctness": "error",
+    "suspicious": "error"
+  },
+  "ignorePatterns": [
+    // The user's live editor buffer, and a device script: no gate step touches
+    // it (see CLAUDE.md).
+    "scripts/main.ts",
+    // The gate's device entry. Must stay clean on the five device tiers, which
+    // is a different dialect and a different set of rules.
+    "fixtures/**",
+    // Device scripts: the minify benchmark corpus and the starter template.
+    "bench/**",
+    "templates/**",
+    // Device typings (the whole stdlib for device code, since noLib drops
+    // lib.es*) plus probe/profile output.
+    "types/**",
+    // Vendored Espruino UMD bundles (esprima/esmangle/escodegen).
+    "web/static/vendor/**",
+    // Agent notes, plans and the designer's handoff documents.
+    ".claude/**",
+    // Build output and vendored binaries. All gitignored, which oxlint already
+    // honours; listed so --no-ignore stays in scope too.
+    "dist/**",
+    "web/dist/**",
+    "site/**",
+    ".tsc-out/**",
+    ".txiki/**",
+    ".tmp/**",
+    "vendor/**",
+    "node_modules/**"
+  ],
+  "rules": {
+    // Cyclomatic complexity cap. Not in `correctness`/`suspicious` — it lives in
+    // `restriction`, which is otherwise far too noisy to enable wholesale.
+    "complexity": ["error", { "max": 20 }],
+    // Both want the ES2023 change-by-copy methods, and their --fix-dangerously
+    // rewrite breaks `tsc`: web/ is lib ES2020 and server/ target ES2022, so
+    // toSorted/toReversed are TS2550 there. Every site already sorts or
+    // reverses a freshly built local array, so mutating in place is the intent.
+    "unicorn/no-array-sort": "off",
+    "unicorn/no-array-reverse": "off",
+    // Wants nested helpers hoisted to module scope. They are local on purpose —
+    // hoisting widens each module's surface to buy nothing.
+    "unicorn/consistent-function-scoping": "off",
+    // Naming style only, and it flags identifiers that have to look like this:
+    // `__dirname` in ESM scripts, and the `__SHELLINT_REPO__` esbuild define.
+    "no-underscore-dangle": "off",
+    // Flags `worker.onmessage` / `onerror`. Single-handler assignment is
+    // deliberate for the pipeline worker, and addEventListener would also
+    // change port start() semantics.
+    "unicorn/prefer-add-event-listener": "off",
+    // False positive on `Worker.postMessage(msg)`, which takes no
+    // targetOrigin — that parameter belongs to `window.postMessage`. Its
+    // --fix-dangerously rewrite emits `w.postMessage(msg, w.location.origin)`,
+    // and a Worker has no `location`.
+    "unicorn/require-post-message-target-origin": "off"
+  },
+  "overrides": [
+    {
+      // The probe catalog test evaluates every probe expression in Node to
+      // prove it is well-formed before `mise run probe` sends it to real
+      // hardware. eval is the assertion, not an accident.
+      "files": ["scripts/test-probe-catalog.mjs"],
+      "rules": { "no-eval": "off" }
+    },
+    {
+      // Playwright derives a fixture's dependencies from its first parameter's
+      // destructuring pattern and rejects anything else, so a fixture that
+      // needs none must literally be written `async ({}, use)`.
+      "files": ["e2e/**"],
+      "rules": { "no-empty-pattern": "off" }
+    }
+  ]
+}

@@ -3,7 +3,7 @@ export async function api<T>(
   init?: RequestInit,
 ): Promise<T & { ok: boolean; error?: string }> {
   const res = await fetch(path, {
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+    headers: { "Content-Type": "application/json", ...init?.headers },
     ...init,
   });
   const data = (await res.json()) as T & { ok: boolean; error?: string };
@@ -27,7 +27,7 @@ export async function apiStream<T>(
   onProgress: (progress: { done: number; total: number }) => void,
 ): Promise<T> {
   const res = await fetch(path, {
-    headers: { "Content-Type": "application/json", ...(init?.headers || {}) },
+    headers: { "Content-Type": "application/json", ...init?.headers },
     ...init,
   });
   if (!res.ok) {

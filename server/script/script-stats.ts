@@ -85,6 +85,33 @@ function bump(map: Record<string, number>, key: string) {
   map[key] = (map[key] ?? 0) + 1;
 }
 
+/** Calls counted by name alone. */
+const CALL_COUNTERS: Record<string, (s: ScriptStats) => void> = {
+  "Timer.set": (s) => void (s.registrations.timers += 1),
+  "Shelly.addEventHandler": (s) => void (s.registrations.eventHandlers += 1),
+  "Shelly.addStatusHandler": (s) => void (s.registrations.statusHandlers += 1),
+  "HTTPServer.registerEndpoint": (s) => void (s.registrations.httpEndpoints += 1),
+  "Script.addRpcHandler": (s) => void (s.registrations.rpcHandlers += 1),
+  "MQTT.subscribe": (s) => void (s.registrations.mqttSubs += 1),
+  "Shelly.HTTP.get": (s) => void (s.network.httpGet += 1),
+  "HTTP.get": (s) => void (s.network.httpGet += 1),
+  "Shelly.HTTP.post": (s) => void (s.network.httpPost += 1),
+  "HTTP.post": (s) => void (s.network.httpPost += 1),
+  "MQTT.publish": (s) => void (s.network.mqttPublish += 1),
+};
+
+/** Calls that also get a clickable source line behind their badge. */
+const MARKED_CALLS: Record<
+  string,
+  { site: keyof StatSites; count: (s: ScriptStats) => void }
+> = {
+  "console.log": { site: "consoleLog", count: (s) => void (s.logging.consoleLog += 1) },
+  "console.error": { site: "consoleLog", count: (s) => void (s.logging.consoleLog += 1) },
+  "console.warn": { site: "consoleLog", count: (s) => void (s.logging.consoleLog += 1) },
+  print: { site: "print", count: (s) => void (s.logging.print += 1) },
+  "Shelly.call": { site: "shellyCall", count: (s) => void (s.network.shellyCall += 1) },
+};
+
 function isAnonFunction(node: ts.Node): boolean {
   if (ts.isFunctionExpression(node) || ts.isArrowFunction(node)) {
     return !node.name;
@@ -220,15 +247,7 @@ export function analyzeSource(source: string, fileName = "main.ts"): ScriptStats
     stats.sites[key].push(at(node));
   };
 
-  const visit = (node: ts.Node) => {
-    const enteredAnon = isAnonFunction(node);
-    if (enteredAnon) {
-      anonDepth += 1;
-      if (anonDepth > stats.nesting.maxAnonymousDepth) {
-        stats.nesting.maxAnonymousDepth = anonDepth;
-      }
-    }
-
+  const countDeclarations = (node: ts.Node) => {
     if (
       ts.isVariableDeclarationList(node) &&
       !(
@@ -260,7 +279,9 @@ export function analyzeSource(source: string, fileName = "main.ts"): ScriptStats
       stats.declarations.params += node.parameters.length;
       mark("functions", node);
     }
+  };
 
+  const countLiterals = (node: ts.Node) => {
     if (ts.isStringLiteral(node) || ts.isNoSubstitutionTemplateLiteral(node)) {
       stats.literals.strings.count += 1;
       stats.literals.strings.totalBytes += runtime.byteLength(node.text);
@@ -269,9 +290,37 @@ export function analyzeSource(source: string, fileName = "main.ts"): ScriptStats
     if (ts.isNumericLiteral(node)) {
       stats.literals.numbers.count += 1;
     }
+  };
+
+  const countCall = (node: ts.CallExpression) => {
+    const name = calleeName(node.expression);
+    if (!name) return;
+    if (isKnownApi(name)) {
+      bump(stats.apis, name);
+      mark("apis", node);
+    }
+    CALL_COUNTERS[name]?.(stats);
+    const marked = MARKED_CALLS[name];
+    if (marked) {
+      marked.count(stats);
+      mark(marked.site, node);
+    }
+  };
+
+  const visit = (node: ts.Node) => {
+    const enteredAnon = isAnonFunction(node);
+    if (enteredAnon) {
+      anonDepth += 1;
+      if (anonDepth > stats.nesting.maxAnonymousDepth) {
+        stats.nesting.maxAnonymousDepth = anonDepth;
+      }
+    }
+
+    countDeclarations(node);
+    countLiterals(node);
 
     // Non-call member uses (e.g. BLE.Scanner.SCAN_RESULT). Call callees are
-    // handled below so `BLE.Scanner.Start(...)` stays a single site.
+    // handled by countCall so `BLE.Scanner.Start(...)` stays a single site.
     if (ts.isPropertyAccessExpression(node) && isApiMemberSite(node)) {
       const name = calleeName(node);
       if (name && isKnownApi(name)) {
@@ -280,45 +329,7 @@ export function analyzeSource(source: string, fileName = "main.ts"): ScriptStats
       }
     }
 
-    if (ts.isCallExpression(node)) {
-      const name = calleeName(node.expression);
-      if (name) {
-        if (isKnownApi(name)) {
-          bump(stats.apis, name);
-          mark("apis", node);
-        }
-
-        if (name === "Timer.set") stats.registrations.timers += 1;
-        if (name === "Shelly.addEventHandler")
-          stats.registrations.eventHandlers += 1;
-        if (name === "Shelly.addStatusHandler")
-          stats.registrations.statusHandlers += 1;
-        if (name === "HTTPServer.registerEndpoint")
-          stats.registrations.httpEndpoints += 1;
-        if (name === "Script.addRpcHandler")
-          stats.registrations.rpcHandlers += 1;
-        if (name === "MQTT.subscribe") stats.registrations.mqttSubs += 1;
-
-        if (name === "console.log" || name === "console.error" || name === "console.warn") {
-          stats.logging.consoleLog += 1;
-          mark("consoleLog", node);
-        }
-        if (name === "print") {
-          stats.logging.print += 1;
-          mark("print", node);
-        }
-
-        if (name === "Shelly.call") {
-          stats.network.shellyCall += 1;
-          mark("shellyCall", node);
-        }
-        if (name === "Shelly.HTTP.get" || name === "HTTP.get")
-          stats.network.httpGet += 1;
-        if (name === "Shelly.HTTP.post" || name === "HTTP.post")
-          stats.network.httpPost += 1;
-        if (name === "MQTT.publish") stats.network.mqttPublish += 1;
-      }
-    }
+    if (ts.isCallExpression(node)) countCall(node);
 
     ts.forEachChild(node, visit);
 

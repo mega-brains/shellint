@@ -2,7 +2,7 @@
  * The static build's replacement for web/lib/api.ts.
  *
  * Same signature as the real `api()`, matching on the same route strings the
- * Hono server serves, so the ~45 endpoint literals scattered across web/ keep
+ * server serves, so the ~45 endpoint literals scattered across web/ keep
  * working untouched — swapping this one module is what makes a server-less
  * build possible without forking the UI (M17 plan §1). Response shapes must
  * match server/script/routes.ts exactly: a mismatch shows up as a blank panel
@@ -290,6 +290,128 @@ async function statsFor(source: string): Promise<StatsResult> {
   return pipelineRequest<StatsResult>({ type: "stats", source, artifacts });
 }
 
+type RouteCtx = {
+  method: string;
+  body: Record<string, unknown>;
+  params: URLSearchParams;
+};
+
+function putScript(body: Record<string, unknown>) {
+  const source = body.source;
+  if (typeof source !== "string") throw new Error("body.source must be a string");
+  snapshotBeforeWrite(loadSource(), source);
+  writeStore(KEY_SOURCE, source);
+  // Set by file-io.ts (M17.6) when the opened file was .js/.mjs — absent on
+  // every other write, which leaves sourceKind at whatever it already was.
+  const kind = body.kind;
+  if (kind === "ts" || kind === "js") setStaticSourceKind(kind);
+  return { bytes: byteLen(source) };
+}
+
+function restoreScript(body: Record<string, unknown>) {
+  const id = body.id;
+  if (typeof id !== "string") throw new Error("body.id must be a string");
+  const row = scriptRows().find((r) => r.id === id);
+  if (!row) throw new Error("unknown history id");
+  snapshotBeforeWrite(loadSource(), row.source);
+  writeStore(KEY_SOURCE, row.source);
+  return { bytes: byteLen(row.source) };
+}
+
+async function runBuild() {
+  // Builds the last *saved* source, not the editor buffer — same as the
+  // server, which compiles scripts/main.ts off disk.
+  const source = loadSource();
+  const result = await pipelineRequest<BuildResult>({
+    type: "build",
+    source,
+    kind: sourceKind,
+    minify: loadMinify(),
+    deviceProfile: {},
+  });
+  storeArtifacts(result);
+  const sizes = sizesOf(result);
+  const s = await statsFor(source);
+  const historyRow = appendHistory({
+    ts: new Date().toISOString(),
+    sizes,
+    stats: summarizeStats(s.stats),
+    memEstimate: s.estimate.bytes,
+  });
+  // `dialect` is deliberately absent: the post-compile guard runs as part
+  // of Check over these same artifacts, and app.tsx already treats the
+  // field as optional.
+  return {
+    sizes,
+    stats: s.stats,
+    variants: s.variants,
+    estimate: s.estimate,
+    minFirmware: s.minFirmware,
+    historyRow,
+    stdout: "",
+    stderr: "",
+  };
+}
+
+function readArtifact(params: URLSearchParams) {
+  const name = params.get("name") ?? "";
+  const code = artifacts[name];
+  if (code === undefined) throw new Error("unknown or unbuilt artifact");
+  return { name, bytes: new TextEncoder().encode(code).length, code };
+}
+
+/** Same route strings the server's router registers, one handler each. */
+const ROUTES: Record<string, (ctx: RouteCtx) => unknown> = {
+  "/api/config": ({ method, body }) =>
+    method === "PATCH"
+      ? { config: patchMinify(body) }
+      : // The one field the server never sends — what device-section.tsx gates on.
+        { config: configPayload(), devices: [], active: null, static: true },
+
+  "/api/script": ({ method, body }) =>
+    method === "PUT"
+      ? putScript(body)
+      : { path: "scripts/main.ts", source: loadSource() },
+
+  "/api/script/history": () => ({
+    rows: scriptRows()
+      .map((r) => ({ id: r.id, bytes: r.bytes, ts: r.id }))
+      .reverse(),
+  }),
+
+  "/api/script/checkpoint": () => {
+    const row = checkpointNow(loadSource());
+    return { created: row !== null, id: row?.id ?? null };
+  },
+
+  "/api/script/restore": ({ body }) => restoreScript(body),
+
+  "/api/build": () => runBuild(),
+
+  "/api/check": async () => ({
+    report: await pipelineRequest<CheckReport>({
+      type: "check",
+      source: loadSource(),
+      artifacts,
+    }),
+  }),
+
+  "/api/checks": () => ({ groups: CHECK_GROUPS, checks: CHECK_CATALOG }),
+
+  "/api/stats": async () => {
+    const s = await statsFor(loadSource());
+    return { stats: s.stats, variants: s.variants, estimate: s.estimate, minFirmware: s.minFirmware };
+  },
+
+  "/api/history": ({ params }) => ({
+    history: readHistory(Number(params.get("limit") ?? 20)),
+  }),
+
+  "/api/artifacts": () => ({ artifacts: artifactList() }),
+
+  "/api/artifact": ({ params }) => readArtifact(params),
+};
+
 async function route(path: string, init?: RequestInit): Promise<unknown> {
   const [pathname, query = ""] = path.split("?");
   const params = new URLSearchParams(query);
@@ -300,7 +422,7 @@ async function route(path: string, init?: RequestInit): Promise<unknown> {
     throw new StaticModeError(pathname);
   }
 
-  // Before the switch: the id is an ISO timestamp, so it can't be a case label.
+  // Not a table entry: the id is an ISO timestamp, so it is not a fixed string.
   if (pathname.startsWith("/api/script/history/")) {
     const id = decodeURIComponent(pathname.slice("/api/script/history/".length));
     const row = scriptRows().find((r) => r.id === id);
@@ -308,113 +430,9 @@ async function route(path: string, init?: RequestInit): Promise<unknown> {
     return { id: row.id, source: row.source };
   }
 
-  switch (pathname) {
-    case "/api/config":
-      if (method === "PATCH") return { config: patchMinify(body) };
-      // The one field the server never sends — what device-section.tsx gates on.
-      return { config: configPayload(), devices: [], active: null, static: true };
-
-    case "/api/script":
-      if (method === "PUT") {
-        if (typeof body.source !== "string") throw new Error("body.source must be a string");
-        snapshotBeforeWrite(loadSource(), body.source);
-        writeStore(KEY_SOURCE, body.source);
-        // Set by file-io.ts (M17.6) when the opened file was .js/.mjs — absent on
-        // every other write, which leaves sourceKind at whatever it already was.
-        if (body.kind === "ts" || body.kind === "js") setStaticSourceKind(body.kind);
-        return { bytes: byteLen(body.source) };
-      }
-      return { path: "scripts/main.ts", source: loadSource() };
-
-    case "/api/script/history":
-      return {
-        rows: scriptRows()
-          .map((r) => ({ id: r.id, bytes: r.bytes, ts: r.id }))
-          .reverse(),
-      };
-
-    case "/api/script/checkpoint": {
-      const row = checkpointNow(loadSource());
-      return { created: row !== null, id: row?.id ?? null };
-    }
-
-    case "/api/script/restore": {
-      if (typeof body.id !== "string") throw new Error("body.id must be a string");
-      const row = scriptRows().find((r) => r.id === body.id);
-      if (!row) throw new Error("unknown history id");
-      snapshotBeforeWrite(loadSource(), row.source);
-      writeStore(KEY_SOURCE, row.source);
-      return { bytes: byteLen(row.source) };
-    }
-
-    case "/api/build": {
-      // Builds the last *saved* source, not the editor buffer — same as the
-      // server, which compiles scripts/main.ts off disk.
-      const source = loadSource();
-      const result = await pipelineRequest<BuildResult>({
-        type: "build",
-        source,
-        kind: sourceKind,
-        minify: loadMinify(),
-        deviceProfile: {},
-      });
-      storeArtifacts(result);
-      const sizes = sizesOf(result);
-      const s = await statsFor(source);
-      const historyRow = appendHistory({
-        ts: new Date().toISOString(),
-        sizes,
-        stats: summarizeStats(s.stats),
-        memEstimate: s.estimate.bytes,
-      });
-      // `dialect` is deliberately absent: the post-compile guard runs as part
-      // of Check over these same artifacts, and app.tsx already treats the
-      // field as optional.
-      return {
-        sizes,
-        stats: s.stats,
-        variants: s.variants,
-        estimate: s.estimate,
-        minFirmware: s.minFirmware,
-        historyRow,
-        stdout: "",
-        stderr: "",
-      };
-    }
-
-    case "/api/check": {
-      const report = await pipelineRequest<CheckReport>({
-        type: "check",
-        source: loadSource(),
-        artifacts,
-      });
-      return { report };
-    }
-
-    case "/api/checks":
-      return { groups: CHECK_GROUPS, checks: CHECK_CATALOG };
-
-    case "/api/stats": {
-      const s = await statsFor(loadSource());
-      return { stats: s.stats, variants: s.variants, estimate: s.estimate, minFirmware: s.minFirmware };
-    }
-
-    case "/api/history":
-      return { history: readHistory(Number(params.get("limit") ?? 20)) };
-
-    case "/api/artifacts":
-      return { artifacts: artifactList() };
-
-    case "/api/artifact": {
-      const name = params.get("name") ?? "";
-      const code = artifacts[name];
-      if (code === undefined) throw new Error("unknown or unbuilt artifact");
-      return { name, bytes: new TextEncoder().encode(code).length, code };
-    }
-
-    default:
-      throw new Error(`no static handler for ${pathname}`);
-  }
+  const handler = ROUTES[pathname];
+  if (!handler) throw new Error(`no static handler for ${pathname}`);
+  return await handler({ method, body, params });
 }
 
 /** Drop-in for web/lib/api.ts's `api()` — same signature, same `ok` envelope. */

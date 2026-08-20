@@ -25,8 +25,8 @@
     "build:txiki": "npm run vendor:txiki && node scripts/build-txiki.mjs",
     "build:txiki:executable": "npm run build:txiki && node scripts/compile-txiki.mjs",
     "preview:static": "node scripts/preview-static.mjs",
-    "build": "npm run build:shelly && npm run build:web",
-    "build:gate": "npm run build:shelly:fixture && npm run build:web",
+    "build": "npm run oxlint && npm run build:shelly && npm run build:web",
+    "build:gate": "npm run oxlint && npm run build:shelly:fixture && npm run build:web",
     "dev": "npm run build:web:dev && node --import tsx server/index.ts",
     "dev:txiki": "npm run build:web:dev && npm run build:txiki && node scripts/run-txiki.mjs server",
     "start:txiki": "node scripts/run-txiki.mjs server",
@@ -43,6 +43,7 @@
     "typecheck:txiki": "tsc -p tsconfig.txiki.json",
     "typecheck": "npm run typecheck:shelly && npm run typecheck:server && npm run typecheck:web",
     "lint": "npm run typecheck",
+    "oxlint": "oxlint server web scripts shared e2e",
     "bench": "node scripts/bench-minify.mjs",
     "check:lines": "node scripts/check-line-limit.mjs",
     "clean": "node scripts/clean.mjs",
@@ -53,14 +54,12 @@
     "test:e2e:hybrid": "node scripts/e2e-hybrid.mjs",
     "install:lightpanda": "node scripts/install-lightpanda.mjs",
     "test:txiki": "npm run vendor:txiki && npm run typecheck:txiki && npm run build:web && node scripts/test-txiki-runtime.mjs",
-    "beforeCommit": "npm run check:lines && npm run typecheck && npm run build:gate && npm run build:static && npm run test && npm run test:e2e && npm run test:e2e:txiki"
+    "beforeCommit": "npm run oxlint && npm run check:lines && npm run typecheck && npm run build:gate && npm run build:static && npm run test && npm run test:e2e && npm run test:e2e:txiki"
   },
   "engines": {
     "node": ">=20"
   },
   "dependencies": {
-    "@hono/node-server": "^1.14.0",
-    "hono": "^4.7.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {
@@ -78,6 +77,7 @@
     "@types/ws": "^8.5.14",
     "esbuild": "^0.25.0",
     "espruino": "^0.1.67",
+    "oxlint": "1.79.0",
     "playwright": "^1.62.1",
     "preact": "^10.29.8",
     "terser": "^5.49.2",

@@ -355,7 +355,7 @@ console.log("\n# summary");
 const pass = results.filter((r) => r.verdict === "PASS").length;
 const fail = results.filter((r) => r.verdict === "FAIL").length;
 console.log(`# ${pass} pass, ${fail} fail of ${results.length} probes`);
-for (const r of results.filter((r) => r.verdict === "FAIL")) {
+for (const r of results.filter((x) => x.verdict === "FAIL")) {
   console.log(`#   FAIL ${r.name}`);
 }
 

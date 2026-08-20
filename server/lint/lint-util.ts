@@ -16,6 +16,29 @@ export type FindingFix = {
   text: string;
 };
 
+export type FunctionLike =
+  | ts.FunctionDeclaration
+  | ts.FunctionExpression
+  | ts.MethodDeclaration;
+
+/** The function forms that can carry `async`/`*` — arrow functions excluded. */
+export function isFunctionLike(node: ts.Node): node is FunctionLike {
+  return (
+    ts.isFunctionDeclaration(node) ||
+    ts.isFunctionExpression(node) ||
+    ts.isMethodDeclaration(node)
+  );
+}
+
+/** `new Name(…)` or `Name(…)` with a bare identifier callee. */
+export function isNamedCallee(node: ts.Node, name: string): boolean {
+  return (
+    (ts.isNewExpression(node) || ts.isCallExpression(node)) &&
+    ts.isIdentifier(node.expression) &&
+    node.expression.text === name
+  );
+}
+
 /** Dotted name of a call target: `Timer.set`, `Script.storage.setItem`, … */
 export function calleeName(expr: ts.Expression): string | null {
   if (ts.isIdentifier(expr)) return expr.text;

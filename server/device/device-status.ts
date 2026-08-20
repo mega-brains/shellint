@@ -97,6 +97,78 @@ async function timedCall(
   return { result, ms: Math.round(performance.now() - t0) };
 }
 
+type Rec = Record<string, unknown>;
+
+function deviceBlock(info: Rec, deviceCfg: Rec): DeviceStatus["device"] {
+  return {
+    id: str(info.id) ?? undefined,
+    name: str(info.name) ?? str(deviceCfg.name) ?? undefined,
+    model: str(info.model) ?? undefined,
+    gen: (info.gen as number | string | undefined) ?? undefined,
+    ver: str(info.ver) ?? undefined,
+    app: str(info.app) ?? undefined,
+    chip: inferChip(info.gen, info.model),
+    chipInferred: true,
+  };
+}
+
+function scriptBlock(
+  id: number,
+  script: Rec,
+  slot: Rec | undefined,
+): DeviceStatus["script"] {
+  return {
+    id,
+    name: slot ? str(slot.name) : null,
+    running: bool(script.running),
+    mem_used: num(script.mem_used),
+    mem_peak: num(script.mem_peak),
+    mem_free: num(script.mem_free),
+    cpu: num(script.cpu),
+    errors: Array.isArray(script.errors) ? script.errors : [],
+  };
+}
+
+function sysBlock(sys: Rec): DeviceStatus["sys"] {
+  return {
+    ram_size: num(sys.ram_size),
+    ram_free: num(sys.ram_free),
+    ram_min_free: num(sys.ram_min_free),
+    fs_size: num(sys.fs_size),
+    fs_free: num(sys.fs_free),
+    uptime: num(sys.uptime),
+    restart_required: bool(sys.restart_required),
+    unixtime: num(sys.unixtime),
+  };
+}
+
+function wifiBlock(wifi: Rec, sta: Rec): DeviceStatus["wifi"] {
+  return {
+    rssi: num(wifi.rssi) ?? num(sta.rssi),
+    ssid: str(wifi.ssid) ?? str(sta.ssid),
+    sta_ip: str(wifi.sta_ip) ?? str(sta.ip) ?? str(sta.sta_ip),
+  };
+}
+
+/**
+ * A dedicated sensor is the real reading; a relay's own die temperature is the
+ * fallback, because most Gen2 boxes report only that. First non-null wins.
+ */
+const TEMP_SOURCES = [
+  {
+    component: "temperature",
+    method: "Temperature.GetStatus",
+    from: "temperature:0",
+    read: (r: Rec) => num(r.tC),
+  },
+  {
+    component: "switch",
+    method: "Switch.GetStatus",
+    from: "switch:0",
+    read: (r: Rec) => num(((r.temperature ?? {}) as Rec).tC),
+  },
+];
+
 async function softCall(
   rpc: ShellyRpc,
   method: string,
@@ -108,6 +180,52 @@ async function softCall(
     if (e instanceof AuthNotSupportedError) throw e;
     return null;
   }
+}
+
+/** Call, record its round trip, hand back the result — `null` if it failed. */
+async function softRec(
+  rpc: ShellyRpc,
+  rtts: number[],
+  method: string,
+  params: Rec = {},
+): Promise<Rec | null> {
+  const call = await softCall(rpc, method, params);
+  if (!call) return null;
+  rtts.push(call.ms);
+  return (call.result ?? {}) as Rec;
+}
+
+/** Same, for the two calls whose failure must fail the whole poll. */
+async function hardRec(
+  rpc: ShellyRpc,
+  rtts: number[],
+  method: string,
+  params: Rec = {},
+): Promise<Rec> {
+  const call = await timedCall(rpc, method, params);
+  rtts.push(call.ms);
+  return (call.result ?? {}) as Rec;
+}
+
+function meanMs(rtts: number[]): number {
+  if (rtts.length === 0) return 0;
+  return Math.round(rtts.reduce((a, b) => a + b, 0) / rtts.length);
+}
+
+async function readTemperature(
+  rpc: ShellyRpc,
+  rtts: number[],
+): Promise<{ temperatureC: number | null; temperatureFrom: string | null }> {
+  const present = await knownComponentTypes();
+  for (const src of TEMP_SOURCES) {
+    if (present !== null && !present.has(src.component)) continue;
+    const call = await softCall(rpc, src.method, { id: 0 });
+    if (!call) continue;
+    rtts.push(call.ms);
+    const tC = src.read((call.result ?? {}) as Rec);
+    if (tC != null) return { temperatureC: tC, temperatureFrom: src.from };
+  }
+  return { temperatureC: null, temperatureFrom: null };
 }
 
 export async function fetchDeviceStatus(): Promise<DeviceStatus> {
@@ -122,119 +240,42 @@ export async function fetchDeviceStatus(): Promise<DeviceStatus> {
   try {
     await rpc.connect();
 
-    const infoCall = await softCall(rpc, "Shelly.GetDeviceInfo", {});
-    if (infoCall) rtts.push(infoCall.ms);
-    const info = (infoCall?.result ?? {}) as Record<string, unknown>;
+    const info = await softRec(rpc, rtts, "Shelly.GetDeviceInfo");
     // Only on a successful answer — a failed poll must not blank out good info.
-    if (infoCall) await touchDeviceInfo(target.device.id, toDeviceInfo(info));
+    if (info) await touchDeviceInfo(target.device.id, toDeviceInfo(info));
 
-    const scriptCall = await timedCall(rpc, "Script.GetStatus", {
+    const script = await hardRec(rpc, rtts, "Script.GetStatus", {
       id: scriptId,
     });
-    rtts.push(scriptCall.ms);
-    const script = (scriptCall.result ?? {}) as Record<string, unknown>;
+    const sys = await hardRec(rpc, rtts, "Sys.GetStatus");
 
-    const sysCall = await timedCall(rpc, "Sys.GetStatus", {});
-    rtts.push(sysCall.ms);
-    const sys = (sysCall.result ?? {}) as Record<string, unknown>;
+    const sysCfg = await softRec(rpc, rtts, "Sys.GetConfig");
+    const deviceCfg = (sysCfg?.device ?? {}) as Rec;
 
-    const cfgCall = await softCall(rpc, "Sys.GetConfig", {});
-    if (cfgCall) rtts.push(cfgCall.ms);
-    const sysCfg = (cfgCall?.result ?? {}) as Record<string, unknown>;
-    const deviceCfg = (sysCfg.device ?? {}) as Record<string, unknown>;
-
-    const wifiCall = await softCall(rpc, "WiFi.GetStatus", {});
-    if (wifiCall) rtts.push(wifiCall.ms);
-    const wifi = (wifiCall?.result ?? {}) as Record<string, unknown>;
-    const sta = (wifi.sta_ip != null ? wifi : (wifi.sta ?? wifi)) as Record<
-      string,
-      unknown
-    >;
+    const wifi = (await softRec(rpc, rtts, "WiFi.GetStatus")) ?? {};
+    const sta = (wifi.sta_ip != null ? wifi : (wifi.sta ?? wifi)) as Rec;
 
     // Script.GetStatus carries no name; the slot listing is the only source.
-    const listCall = await softCall(rpc, "Script.List", {});
-    if (listCall) rtts.push(listCall.ms);
-    const list = (listCall?.result ?? {}) as { scripts?: unknown };
+    const list = (await softRec(rpc, rtts, "Script.List")) ?? {};
     const slot = (Array.isArray(list.scripts) ? list.scripts : []).find(
-      (s): s is Record<string, unknown> =>
+      (s): s is Rec =>
         !!s && typeof s === "object" && (s as { id?: unknown }).id === scriptId,
     );
 
-    // A dedicated sensor is the real reading; a relay's own die temperature is
-    // the fallback, because most Gen2 boxes report only that.
-    const present = await knownComponentTypes();
-    let temperatureC: number | null = null;
-    let temperatureFrom: string | null = null;
-
-    if (present === null || present.has("temperature")) {
-      const tempCall = await softCall(rpc, "Temperature.GetStatus", { id: 0 });
-      if (tempCall) {
-        rtts.push(tempCall.ms);
-        const t = (tempCall.result ?? {}) as Record<string, unknown>;
-        temperatureC = num(t.tC);
-        if (temperatureC != null) temperatureFrom = "temperature:0";
-      }
-    }
-
-    if (temperatureC == null && (present === null || present.has("switch"))) {
-      const swCall = await softCall(rpc, "Switch.GetStatus", { id: 0 });
-      if (swCall) {
-        rtts.push(swCall.ms);
-        const sw = (swCall.result ?? {}) as Record<string, unknown>;
-        const t = (sw.temperature ?? {}) as Record<string, unknown>;
-        temperatureC = num(t.tC);
-        if (temperatureC != null) temperatureFrom = "switch:0";
-      }
-    }
-
-    const latencyMs =
-      rtts.length > 0
-        ? Math.round(rtts.reduce((a, b) => a + b, 0) / rtts.length)
-        : 0;
+    const { temperatureC, temperatureFrom } = await readTemperature(rpc, rtts);
 
     return {
       deviceIp: target.device.ip,
       deviceId: target.device.id,
       scriptId,
-      latencyMs,
-      device: {
-        id: str(info.id) ?? undefined,
-        name: str(info.name) ?? str(deviceCfg.name) ?? undefined,
-        model: str(info.model) ?? undefined,
-        gen: (info.gen as number | string | undefined) ?? undefined,
-        ver: str(info.ver) ?? undefined,
-        app: str(info.app) ?? undefined,
-        chip: inferChip(info.gen, info.model),
-        chipInferred: true,
-      },
-      script: {
-        id: scriptId,
-        name: slot ? str(slot.name) : null,
-        running: bool(script.running),
-        mem_used: num(script.mem_used),
-        mem_peak: num(script.mem_peak),
-        mem_free: num(script.mem_free),
-        cpu: num(script.cpu),
-        errors: Array.isArray(script.errors) ? script.errors : [],
-      },
-      sys: {
-        ram_size: num(sys.ram_size),
-        ram_free: num(sys.ram_free),
-        ram_min_free: num(sys.ram_min_free),
-        fs_size: num(sys.fs_size),
-        fs_free: num(sys.fs_free),
-        uptime: num(sys.uptime),
-        restart_required: bool(sys.restart_required),
-        unixtime: num(sys.unixtime),
-      },
+      latencyMs: meanMs(rtts),
+      device: deviceBlock(info ?? {}, deviceCfg),
+      script: scriptBlock(scriptId, script, slot),
+      sys: sysBlock(sys),
       eco_mode: bool(deviceCfg.eco_mode),
       temperatureC,
       temperatureFrom,
-      wifi: {
-        rssi: num(wifi.rssi) ?? num(sta.rssi),
-        ssid: str(wifi.ssid) ?? str(sta.ssid),
-        sta_ip: str(wifi.sta_ip) ?? str(sta.ip) ?? str(sta.sta_ip),
-      },
+      wifi: wifiBlock(wifi, sta),
     };
   } finally {
     rpc.close();
