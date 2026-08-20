@@ -93,6 +93,26 @@ async function openSettled(page: Page) {
   await expect(page.locator("#optionsPeek")).not.toHaveText("…", {
     timeout: 10_000,
   });
+  // The build panel's own data — the last hop of `useInitialLoad`'s
+  // /api/config → /api/checks → /api/stats → /api/history chain — is the one
+  // boot fetch none of the waits above covers: `#checkNote` is satisfied by
+  // the catalog, one hop earlier. Only the boot check run behind
+  // `gate-checked` normally outlasts it, and by 81–190 ms; that margin goes
+  // negative roughly one boot in eight at 10 workers on a loaded machine.
+  // It has to be waited for because `#historySpark` is masked. With no
+  // history points the sparkline renders its 17px "no data yet" box instead
+  // of the 62px chart, which leaves the mask ~386px higher up the pane — and
+  // Playwright paints masks as fixed overlays off getBoundingClientRect(),
+  // which the pane's own scroll does not clip, so the band lands in shots
+  // taken below the sidebar as readily as in the sidebar's own. In
+  // footer-device-logs that band *is* the whole delta: 3072 px, the 8 rows ×
+  // 384 px of #historySpark that reach into the dock.
+  // The <svg> child exists only once sparkBounds() has a live point, so this
+  // waits on the data arriving rather than on a clock, and the whole patch
+  // lands in one setDash() — a single condition settles the pane.
+  await expect(page.locator("#historySpark .spark")).toBeVisible({
+    timeout: 15_000,
+  });
 }
 
 function masks(page: Page): Locator[] {
