@@ -22,17 +22,14 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = 8797;
 const BASE = `http://127.0.0.1:${PORT}`;
 
-const servers = Array.isArray(base.webServer)
-  ? base.webServer
-  : base.webServer
-    ? [base.webServer]
-    : [];
-/** The static-preview server from the base config: unchanged, and addressed by
- * absolute URL from e2e/static.spec.ts, so it is runtime-independent. */
-const staticServer = servers.slice(1);
-
 export default defineConfig({
   ...base,
+  // static.spec.ts is the one spec this leg has nothing to say about: it
+  // addresses the static preview server by absolute URL and never touches the
+  // server under test, so running it here re-asserts the base config's
+  // findings against identical bytes — and pays for the second webServer
+  // (`build:static` + preview) to do it. The base config still runs it once.
+  testIgnore: ["**/static.spec.ts"],
   // One worker, unlike the Node config's four: txiki.js runs one event loop and
   // its builder type-checks *in process*, so four browsers each triggering a
   // Build/Check at once serialize behind each other and blow the per-assertion
@@ -58,6 +55,5 @@ export default defineConfig({
       reuseExistingServer: false,
       timeout: 300_000,
     },
-    ...staticServer,
   ],
 });
