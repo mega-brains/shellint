@@ -1,4 +1,5 @@
-import type { Hono, Context } from "hono";
+import type { Context } from "../core/context.ts";
+import type { Router } from "../core/router.ts";
 import {
   loadConfig,
   sanitizeConfig,
@@ -41,7 +42,7 @@ function checkError(e: unknown): string {
 }
 
 /** Config, build, check, stats, history, artifacts — plus script source CRUD (script-routes.ts). Split out of app.ts to stay under the 500-line cap. */
-export function registerScriptBuildRoutes(app: Hono) {
+export function registerScriptBuildRoutes(app: Router) {
   app.get("/api/config", async (c) => {
     const devicesFile = await loadDevices();
     const devices = await listDevices();

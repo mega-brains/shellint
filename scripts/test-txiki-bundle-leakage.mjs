@@ -50,9 +50,6 @@ function moduleLeak(specifier) {
   if (nodeBuiltins.has(specifier) || nodeBuiltins.has(specifier.split("/")[0])) {
     return "bare Node builtin";
   }
-  if (specifier === "@hono/node-server" || specifier.startsWith("@hono/node-server/")) {
-    return "Node Hono adapter";
-  }
   if (specifier === "ws" || specifier.startsWith("ws/")) return "ws package";
   return null;
 }
@@ -141,7 +138,7 @@ function visit(node) {
 visit(file);
 
 for (const marker of [
-  "node_modules/@hono/node-server/",
+  "server/core/node-server.ts",
   "node_modules/ws/",
   "WS_NO_BUFFER_UTIL",
   "WS_NO_UTF_8_VALIDATE",

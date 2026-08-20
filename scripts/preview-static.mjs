@@ -2,7 +2,7 @@
  * Plain static file server over `site/` — no framework, deliberately: the
  * whole point of `mise run preview:static` is to prove `build:static`'s
  * output needs nothing but a dumb file host (the way GitHub Pages serves it),
- * so reaching for Hono/express here would undermine the thing it's proving.
+ * so reaching for a web framework here would undermine the thing it's proving.
  *
  * Usage: node scripts/preview-static.mjs [--port N]   (default 8788, or $PORT)
  */

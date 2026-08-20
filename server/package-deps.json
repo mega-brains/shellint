@@ -1,8 +1,6 @@
 {
-  "description": "Deps for M2–M4 (Hono UI + WS deploy). Merged into root package.json — reference copy.",
+  "description": "Deps for M2–M4 (editor UI + WS deploy). Merged into root package.json — reference copy.",
   "dependencies": {
-    "hono": "^4.7.0",
-    "@hono/node-server": "^1.14.0",
     "ws": "^8.18.0"
   },
   "devDependencies": {

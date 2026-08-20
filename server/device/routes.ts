@@ -1,4 +1,5 @@
-import type { Context, Hono } from "hono";
+import type { Context } from "../core/context.ts";
+import type { Router } from "../core/router.ts";
 import { runtime } from "#shellint/runtime";
 import { CompilerNotWiredError } from "../core/config.ts";
 import {
@@ -17,7 +18,7 @@ import {
   touchDeviceInfo,
   updateDevice,
 } from "./devices.ts";
-import { probeState, resolveCapture } from "../probe/probe-store.ts";
+import { probeState } from "../probe/probe-store.ts";
 import {
   createSlot,
   deleteSlot,
@@ -40,7 +41,6 @@ import {
   stopLogStream,
 } from "./debug-log.ts";
 import { expandLogText, loadLogMap } from "../script/log-map.ts";
-import { writeGeneratedTypings } from "../probe/probe-typings.ts";
 
 /**
  * Shared error → response mapping for every route that talks to a device:
@@ -79,7 +79,7 @@ export async function deviceError(c: Context, e: unknown) {
 }
 
 /** Device telemetry, logs, probe, deploy. Split out of app.ts to stay under the 500-line cap. */
-export function registerDeviceRoutes(app: Hono) {
+export function registerDeviceRoutes(app: Router) {
   app.get("/api/devices", async (c) => {
     const file = await loadDevices();
     const devices = await listDevices();

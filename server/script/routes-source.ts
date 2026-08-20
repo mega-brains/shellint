@@ -1,4 +1,4 @@
-import type { Hono } from "hono";
+import type { Router } from "../core/router.ts";
 import runtime from "#shellint/runtime";
 import { SCRIPT_LABEL, SCRIPT_PATH } from "../core/paths.ts";
 import {
@@ -9,7 +9,7 @@ import {
 } from "./script-history.ts";
 
 /** `/api/script` (read/write) plus history/checkpoint/restore. Split out of app.ts to stay under the 500-line cap. */
-export function registerScriptRoutes(app: Hono) {
+export function registerScriptRoutes(app: Router) {
   app.get("/api/script", async (c) => {
     if (!(await runtime.fs.exists(SCRIPT_PATH))) {
       return c.json({ ok: false, error: `${SCRIPT_LABEL} not found` }, 404);

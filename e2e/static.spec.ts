@@ -6,7 +6,7 @@ import { STATIC_PORT } from "./playwright.config";
  * Playwright against `site/` (M17.8, moved under `site/demo/` by M26), served
  * by the plain static server from `scripts/preview-static.mjs` (wired as a
  * second `webServer` entry in playwright.config.ts) — proving the
- * offline/device-less build works end to end with zero relation to the Hono
+ * offline/device-less build works end to end with zero relation to the
  * dev server the other specs use. The demo app itself lives one level down
  * from the site root now (`${STATIC_BASE}/demo/`); the landing/download shell
  * around it is covered separately below.

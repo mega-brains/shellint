@@ -1,4 +1,4 @@
-import { serve } from "@hono/node-server";
+import { serve } from "./core/node-server.ts";
 import { prepareStartup } from "./startup.ts";
 
 const { app, config: cfg, summary } = await prepareStartup();

@@ -9,7 +9,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = 8789;
 const BASE = `http://127.0.0.1:${PORT}`;
 // Static/offline build (M17.8) — a second, independent server with no relation
-// to the Hono app above; e2e/static.spec.ts targets it via absolute URLs
+// to the app above; e2e/static.spec.ts targets it via absolute URLs
 // rather than the config's `baseURL`, so it stays this port regardless of
 // which spec runs first.
 export const STATIC_PORT = 8788;

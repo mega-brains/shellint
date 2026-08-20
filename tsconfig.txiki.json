@@ -18,6 +18,7 @@
   ],
   "exclude": [
     "server/index.ts",
+    "server/core/node-server.ts",
     "server/build/node-builder-entry.ts",
     "server/runtime/node.ts"
   ]

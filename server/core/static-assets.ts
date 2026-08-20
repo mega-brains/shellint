@@ -1,4 +1,4 @@
-import type { Context } from "hono";
+import type { Context } from "./context.ts";
 import { runtime } from "#shellint/runtime";
 import { ROOT, WEB_DIR } from "./paths.ts";
 

@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Router } from "./core/router.ts";
 import { runtime } from "#shellint/runtime";
 import { WEB_DIR } from "./core/paths.ts";
 import { registerDeviceRoutes } from "./device/routes.ts";
@@ -7,7 +7,7 @@ import { registerScriptBuildRoutes } from "./script/routes.ts";
 import { apiDocsJson, appJs, appJsMap, css, webAsset } from "./core/static-assets.ts";
 
 export function createApp() {
-  const app = new Hono();
+  const app = new Router();
 
   registerScriptBuildRoutes(app);
   registerDeviceRoutes(app);

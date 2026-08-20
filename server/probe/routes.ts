@@ -1,4 +1,5 @@
-import type { Context, Hono } from "hono";
+import type { Context } from "../core/context.ts";
+import type { Router } from "../core/router.ts";
 import {
   getDevice,
   loadDevices,
@@ -39,7 +40,7 @@ async function resolveDevice(c: Context): Promise<DeviceRecord | null> {
  * (M16 §6). The actual enforcement lives server-side in `deploy.ts` — these
  * routes only let the UI show and manage that gate.
  */
-export function registerProbeRoutes(app: Hono) {
+export function registerProbeRoutes(app: Router) {
   app.get("/api/probe/progress", (c) => {
     return c.json({ ok: true, ...getProbeProgress() });
   });
