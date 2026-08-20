@@ -1,3 +1,4 @@
+import { runtime } from "#shellint/runtime";
 import type { Context } from "../core/context.ts";
 import type { Router } from "../core/router.ts";
 import {
@@ -25,7 +26,18 @@ type CheckStreamEvent =
   | { type: "report"; report: CheckReport }
   | { type: "error"; error: string };
 
+/**
+ * Set by both e2e configs. `connected` arrives from the browser, and every spec
+ * mocks `/api/device/status` to report a device online — so the flag rode the
+ * check body into `runCheck`, where it means "open an RPC to the configured
+ * device". That is how a suite that owns no hardware rewrote a real device's
+ * profile mid-run on 2026-08-20. Refusing it here rather than in each spec's
+ * mock keeps the guarantee when a future spec forgets to install one.
+ */
+const DEVICE_ACCESS_BLOCKED = runtime.process.env.SHELLINT_NO_DEVICE === "1";
+
 async function checkConnected(c: Context): Promise<boolean> {
+  if (DEVICE_ACCESS_BLOCKED) return false;
   let connected = c.req.query("connected") === "1";
   if (c.req.method !== "POST") return connected;
   try {

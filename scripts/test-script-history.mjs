@@ -23,6 +23,7 @@ import {
 } from "../server/script/script-history.ts";
 import { SCRIPT_PATH, ROOT } from "../server/core/paths.ts";
 import { createApp } from "../server/app.ts";
+import { AssertionFailed, restoreOnExit } from "./real-state-guard.mjs";
 
 const HISTORY_FILE = join(ROOT, ".shellint", "script-history.jsonl");
 // Spacing used between calls that should each land outside the coalescing
@@ -30,8 +31,7 @@ const HISTORY_FILE = join(ROOT, ".shellint", "script-history.jsonl");
 const STEP_MS = COALESCE_WINDOW_MS + 1000;
 
 function fail(msg) {
-  console.error(`FAIL: ${msg}`);
-  process.exit(1);
+  throw new AssertionFailed(msg);
 }
 
 const originalScript = existsSync(SCRIPT_PATH)
@@ -54,6 +54,8 @@ function restore() {
   if (originalHistory !== null) writeFileSync(HISTORY_FILE, originalHistory, "utf8");
   else rmSync(HISTORY_FILE, { force: true });
 }
+
+const restoreOnce = restoreOnExit(restore);
 
 try {
   rmSync(HISTORY_FILE, { force: true });
@@ -199,5 +201,5 @@ try {
 
   console.log("OK: script history snapshot/coalesce/checkpoint/cap/restore");
 } finally {
-  restore();
+  restoreOnce();
 }

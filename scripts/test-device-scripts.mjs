@@ -18,6 +18,7 @@ import {
 import { _resetCache, addDevice, loadDevices, setActive } from "../server/device/devices.ts";
 import { deploy } from "../server/device/deploy.ts";
 import { GENERATED_DTS_PATH } from "../server/probe/probe-typings.ts";
+import { AssertionFailed, restoreOnExit } from "./real-state-guard.mjs";
 
 const SHELLINT_JSON = join(ROOT, "shellint.json");
 const DEVICES_DIR = join(ROOT, ".shellint");
@@ -25,8 +26,7 @@ const DEVICES_FILE = join(DEVICES_DIR, "devices.json");
 const ARTIFACT = join(DIST_DIR, "prod.js");
 
 function fail(msg) {
-  console.error(`FAIL: ${msg}`);
-  process.exit(1);
+  throw new AssertionFailed(msg);
 }
 
 const originalShellint = existsSync(SHELLINT_JSON) ? readFileSync(SHELLINT_JSON, "utf8") : null;
@@ -83,6 +83,8 @@ function fakeSlotRpc(script) {
     },
   };
 }
+
+const restoreOnce = restoreOnExit(restore);
 
 try {
   // --- Script.List mapping (+ per-slot Script.GetStatus, best-effort) ---
@@ -211,5 +213,5 @@ try {
 
   console.log("OK: device-scripts slot list/code/create/delete, deploy-to-new-slot");
 } finally {
-  restore();
+  restoreOnce();
 }

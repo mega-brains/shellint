@@ -93,11 +93,29 @@ async function json(route: Route, body: unknown, status = 200) {
 
 /**
  * Intercept device/probe APIs so e2e never needs Shelly hardware.
- * Real /api/config, /api/script, /api/stats, /api/checks, build/check stay live.
+ * Real /api/config, /api/script, /api/stats, /api/checks, build/check stay live
+ * — build and check run against the fixture workspace. Check is the one live
+ * route that can still reach hardware, because it takes the device's reachable
+ * state from the caller; the interception below is what stops it.
  */
 export async function mockDeviceApis(page: Page): Promise<void> {
   let logConnected = false;
   let logSeq = 0;
+
+  // The mocked status above reports a device ONLINE, and app.tsx puts that flag
+  // straight into the check body — where `connected` means "refresh the device
+  // profile over RPC first", i.e. connect to whatever .shellint/devices.json
+  // names. A check fires on every page load, so this ran on nearly every spec.
+  // Rewrite the flag instead of stubbing the response: probe-required and
+  // smoke-panels assert on real check output, so a canned report would make
+  // them vacuous. The server refuses `connected` outright when
+  // SHELLINT_NO_DEVICE is set (both playwright configs); this keeps a spec that
+  // runs against a plain dev server honest too.
+  await page.route("**/api/check**", async (route) => {
+    if (route.request().method() !== "POST") return route.fallback();
+    const body = (route.request().postDataJSON() ?? {}) as Record<string, unknown>;
+    await route.continue({ postData: JSON.stringify({ ...body, connected: false }) });
+  });
 
   await page.route("**/api/device/status", (route) =>
     json(route, { ok: true, status: mockDeviceStatus }),

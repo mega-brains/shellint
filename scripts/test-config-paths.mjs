@@ -4,6 +4,7 @@ import { join } from "node:path";
 import { ROOT } from "../server/core/paths.ts";
 import { loadConfig, patchMinifyConfig } from "../server/core/config.ts";
 import { loadConfig as loadBuildConfig } from "./build-shelly.mjs";
+import { AssertionFailed, restoreOnExit } from "./real-state-guard.mjs";
 
 const primary = join(ROOT, "shellint.json");
 const legacy = join(ROOT, "devroom.json");
@@ -11,14 +12,18 @@ const savedPrimary = existsSync(primary) ? readFileSync(primary, "utf8") : null;
 const savedLegacy = existsSync(legacy) ? readFileSync(legacy, "utf8") : null;
 
 function fail(message) {
-  console.error(`FAIL: ${message}`);
-  process.exit(1);
+  throw new AssertionFailed(message);
 }
 
 function restore(path, saved) {
   if (saved === null) rmSync(path, { force: true });
   else writeFileSync(path, saved, "utf8");
 }
+
+const restoreOnce = restoreOnExit(() => {
+  restore(primary, savedPrimary);
+  restore(legacy, savedLegacy);
+});
 
 try {
   rmSync(primary, { force: true });
@@ -35,8 +40,7 @@ try {
     fail("config PATCH must target shellint.json");
   }
 } finally {
-  restore(primary, savedPrimary);
-  restore(legacy, savedLegacy);
+  restoreOnce();
 }
 
 console.log("OK: config rename paths");

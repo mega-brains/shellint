@@ -30,6 +30,7 @@ import { resetForDeviceSwitch, readLogs } from "../server/device/debug-log.ts";
 import { GENERATED_DTS_PATH } from "../server/probe/probe-typings.ts";
 import { createApp } from "../server/app.ts";
 import { loadConfig, patchMinifyConfig } from "../server/core/config.ts";
+import { AssertionFailed, restoreOnExit } from "./real-state-guard.mjs";
 
 const SHELLINT_JSON = join(ROOT, "shellint.json");
 const LEGACY_CONFIG_JSON = join(ROOT, "devroom.json");
@@ -37,8 +38,7 @@ const DEVICES_DIR = join(ROOT, ".shellint");
 const DEVICES_FILE = join(DEVICES_DIR, "devices.json");
 
 function fail(msg) {
-  console.error(`FAIL: ${msg}`);
-  process.exit(1);
+  throw new AssertionFailed(msg);
 }
 
 const originalShellint = existsSync(SHELLINT_JSON) ? readFileSync(SHELLINT_JSON, "utf8") : null;
@@ -124,6 +124,8 @@ function fakeRpcFactory({ failConnect = false, info = {} } = {}) {
   });
 }
 
+const restoreOnce = restoreOnExit(restore);
+
 try {
   // Primary config wins over legacy, and PATCH always writes primary.
   writeFileSync(LEGACY_CONFIG_JSON, '{"port":9999}\n', "utf8");
@@ -207,12 +209,14 @@ try {
     await requireActive();
     fail("requireActive() should throw NoDeviceError when no device is active");
   } catch (e) {
+    if (e instanceof AssertionFailed) throw e;
     if (!(e instanceof NoDeviceError)) fail(`expected NoDeviceError, got ${e}`);
   }
   try {
     await resolveTarget();
     fail("resolveTarget() should throw NoDeviceError when no device is active");
   } catch (e) {
+    if (e instanceof AssertionFailed) throw e;
     if (!(e instanceof NoDeviceError)) fail(`expected NoDeviceError, got ${e}`);
   }
 
@@ -244,6 +248,7 @@ try {
     await addDevice({ ip: "10.0.0.5", label: "Garage 2" }, fakeRpcFactory({ failConnect: true }));
     fail("adding a device with a duplicate ip should be rejected");
   } catch (e) {
+    if (e instanceof AssertionFailed) throw e;
     if (!(e instanceof DuplicateDeviceError)) fail(`expected DuplicateDeviceError, got ${e}`);
   }
 
@@ -418,5 +423,5 @@ try {
 
   console.log("OK: devices load/migration/CRUD, digest auth vector, nc increment/reset");
 } finally {
-  restore();
+  restoreOnce();
 }

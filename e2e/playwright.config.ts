@@ -26,6 +26,15 @@ export const FIXTURE_ENV = {
   SHELLINT_SCRIPT: ".tmp/e2e/main.ts",
   SHELLINT_DIST: ".tmp/e2e/dist",
 };
+
+/**
+ * The suite owns no hardware, but it does own a `.shellint/devices.json` naming
+ * a real one. `/api/check` is left live on purpose, and it opens an RPC to that
+ * device whenever the caller reports it reachable — which the mocked device
+ * status always does. This makes the server refuse, so the guarantee does not
+ * rest on every spec remembering to install `mockDeviceApis`.
+ */
+export const NO_DEVICE_ENV = { SHELLINT_NO_DEVICE: "1" };
 const STATIC_BASE = `http://127.0.0.1:${STATIC_PORT}`;
 
 export default defineConfig({
@@ -84,7 +93,7 @@ export default defineConfig({
         "node scripts/build-fixture.mjs e2e && npm run build:web && node --import tsx server/index.ts",
       cwd: ROOT,
       url: BASE,
-      env: { ...FIXTURE_ENV, SHELLINT_PORT: String(PORT) },
+      env: { ...FIXTURE_ENV, SHELLINT_PORT: String(PORT), ...NO_DEVICE_ENV },
       // Never reuse: a server already on this port may be pointed at another
       // script, which is exactly the dependency this suite must not have.
       // (scripts/e2e-hybrid.mjs runs its Lightpanda pass against a server of

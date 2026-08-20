@@ -34,14 +34,14 @@ import {
   verKeyOf,
   writeCapture,
 } from "../server/probe/probe-store.ts";
+import { AssertionFailed, restoreOnExit } from "./real-state-guard.mjs";
 
 const DEVICES_DIR = join(ROOT, ".shellint");
 const DEVICES_FILE = join(DEVICES_DIR, "devices.json");
 const FAKE_IDS = ["probe-store-test-a", "probe-store-test-b"];
 
 function fail(msg) {
-  console.error(`FAIL: ${msg}`);
-  process.exit(1);
+  throw new AssertionFailed(msg);
 }
 
 const originalDevices = existsSync(DEVICES_FILE) ? readFileSync(DEVICES_FILE, "utf8") : null;
@@ -118,6 +118,8 @@ function makeReport(deviceIp, ver, deviceId, resultForAbsent = "undefined") {
     ],
   };
 }
+
+const restoreOnce = restoreOnExit(restore);
 
 try {
   restore(); // start from a clean slate for the fake ids
@@ -226,8 +228,8 @@ try {
     try {
       await deleteCapture(id, "../etc/passwd");
       fail("deleteCapture should reject a path-unsafe verKey");
-    } catch {
-      /* expected */
+    } catch (e) {
+      if (e instanceof AssertionFailed) throw e; // not "expected" — that is the failure
     }
 
     rmSync(devicePaths(id).probesDir, { recursive: true, force: true });
@@ -392,5 +394,5 @@ try {
 
   console.log("OK: probe-store verKey/migration/CRUD/probeState/mirrorActiveDevice firmware fallback");
 } finally {
-  restore();
+  restoreOnce();
 }

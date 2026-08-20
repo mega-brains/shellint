@@ -16,7 +16,7 @@
 import { defineConfig } from "@playwright/test";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import base from "./playwright.config.ts";
+import base, { NO_DEVICE_ENV } from "./playwright.config.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const PORT = 8797;
@@ -51,6 +51,7 @@ export default defineConfig({
         SHELLINT_PORT: String(PORT),
         SHELLINT_SCRIPT: ".tmp/e2e-txiki/main.ts",
         SHELLINT_DIST: ".tmp/e2e-txiki/dist",
+        ...NO_DEVICE_ENV,
       },
       reuseExistingServer: false,
       timeout: 300_000,
