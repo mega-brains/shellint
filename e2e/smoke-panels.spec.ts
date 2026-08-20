@@ -11,6 +11,21 @@ function patchResponse(page: Page) {
   );
 }
 
+/**
+ * Resolve after the frame that lays out a pending style change, and the one
+ * after it. Everything the header reflows on is a CSS breakpoint over system
+ * fonts (`--sans-narrow`, tokens.css), so once those two frames are in there
+ * is nothing left pending — no web font, no transition, no async measure.
+ */
+function nextLayout(page: Page) {
+  return page.evaluate(
+    () =>
+      new Promise<void>((resolve) =>
+        requestAnimationFrame(() => requestAnimationFrame(() => resolve())),
+      ),
+  );
+}
+
 test.describe("panels smoke", () => {
   test("inspector tabs are mutually exclusive and persist", { tag: "@layout" }, async ({ page }) => {
     await openApp(page);
@@ -117,7 +132,7 @@ test.describe("panels smoke", () => {
     await openApp(page);
     for (const width of [1440, 1100, 900, 780, 640]) {
       await page.setViewportSize({ width, height: 700 });
-      await page.waitForTimeout(150);
+      await nextLayout(page);
       const boxes = await page.evaluate(() =>
         [...document.querySelectorAll("header.top > *")]
           .filter((el) => (el as HTMLElement).offsetParent !== null)
@@ -141,21 +156,27 @@ test.describe("panels smoke", () => {
     await openApp(page);
     const dock = page.locator("#dock");
     const handle = page.locator("#dockSplitter");
+    const dockHeight = () => dock.evaluate((el) => el.getBoundingClientRect().height);
     await page.locator("#dockToggle").click();
-    // Wait out the 180ms open transition — the handle moves while it runs.
+    // The handle moves while the 180ms open transition runs, so wait for where
+    // it ends up — the 300px default of `.dock.open` (panels.css) — rather than
+    // for the clock.
     await expect(handle).toBeVisible();
-    await page.waitForTimeout(400);
+    await expect.poll(dockHeight).toBeCloseTo(300, 0);
 
-    const before = (await dock.boundingBox())!.height;
+    const before = await dockHeight();
     const hb = (await handle.boundingBox())!;
     await page.mouse.move(hb.x + hb.width / 2, hb.y + hb.height / 2);
     await page.mouse.down();
     await page.mouse.move(hb.x + hb.width / 2, hb.y - 120, { steps: 8 });
     await page.mouse.up();
-    await page.waitForTimeout(350);
 
-    const after = (await dock.boundingBox())!.height;
-    expect(after).toBeGreaterThan(before + 100);
+    // No settle wait after the drag: `body.row-resizing .dock` suppresses the
+    // transition for its duration, and endDrag (web/ui/splitter.ts) applies the
+    // size and writes localStorage synchronously on pointerup — so the height
+    // is already final here.
+    await expect.poll(dockHeight).toBeGreaterThan(before + 100);
+    const after = await dockHeight();
 
     // The dock takes the height from the workspace instead of overlapping it.
     const ws = (await page.locator("#workspace").boundingBox())!;
@@ -170,8 +191,7 @@ test.describe("panels smoke", () => {
 
     // Double-click resets to the 300px default.
     await handle.dblclick();
-    await page.waitForTimeout(350);
-    expect((await dock.boundingBox())!.height).toBeCloseTo(300, 0);
+    await expect.poll(dockHeight).toBeCloseTo(300, 0);
   });
 
   test("device overflow menu shows Reboot device", { tag: "@layout" }, async ({ page }) => {
