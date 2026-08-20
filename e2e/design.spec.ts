@@ -113,6 +113,24 @@ async function openSettled(page: Page) {
   await expect(page.locator("#historySpark .spark")).toBeVisible({
     timeout: 15_000,
   });
+  // /api/devices is the other boot fetch outside that chain: `useDevices` fires
+  // it from its own mount effect, so nothing above reaches it. It sizes four
+  // things in the header — `#deviceIp` only exists once a device names an IP
+  // (`shownIp = activeDevice?.ip ?? config.deviceIp`, and the fixture's config
+  // IP is empty), `#deviceSelect` grows 116px → 176px as the device labels push
+  // it into its 11rem clamp, `#slotSelect` does not render at all while
+  // `deviceId` is null, and `#btnDeployDetail` gains " → label:slot", which
+  // shifts the whole right-hand toolbar 93px. In build-menu, a 1440×52 crop,
+  // that is 12441 of 74880 pixels against a 120px budget: `#slotSelect`'s
+  // missing mask band alone is exactly 3456 (144 × 24), and the toolbar shift
+  // is unmasked content, so no mask list could paper it over.
+  // Because the fetch starts at mount it normally lands ~140ms before
+  // `gate-checked`, and it takes ~370ms of extra lag to actually flip a shot —
+  // but the slack does invert (−147ms in 1 of 40 boots at 10 workers), and
+  // `#slotSelect` mounting is a single condition that covers all four: it
+  // appears only once `active.device` is set, and `setDevices`/`setActive` land
+  // in one batch off the same response.
+  await expect(page.locator("#slotSelect")).toBeVisible({ timeout: 15_000 });
 }
 
 function masks(page: Page): Locator[] {
