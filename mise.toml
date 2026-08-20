@@ -28,12 +28,18 @@ run = "npm run build:shelly"
 description = "Build web UI bundle"
 run = "npm run build:web"
 
+[tasks."vendor:txiki"]
+description = "Fetch/verify the pinned txiki.js pair in gitignored vendor/txiki (SHELLINT_TJS_BIN + _BUNDLE_BIN); --force refetches, --check verifies without network"
+run = "npm run vendor:txiki -- \"$@\""
+
 [tasks."build:txiki"]
 description = "Build txiki server and CLI bundles"
+depends = "vendor:txiki"
 run = "npm run build:txiki"
 
 [tasks."build:txiki:executable"]
 description = "Build standalone txiki server executable"
+depends = "vendor:txiki"
 run = "npm run build:txiki:executable"
 
 [tasks.build]

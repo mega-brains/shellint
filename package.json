@@ -21,7 +21,8 @@
     "build:web": "node scripts/gen-api-docs.mjs && node scripts/build-web.mjs --prod",
     "build:web:dev": "node scripts/gen-api-docs.mjs && node scripts/build-web.mjs",
     "build:static": "node scripts/build-static.mjs",
-    "build:txiki": "node scripts/build-txiki.mjs",
+    "vendor:txiki": "node scripts/vendor-txiki.mjs",
+    "build:txiki": "npm run vendor:txiki && node scripts/build-txiki.mjs",
     "build:txiki:executable": "npm run build:txiki && node scripts/compile-txiki.mjs",
     "preview:static": "node scripts/preview-static.mjs",
     "build": "npm run build:shelly && npm run build:web",
@@ -51,7 +52,7 @@
     "test:e2e:lightpanda": "playwright test -c e2e/playwright.lightpanda.config.ts",
     "test:e2e:hybrid": "node scripts/e2e-hybrid.mjs",
     "install:lightpanda": "node scripts/install-lightpanda.mjs",
-    "test:txiki": "npm run typecheck:txiki && npm run build:web && node scripts/test-txiki-runtime.mjs",
+    "test:txiki": "npm run vendor:txiki && npm run typecheck:txiki && npm run build:web && node scripts/test-txiki-runtime.mjs",
     "beforeCommit": "npm run check:lines && npm run typecheck && npm run build:gate && npm run build:static && npm run test && npm run test:e2e && npm run test:e2e:txiki"
   },
   "engines": {

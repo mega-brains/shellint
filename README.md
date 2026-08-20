@@ -75,16 +75,22 @@ Node.js remains the default runtime. txiki.js `v26.6.0` is supported as an
 opt-in server and CLI runtime. It runs a bundle because txiki does not resolve
 npm packages or parse TypeScript directly.
 
-Put `tjs` on `PATH`, or point at a local executable:
+Two txiki builds are needed, both vendored into gitignored `vendor/txiki/` and
+pinned by `mise.toml`: the slim `min` profile that ships inside the compiled
+executable (`SHELLINT_TJS_BIN`), and the full upstream build for the one
+`tjs bundle` step the slim one cannot do (`SHELLINT_TJS_BUNDLE_BIN`). Fetch
+them once — pinned release tags, sha256-verified:
 
 ```bash
-export SHELLINT_TJS_BIN=/path/to/txiki.js/build/tjs
+mise run vendor:txiki          # --force refetch, --check verify without network
 mise run build:txiki
 mise run start:txiki
 ```
 
-This repository's `mise.toml` pins txiki.js `26.6.0` and resolves the sibling
-clone at `../../txiki.js/build/tjs`. `SHELLINT_TJS_BIN` may still override it.
+`build:txiki`, `build:txiki:executable` and `test:txiki` depend on it, so a
+fresh clone needs no separate step. Assets are pinned for darwin-arm64 only;
+elsewhere point `SHELLINT_TJS_BIN` / `SHELLINT_TJS_BUNDLE_BIN` at your own
+builds (a repo-relative value resolves against the repo root).
 
 Build one standalone native executable:
 

@@ -95,6 +95,7 @@ mise run beforeCommit     # check:lines → typecheck → build:gate → test �
 mise run build:gate       # fixture device build + web bundle (what the gate builds)
 mise run typecheck:script # typecheck your live scripts/main.ts (outside the gate)
 mise run start            # shellint server (alias: mise run dev)
+mise run vendor:txiki     # fetch/verify the pinned vendor/txiki pair (--force, --check)
 mise run build:txiki      # bundle txiki server and CLI entries
 mise run start:txiki      # start the txiki server bundle
 mise run test:txiki       # capabilities and Node/txiki HTTP parity
@@ -109,6 +110,12 @@ mise run clean
 ```
 
 Also available via `npm run …` (`build:shelly`, `build:web`, `dev`, `beforeCommit`, …).
+`vendor/` is gitignored and both binaries are pinned by repo-relative path, so a
+fresh clone (or anything that wipes `vendor/`) has no `tjs` at all — that is what
+`scripts/vendor-txiki.mjs` fixes: pinned tags + sha256 of the extracted binary,
+darwin-arm64 only (upstream publishes no Linux asset for the bundler half).
+`build:txiki`, `build:txiki:executable` and `test:txiki` all depend on it, and a
+re-run with both binaries present spawns `--version` and touches no network.
 Set `SHELLINT_TJS_BIN` when `tjs` is not on `PATH` — it still overrides the
 vendored default, and a repo-relative value is resolved against the repo root
 (`scripts/txiki-test-util.mjs`), so moving the checkout does not break it.
