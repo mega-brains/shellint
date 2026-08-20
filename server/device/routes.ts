@@ -26,7 +26,13 @@ import {
   listSlots,
 } from "./device-scripts.ts";
 import { ShellyRpc } from "./rpc.ts";
-import { deploy, AuthNotSupportedError, AuthFailedError, ProbeRequiredError } from "./deploy.ts";
+import {
+  deploy,
+  AuthNotSupportedError,
+  AuthFailedError,
+  ProbeRequiredError,
+  UnknownDeviceError,
+} from "./deploy.ts";
 import {
   fetchDeviceStatus,
   fetchEcoMode,
@@ -41,16 +47,21 @@ import {
   stopLogStream,
 } from "./debug-log.ts";
 import { expandLogText, loadLogMap } from "../script/log-map.ts";
+import { bodyError } from "./validate-body.ts";
 
 /**
  * Shared error → response mapping for every route that talks to a device:
- * `NoDeviceError` → 409, `AuthFailedError` → 401 (wrong password),
+ * `NoDeviceError` → 409, `UnknownDeviceError` → 404 (a named device that is not
+ * in devices.json), `AuthFailedError` → 401 (wrong password),
  * `AuthNotSupportedError` → 401 (non-digest challenge), `CompilerNotWiredError`
  * → 400, everything else → 500.
  */
 export async function deviceError(c: Context, e: unknown) {
   if (e instanceof NoDeviceError) {
     return c.json({ ok: false, error: e.message }, 409);
+  }
+  if (e instanceof UnknownDeviceError) {
+    return c.json({ ok: false, error: e.message }, 404);
   }
   if (e instanceof ProbeRequiredError) {
     return c.json(
@@ -103,6 +114,8 @@ export function registerDeviceRoutes(app: Router) {
     if (typeof body.ip !== "string" || body.ip.length === 0) {
       return c.json({ ok: false, error: "body.ip must be a non-empty string" }, 400);
     }
+    const invalid = bodyError(body);
+    if (invalid) return c.json({ ok: false, error: invalid }, 400);
     try {
       const device = await addDevice({
         ip: body.ip,
@@ -125,6 +138,8 @@ export function registerDeviceRoutes(app: Router) {
     } catch {
       return c.json({ ok: false, error: "expected JSON body" }, 400);
     }
+    const invalid = bodyError(body);
+    if (invalid) return c.json({ ok: false, error: invalid }, 400);
     try {
       const device = await updateDevice(c.req.param("id"), body);
       return c.json({ ok: true, device: await sanitizeDevice(device) });
@@ -188,6 +203,8 @@ export function registerDeviceRoutes(app: Router) {
         400,
       );
     }
+    const invalid = bodyError(body);
+    if (invalid) return c.json({ ok: false, error: invalid }, 400);
     try {
       const target = await setActive(body);
       // A new active device means the old one's log ring must not bleed into it.
@@ -372,6 +389,8 @@ export function registerDeviceRoutes(app: Router) {
         400,
       );
     }
+    const invalid = bodyError(body);
+    if (invalid) return c.json({ ok: false, error: invalid }, 400);
     try {
       let lastStatus = "starting";
       const result = await deploy(

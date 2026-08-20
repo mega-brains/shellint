@@ -253,9 +253,11 @@ export type AddDeviceInput = { ip: string; label?: string; password?: string };
  * Probes `Shelly.GetDeviceInfo` for a stable id + info. Offline (device
  * unreachable right now) falls back to `slug(label || ip)` — the id is
  * rewritten once on the first successful connect, since keying by IP goes
- * stale exactly when DHCP reassigns it. A wrong password (digest challenge
- * that fails) is rejected outright rather than stored to fail again later.
- * `rpcFactory` is a test seam — production always uses the real `ShellyRpc`.
+ * stale exactly when DHCP reassigns it. Either way it is slugged: the id is a
+ * path component in `.shellint/devices/<id>/`, so a device answering `../`
+ * must not be able to name a directory outside it. A wrong password (digest
+ * challenge that fails) is rejected outright rather than stored to fail again
+ * later. `rpcFactory` is a test seam — production always uses the real `ShellyRpc`.
  */
 export async function addDevice(
   input: AddDeviceInput,
@@ -273,7 +275,7 @@ export async function addDevice(
   const rpc = rpcFactory(input.ip, auth);
   try {
     const probed = await probeDeviceInfo(rpc);
-    if (probed.id) id = probed.id;
+    if (probed.id) id = slug(probed.id);
     info = { model: probed.model, gen: probed.gen, ver: probed.ver, app: probed.app };
     lastSeen = new Date().toISOString();
   } catch (e) {

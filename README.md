@@ -8,7 +8,7 @@ Small, simple development room (playground) for developing shelly scripts
 
 ```json
 {
-  "host": "0.0.0.0",
+  "host": "127.0.0.1",
   "port": 8787,
   "compiler": "shellint"
 }
@@ -16,7 +16,7 @@ Small, simple development room (playground) for developing shelly scripts
 
 | Field | Meaning |
 |---|---|
-| `host` / `port` | shellint HTTP bind (default `0.0.0.0:8787`) |
+| `host` / `port` | shellint HTTP bind (default `127.0.0.1:8787`; `"0.0.0.0"` exposes this unauthenticated API, and everything it can do to your device, to the whole LAN) |
 | `compiler` | Must be `"shellint"` for now (`shelly-forge` not wired) |
 
 Devices are no longer configured in `shellint.json` — add one from UI

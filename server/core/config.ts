@@ -16,8 +16,14 @@ export type ShellintConfig = {
   minify: MinifyConfig;
 };
 
+/**
+ * Loopback by default: this API deploys code to hardware, reboots it, reads
+ * device script source and stores device passwords in plaintext, with no login
+ * of its own — so LAN-wide exposure has to be a deliberate `"host": "0.0.0.0"`
+ * in shellint.json, not what a fresh checkout does.
+ */
 const DEFAULTS: ShellintConfig = {
-  host: "0.0.0.0",
+  host: "127.0.0.1",
   port: 8787,
   compiler: "shellint",
   minify: { ...DEFAULT_MINIFY },
@@ -48,6 +54,7 @@ function envPort(): number | null {
 }
 
 let legacyNoticePrinted = false;
+let malformedNoticePrinted = false;
 
 /** Prefer shellint.json; retain devroom.json only for one-time migration. */
 export async function resolveConfigPath(): Promise<string | null> {
@@ -60,18 +67,31 @@ export async function resolveConfigPath(): Promise<string | null> {
   return LEGACY_CONFIG_JSON;
 }
 
+function defaultConfig(override: number | null): ShellintConfig {
+  return {
+    ...DEFAULTS,
+    ...(override == null ? {} : { port: override }),
+    minify: { ...DEFAULT_MINIFY },
+  };
+}
+
 export async function loadConfig(): Promise<ShellintConfig> {
   const path = await resolveConfigPath();
   const override = envPort();
-  if (!path) {
-    return {
-      ...DEFAULTS,
-      ...(override == null ? {} : { port: override }),
-      minify: { ...DEFAULT_MINIFY },
-    };
+  if (!path) return defaultConfig(override);
+  let raw: Partial<ShellintConfig> & Record<string, unknown>;
+  try {
+    raw = JSON.parse(await runtime.fs.readText(path)) as Partial<ShellintConfig> &
+      Record<string, unknown>;
+  } catch {
+    // Every device route calls this, so a five-second status poll must not
+    // reprint it once a cycle.
+    if (!malformedNoticePrinted) {
+      malformedNoticePrinted = true;
+      console.warn(`shellint: ${path} is not valid JSON — using defaults`);
+    }
+    return defaultConfig(override);
   }
-  const raw = JSON.parse(await runtime.fs.readText(path)) as Partial<ShellintConfig> &
-    Record<string, unknown>;
   return {
     host: typeof raw.host === "string" ? raw.host : DEFAULTS.host,
     port: override ?? (typeof raw.port === "number" ? raw.port : DEFAULTS.port),

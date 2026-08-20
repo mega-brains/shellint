@@ -31,6 +31,18 @@ export class ProbeRequiredError extends Error {
   }
 }
 
+/** Thrown when `opts.deviceId` names a device that is not in devices.json. An
+ * explicit id is never silently swapped for the active one: deploy ends in
+ * `Script.PutCode`, so a mistyped id would overwrite a different box's slot. */
+export class UnknownDeviceError extends Error {
+  deviceId: string;
+  constructor(deviceId: string) {
+    super(`unknown device "${deviceId}"`);
+    this.name = "UnknownDeviceError";
+    this.deviceId = deviceId;
+  }
+}
+
 /** Minimal RPC surface `deploy` needs — lets tests supply a fake device. */
 export type DeployRpc = {
   connect(): Promise<void>;
@@ -45,7 +57,7 @@ export type DeployMode = "debug" | "prod";
 export type DeployMinify = "min" | "raw";
 
 export type DeployOptions = {
-  /** Defaults to the active device. */
+  /** Defaults to the active device; an id that resolves to nothing is an error. */
   deviceId?: string;
   /** Defaults to the active slot; ignored (the new slot wins) when `createName` is set. */
   slot?: number;
@@ -156,9 +168,12 @@ export async function deploy(
   const code = await fs.readText(path);
   const localBytes = runtime.byteLength(code);
   const active = await requireActive();
-  const device = opts.deviceId
-    ? ((await getDevice(opts.deviceId)) ?? active.device)
-    : active.device;
+  let device = active.device;
+  if (opts.deviceId) {
+    const named = await getDevice(opts.deviceId);
+    if (!named) throw new UnknownDeviceError(opts.deviceId);
+    device = named;
+  }
 
   if (opts.skipProbeCheck !== true) {
     const state = await probeState(device.id);
