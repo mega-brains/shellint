@@ -1,198 +1,219 @@
 # shellint
 
-Small, simple development room (playground) for developing shelly scripts
+A local development playground for [Shelly Gen2 device scripts](https://shelly-api-docs.shelly.cloud/gen2/Scripts/Overview):
+write them in TypeScript, see what they will cost in RAM and bytes before they
+reach the device, and have them checked against the Espruino dialect the device
+actually runs — and, when a device is answering, against *that* device's RPC
+methods, components and firmware.
 
-## How to run
+Shelly scripts run on Espruino on an ESP32. It is not Node and not a browser:
+memory is the binding constraint, the dialect is a subset, and most of what a
+general JavaScript toolchain tells you is either irrelevant or wrong. shellint
+is built around that.
 
-1. Copy or edit `shellint.json`:
+![shellint](./shellint-header.png)
 
-```json
-{
-  "host": "127.0.0.1",
-  "port": 8787,
-  "compiler": "shellint"
-}
-```
+**[Try it in your browser →](https://megas0ft.github.io/shellint/)** — the same
+UI, no server and no device, running the real compiler and the real check engine
+in a web worker. The 14 checks that need a device report `skipped`, never a
+false `pass`.
 
-| Field | Meaning |
-|---|---|
-| `host` / `port` | shellint HTTP bind (default `127.0.0.1:8787`; `"0.0.0.0"` exposes this unauthenticated API, and everything it can do to your device, to the whole LAN) |
-| `compiler` | Must be `"shellint"` for now (`shelly-forge` not wired) |
-
-Devices are no longer configured in `shellint.json` — add one from UI
-header device picker (`+ Add device…`), which stores it in `.shellint/devices.json`
-(gitignored, `0600`; the password field is plaintext — this is a LAN-only tool
-with no login of its own). Migration: if `shellint.json` is absent, legacy
-`devroom.json` remains readable once. Rename it, then move `.devroom/` to
-`.shellint/` yourself; credentials are never moved automatically.
-
-2. Install and start (mise preferred):
+## Quick start
 
 ```bash
 mise install && mise run install
 mise run start
-# or: npm install && npm run dev
 ```
 
-Open `http://127.0.0.1:8787` — edit `scripts/main.ts`, **Save → Build → Deploy**.
-The header's device picker switches the active device; a second picker next to
-it switches the active script slot on that device (`+ New slot…` /
-`Delete slot…`, typed-name confirm before a delete). Switching device or slot
-is server-global — this is a single-operator LAN tool, not a multi-tab
-per-target setup — and resets the device panel and log stream so they never
-blend two devices' data.
-Deploy is a split button: main click reuses last choice; ▾ picks
-**debug|prod** × **minified|non-minified**. **Check** runs the Shelly/Espruino
-compliance pass — it works offline, and when the device is answering it also
-checks RPC method names, component ids and firmware capabilities against that
-device. **Probe** runs `Script.Eval` checks and
-writes `types/generated-probe.json`; it never overwrites stored device scripts —
-if configured slot is not running it creates throwaway `shellint-probe`
-slot and deletes it again. The footer polls live device telemetry (script
-mem/cpu, RAM/FS, latency, RSSI) and has an **eco** toggle.
+Then open `http://127.0.0.1:8787` and edit `scripts/main.ts` — created for you
+from `templates/main.example.ts` on first run. Without mise:
+`npm install && npm run dev`.
 
-A resizable sidebar beside the editor holds two panels. **build** carries sizes per
-mode, script counters, resource gauges against the device caps, a **static RAM
-estimate** (a JsVar cost model — an estimate, drawn against the device's measured
-`mem_peak` so the error stays visible), the **minimum firmware** the script's API use
-requires, and size plus estimate over recent builds. **check** is a permanent
-indicator: it lists every compliance check with a one-line rationale and its verdict,
-including the ones **skipped** for want of a device profile or a build. The **logs**
-panel enables `sys.debug.websocket` on the device
-and streams `ws://<ip>/debug/log`; numeric series are charted from a print
+No device required. With none configured, shellint starts read-only: editor,
+compiler, sizes and the offline check tiers all work; the device panels are
+inert.
+
+## ⚠️ Security — read this before exposing it
+
+**shellint has no authentication of its own.** Anyone who can reach the port can
+edit, build and deploy scripts, read your device credentials back out of the UI,
+toggle eco mode and reboot the device.
+
+- **The `shellint.json` committed in this repo binds `0.0.0.0`** — the whole LAN,
+  on first start, without you choosing it. The code default when no config file
+  exists is `127.0.0.1`. If you want the safe one, set it explicitly:
+
+  ```json
+  { "host": "127.0.0.1", "port": 8787, "compiler": "shellint" }
+  ```
+
+- **Device passwords are stored in plaintext** in `.shellint/devices.json`
+  (gitignored, `0600`). Digest auth to the device needs the password back, so it
+  is not hashed. Treat that file as a credential store.
+- **This is a LAN tool.** Do not put it on a routable interface, behind a
+  tunnel, or in front of the internet. There is nothing in it that would survive
+  a hostile network.
+
+See [`SECURITY.md`](./SECURITY.md) for the threat model and how to report
+something.
+
+## What it does
+
+**Authoring.** TypeScript with real types for the device stdlib — `types/` is
+the *whole* library, since the device compile runs `noLib` with `types: []`.
+CodeMirror 6 editor, hover docs, type errors and check findings on the gutter.
+
+**Build.** `tsc` → ES5, `module: none`, flat emit, then `meta.env` dead-code
+elimination → Terser → optionally `espruino --minify`, producing
+`dist/{debug,prod}.{raw.js,js,adv.js}`. Production builds also shorten log
+strings and ship a map the logs panel re-expands, so prod logs stay readable.
+Any built artifact can be previewed read-only in the editor, including a
+unified `debug ↔ prod` diff.
+
+**Checks.** 66 named checks in five tiers plus a post-compile dialect guard, run
+by **Check**. Every run reports pass / warn / fail / **skipped** per rule with a
+one-line rationale, and a script that does not parse or does not type-check says
+so instead of quietly passing over a recovered AST. Tiers 1–3 are offline; tier
+4 needs a device profile; the capability probe adds `probe-absent-api` from 104
+`Script.Eval` expressions run against real hardware. Two of the tier-3 findings
+carry autofixes, previewed as a diff before they apply.
+
+**Dashboard.** Artifact sizes against the device caps, script counters (Shelly
+API calls, timers, strings, HTTP requests, logs) with click-to-highlight back
+into the source, a static **RAM estimate** from a JsVar cost model drawn against
+the device's measured `mem_peak` so the error stays visible, the **minimum
+firmware** the script's API use requires, and size + estimate over recent builds.
+
+**Device.** Deploy over WS `PutCode` — debug or prod, minified or raw. Live
+telemetry (script mem/cpu, RAM/FS, latency, RSSI), an eco toggle, and a streamed
+`ws://<ip>/debug/log` console. Numeric series chart themselves from a print
 convention:
 
 ```js
 print("#m temp " + tC); // "#m <series> <value>"
 ```
 
-Charts are hand-rolled inline SVG — no charting dependency. The device's log buffer
-is circular, so dropped lines render as gaps rather than interpolated lines.
+Charts are hand-rolled inline SVG — no charting dependency.
 
-### Optional txiki.js runtime
+**Multiple devices and slots.** Add devices from the header picker; a second
+picker switches the active script slot on the active device. Digest auth is
+supported. Switching is server-global — this is a single-operator tool — and
+resets the device panel and log stream so two devices' data never blend.
 
-Node.js remains the default runtime. txiki.js `v26.6.0` is supported as an
-opt-in server and CLI runtime. It runs a bundle because txiki does not resolve
-npm packages or parse TypeScript directly.
+## Configuration
 
-One txiki build is needed, vendored into gitignored `vendor/txiki/`: the slim
-`min` profile that ships inside the compiled executable. Bundling does not use
-it — that runs on the repo's own esbuild — so there is nothing to pair it with.
-Fetch it once, from a pinned release tag, sha256-verified:
+`shellint.json` at the repo root:
+
+| Field | Meaning |
+|---|---|
+| `host` / `port` | HTTP bind. Code default `127.0.0.1:8787`; **the committed file says `0.0.0.0`** — see the security section |
+| `compiler` | Must be `"shellint"` (`shelly-forge` is not wired) |
+| `minify` | Terser and tier-3 knobs used by the device build |
+
+Devices are not configured here — add one from the UI's header picker
+(`+ Add device…`), which writes `.shellint/devices.json`.
+
+## Commands
 
 ```bash
-mise run vendor:txiki          # --force refetch, --check verify without network
+mise run build            # device artifacts + web bundle
+mise run start            # server (alias: dev)
+mise run check:lines      # source files ≤ 500 raw lines
+mise run test             # unit + smoke; accepts a name filter
+mise run deploy -- debug min    # or: prod raw
+mise run probe            # 104 capability probes → types/generated-probe.json
+mise run profile          # cache device capabilities for the tier-4 checks
+mise run beforeCommit     # the full gate: lint, lines, typecheck, build, test, e2e ×2
+mise run build:static     # the offline site/ build
+```
+
+Every one is available as `npm run …` too, with identical behaviour.
+`mise tasks` lists the rest.
+
+## Optional txiki.js runtime
+
+Node 22 is the default. [txiki.js](https://github.com/saghul/txiki.js) `v26.6.0`
+is supported as an opt-in server and CLI runtime — it runs a bundle, because
+txiki resolves no npm packages and parses no TypeScript.
+
+One `tjs` build is needed, vendored into gitignored `vendor/txiki/`: the slim
+`min` profile that ships inside the compiled executable. Bundling does not use
+it — that runs on the repo's own esbuild.
+
+```bash
+mise run vendor:txiki          # pinned tag + sha256; --force refetch, --check offline verify
 mise run build:txiki
 mise run start:txiki
 ```
 
-`build:txiki`, `build:txiki:executable` and `test:txiki` depend on it, so a
-fresh clone needs no separate step, and none of them require mise — plain
-`npm run …` finds the vendored binary too. Assets are pinned for darwin-arm64,
-linux-x64 and win32-x64 (only the first has been run here); elsewhere point
-`SHELLINT_TJS_BIN` at your own build (a repo-relative value resolves against the
-repo root).
+`build:txiki`, `build:txiki:executable` and `test:txiki` all depend on the
+vendor step, so a fresh clone needs no separate command, and none of them
+require mise. Binaries are pinned for darwin-arm64, linux-x64 and win32-x64
+(only the first has been run by the maintainer); elsewhere point
+`SHELLINT_TJS_BIN` at your own build — a repo-relative value resolves against
+the repo root.
 
-Build one standalone native executable:
+One standalone native executable, under 5 MB, no Node required:
 
 ```bash
 mise run build:txiki:executable
 ./.txiki/shellint
 ```
 
-Executable embeds txiki runtime plus bundled server code. shellint remains
-workspace tool, so mutable project files (`shellint.json`, `scripts/`, `types/`,
-`dist/`, `web/dist/`, and `.shellint/`) are still read from launch directory.
+It embeds the runtime and the server bundle, but shellint stays a workspace
+tool: `shellint.json`, `scripts/`, `types/`, `dist/`, `web/dist/` and
+`.shellint/` are still read from the launch directory. The peer CLI tasks are
+`deploy:txiki`, `probe:txiki`, `profile:txiki` and `test:txiki`.
 
-Peer CLI and verification tasks are available:
+npm install, TypeScript and Playwright stay on Node.
 
-```bash
-mise run deploy:txiki -- --mode debug --minify min
-mise run probe:txiki
-mise run profile:txiki
-mise run test:txiki
-```
+## Using the checks in your own editor
 
-txiki builds require WebCrypto, filesystem, process, WebSocket, and HTTP server
-features. npm installation, TypeScript checks, and Playwright remain Node-hosted.
-Static/offline mode stays independent from both server runtimes.
+shellint's checks are hand-rolled TypeScript-AST passes, not lint rules — none
+of the cooperative scheduler, the RAM budget, `Shelly.*` existence or the live
+capability probe is expressible as an off-the-shelf ESLint plugin.
 
-```bash
-mise run build
-mise run deploy -- debug min    # or: prod raw
-mise run probe
-mise run profile                # cache device capabilities for the connected lint
-mise run test
-mise run beforeCommit           # lines + typecheck + build + test
-```
+The *syntax* half of tier 1 is different: it needs no custom rule code at all.
+[`templates/eslint.config.mjs`](./templates/eslint.config.mjs) is that half as a
+flat config you can copy into your own Shelly script repo, so your editor and CI
+flag the same dialect bans. It is a template — shellint neither installs nor
+runs ESLint.
 
-Unauthenticated devices only; a 401 surfaces as **auth not supported yet**.
+## Contributing
 
-## Using the checks in your editor
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Short version: `mise run
+beforeCommit` must be green, source files stay under 500 lines, and design
+changes need baselines refreshed on both macOS and Linux.
 
-shellint checks run behind **Check** button — they are hand-rolled
-TypeScript-AST passes, not a linter, because none of the cooperative scheduler,
-the RAM budget, `Shelly.*` existence or the live capability probe is something
-an off-the-shelf ESLint plugin can express.
+## Reference
 
-The *syntax* half of Tier 1 is another matter: it needs no custom rule code at
-all. [`templates/eslint.config.mjs`](./templates/eslint.config.mjs) is that
-half as a flat config you can copy into your own Shelly script repo, so your
-editor and CI flag same dialect bans shellint does. It is template —
-shellint itself neither installs nor runs ESLint.
+Shelly's own documentation is the authority on what the device accepts —
+in particular the
+[Language Reference](https://shelly-api-docs.shelly.cloud/gen2/Scripts/LanguageReference),
+the script API pages
+([Shelly](https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Shelly),
+[Timer](https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Timer),
+[HTTPServer](https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/HTTPServer),
+[RPCHandlers](https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/RPCHandlers),
+[AES](https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/AES),
+[Virtual](https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Virtual)),
+the [RPC protocol](https://shelly-api-docs.shelly.cloud/gen2/General/RPCProtocol)
+and [debug logs](https://shelly-api-docs.shelly.cloud/gen2/General/DebugLogs)
+pages, and the [changelog](https://shelly-api-docs.shelly.cloud/gen2/changelog)
+— the API moves.
 
-Rationale, the plugin survey behind it, and what it deliberately leaves out:
-[`.claude/plans/2026-08-15_19_lint-gaps-and-eslint.md`](./.claude/plans/2026-08-15_19_lint-gaps-and-eslint.md).
+## Status
 
-## Ideas / Features
+Working and in daily use by its author against real hardware. Pre-1.0: no
+release has been tagged yet, the API surface may move, and only macOS arm64 has
+been exercised end to end — Linux and Windows are built by CI but unproven.
 
-- node.js server app with code editor
-- ability to create Shelly scripts in TypeScript with type safety
-- custom oxlint (or eslint) plugins / checks / rules specific to Shelly ecosystem (espruino)
-  - see (related to scripts):
-    - https://shelly-api-docs.shelly.cloud/gen2/Scripts/Overview
-    - https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/AES
-    - https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/HTTPServer
-    - https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/RPCHandlers
-    - https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Shelly
-    - https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Timer
-    - https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Utilities
-    - https://shelly-api-docs.shelly.cloud/gen2/Scripts/APIs/Virtual
-    - https://shelly-api-docs.shelly.cloud/gen2/Scripts/LanguageReference
-    - https://shelly-api-docs.shelly.cloud/gen2/Scripts/Tutorial
-  - changelog: https://shelly-api-docs.shelly.cloud/gen2/changelog
-  - see also:
-    - https://shelly-api-docs.shelly.cloud/gen2/General/CommonErrors
-    - https://shelly-api-docs.shelly.cloud/gen2/General/DebugLogs
-    - https://shelly-api-docs.shelly.cloud/gen2/General/FirmwareUpdatePolicy
-    - https://shelly-api-docs.shelly.cloud/gen2/General/LocalNetworkMessaging
-    - https://shelly-api-docs.shelly.cloud/gen2/General/Notifications
-    - https://shelly-api-docs.shelly.cloud/gen2/General/RPCChannels
-    - https://shelly-api-docs.shelly.cloud/gen2/General/RPCProtocol
-    - https://shelly-api-docs.shelly.cloud/gen2/General/SafeMode
-    - [https://shelly-api-docs.shelly.cloud/cloud-control-api/communication-v2
-    - https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Script
-    - https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Shelly
-    - https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Switch
-    - https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Sys
-    - https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Temperature
-    - https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Webhook
-    - https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/WiFi
-    - https://shelly-api-docs.shelly.cloud/gen2/ComponentsAndServices/Ws
+## Trademark
 
-- simple dashboard to provide basic statistics about script size in the time, with previous versions, various counts:
-  - count of used Shelly APIs
-  - count of defined variables / constants / strings / console logs / http requests / debug logs
-  - script size (raw - unminified, minified, with advanced minification)
-  - computed or estimated memory size
-  - live data from shelly device at runtime
-  - indicating if script is running in the shelly device
-  - basic information about shelly device (used ESP32 chip) and:
-    - memory size and usage, 
-    - cpu usage, 
-    - temperature
-    - latency in ms for responding
-  - toggle for Shelly Eco mode (on/off) with live indication
-- ability to define meta.env.debug / meta.env.prod for build time feature gating
-  - for example to create production minified build without debug logs or with shorter strings in logs, ...
-- ability to parse custom debug logs with numeric data in realtime graphs (uPlot)
+Not affiliated with, endorsed by, or sponsored by Allterco Robotics or Shelly.
+"Shelly" and "Espruino" are the trademarks of their respective owners and are
+used here only to name the target platform.
+
+## License
+
+[MIT](./LICENSE).

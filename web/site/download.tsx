@@ -19,10 +19,17 @@ import { releaseAssetUrl, releasesUrl } from "./release";
 const BINARY_BYTES = 4_194_304; // 4.0 MB (MiB) as reported by `ls -lh`
 const CAP_BYTES = 5 * 1024 * 1024;
 
-const PLATFORMS: { label: string; asset: string }[] = [
+/*
+ * One row per asset `.github/workflows/release.yml` actually builds — the two
+ * lists have to move together or a link here 404s against the release matrix.
+ * macOS x64 is absent on purpose: the slim txiki release publishes no macOS
+ * x86_64 asset in any profile, so that row could only ship the full ~5.6 MB
+ * build and falsify this page's own headline.
+ */
+const PLATFORMS: { label: string; asset: string; note?: string }[] = [
   { label: "macOS arm64", asset: "shellint-macos-arm64" },
-  { label: "macOS x64", asset: "shellint-macos-x64" },
   { label: "Linux x64", asset: "shellint-linux-x64" },
+  { label: "Windows x64", asset: "shellint-windows-x64.exe", note: "unproven" },
 ];
 
 const LOCAL_ADDS = [
@@ -65,10 +72,10 @@ export function Download() {
         <section class="downloads">
           <Group title="Releases" id="releases">
             <p class="release-note">
-              First release pending — <code>scripts/compile-txiki.mjs</code>{" "}
-              builds for the host platform only, and no release workflow has
-              published a tag yet, so the links below 404 until then. Build
-              from source in the meantime (next section).
+              First release pending — the release workflow exists but no tag has
+              been pushed through it yet, so the links below 404 until then.
+              Build from source in the meantime (next section). The Windows
+              build has never been run anywhere; treat it as unproven.
             </p>
             <table id="downloadTable">
               <thead>
@@ -80,7 +87,10 @@ export function Download() {
               <tbody>
                 {PLATFORMS.map((p) => (
                   <tr key={p.asset}>
-                    <td>{p.label}</td>
+                    <td>
+                      {p.label}
+                      {p.note ? <span class="muted"> · {p.note}</span> : null}
+                    </td>
                     <td>
                       <a href={releaseAssetUrl(p.asset)}>{p.asset}</a>
                     </td>

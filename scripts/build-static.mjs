@@ -251,8 +251,9 @@ writeFileSync(join(demoDir, "sw.js"), swSource);
 //
 // REPO (web/site/release.ts) is read through the `__SHELLINT_REPO__` global —
 // `declare const __SHELLINT_REPO__: string;` in that file — so CI can inject
-// the real "owner/repo" slug once the GitHub repo exists without touching
-// source (M26 plan §7.6); SHELLINT_REPO unset falls back to a placeholder.
+// the real "owner/repo" slug without touching source (M26 plan §7.6). ci.yml
+// and pages.yml both set it to `${{ github.repository }}`, so the fallback
+// below only ever shows up in a local `mise run build:static`.
 const siteJsOut = join(siteDir, "site.js");
 await esbuild.build(
   staticAppEsbuildConfig({
@@ -262,7 +263,7 @@ await esbuild.build(
     sourcemap: false,
     logLevel: "info",
     define: {
-      __SHELLINT_REPO__: JSON.stringify(process.env.SHELLINT_REPO || "OWNER/shellint"),
+      __SHELLINT_REPO__: JSON.stringify(process.env.SHELLINT_REPO || "MegaS0ft/shellint"),
     },
   }),
 );

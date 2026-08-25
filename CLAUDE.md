@@ -4,6 +4,12 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## ! IMPORTANT
 
+`.claude/` is **gitignored** — the plans, findings and memory files below are
+local working notes, present in the maintainer's checkout and absent from a
+clone. Comments elsewhere in the repo that cite a plan path (`.claude/plans/…`)
+are pointing at those notes, not at tracked documentation; this file is the
+tracked summary.
+
 - read [BASIC_INSTRUCTIONS](./.claude/memory/BASIC_INSTRUCTIONS.md)
 - read [plans-file-header](./.claude/memory/plan-file-header-format.md)
 - read [plans-in-project-dir](./.claude/memory/plans-in-project-dir.md)

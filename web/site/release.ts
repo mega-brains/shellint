@@ -9,7 +9,7 @@
 declare const __SHELLINT_REPO__: string;
 
 export const REPO: string =
-  typeof __SHELLINT_REPO__ !== "undefined" ? __SHELLINT_REPO__ : "OWNER/shellint";
+  typeof __SHELLINT_REPO__ !== "undefined" ? __SHELLINT_REPO__ : "MegaS0ft/shellint";
 
 /** The repo's GitHub landing page. */
 export function repoUrl(): string {

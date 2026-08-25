@@ -349,6 +349,12 @@ button.chip-icon:hover { color: var(--ink); }
   color: var(--muted);
 }
 
+/* Qualifier on a download row — "unproven" for a platform CI builds but has
+   never run. Same weight as the row, dimmer, so it reads as a footnote. */
+.muted {
+  color: var(--muted);
+}
+
 .curl-line {
   margin: 8px 0 0;
   padding: 10px 12px;
