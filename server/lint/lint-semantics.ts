@@ -13,6 +13,7 @@ import {
   type Finding,
   type Sink,
 } from "./lint-util.ts";
+import { hoistAnonymousFix, syncComponentAccessFix } from "./semantic-fixes.ts";
 
 /**
  * Tier 3 — Espruino/Shelly semantics: the rules neither the type system nor a
@@ -155,11 +156,15 @@ function checkShellyCall(sink: Sink, node: ts.CallExpression) {
     if (sync && !method.startsWith("Shelly.")) {
       const suggested =
         sync[1] === "GetStatus" ? "getComponentStatus" : "getComponentConfig";
+      // Only a plain `Component.GetX` maps onto the accessor's (type, id) pair;
+      // the finding still stands for any other shape, the fix does not.
+      const simple = /^([A-Za-z][A-Za-z0-9_]*)\.(?:GetStatus|GetConfig)$/.exec(method);
       sink.at(
         node,
         "prefer-sync-component-access",
         "warn",
         `Shelly.call("${method}") — Shelly.${suggested}() is synchronous and does not consume one of the 5 call slots`,
+        simple ? syncComponentAccessFix(node, simple[1], suggested) : undefined,
       );
     }
     if (method === "Shelly.Reboot") {
@@ -341,6 +346,7 @@ export function lintSemantics(
           "max-anonymous-nesting",
           "error",
           `anonymous function nested ${anonDepth} deep — deeper than any depth observed to parse on device (${SEMANTIC_LIMITS.maxAnonymousNestingHard}); hoist it to a named function`,
+          hoistAnonymousFix(node),
         );
       } else if (anonDepth > SEMANTIC_LIMITS.maxAnonymousNesting) {
         sink.at(
@@ -348,6 +354,7 @@ export function lintSemantics(
           "max-anonymous-nesting",
           "warn",
           `anonymous function nested ${anonDepth} deep — the docs put the parser limit at ${SEMANTIC_LIMITS.maxAnonymousNesting}, though a probed device ran ${SEMANTIC_LIMITS.maxAnonymousNestingHard}; hoist it to a named function`,
+          hoistAnonymousFix(node),
         );
       }
     }
