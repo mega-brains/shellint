@@ -1,6 +1,16 @@
 .idea/
 .DS_Store
-.claude/.*
+# Agent working files — plans, findings, design handoffs. Local-only: they carry
+# device addresses and pasted device code. The old `.claude/.*` pattern only
+# ignored dotfiles *inside* the directory, which is how 49 of them got tracked.
+.claude/
+# The live editor buffer. Yours, never the repo's — it is what the UI edits and
+# what `mise run typecheck:script` checks, and it has held real credentials.
+# `templates/main.example.ts` seeds it on first run.
+scripts/main.ts
+# MCP browser-session detritus: page snapshots of the running UI, so they capture
+# whatever the editor had open, device address included.
+.playwright-mcp/
 node_modules/
 dist/
 .tsc-out/
