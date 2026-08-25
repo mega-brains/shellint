@@ -1,0 +1,123 @@
+name: Release
+
+# M27 §8 — one single-file native executable per platform, attached to a
+# **draft** release for a human to publish. See
+# .claude/plans/2026-08-18_27_ci-deploy.md.
+#
+# Matrix note: macOS x64 is deliberately absent. The slim release publishes no
+# macOS x86_64 asset in any profile, so that row could only ship the ~5.6 MB
+# upstream full build and would falsify the download page's "Under 5 MB".
+# Windows takes its place — both halves exist and compile-txiki.mjs already
+# emits shellint.exe — but has never been run anywhere; treat a Windows failure
+# as an unproven row, not a regression, and drop it rather than fight it.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: macos-latest,   asset: shellint-macos-arm64 }
+          - { os: ubuntu-latest,  asset: shellint-linux-x64 }
+          - { os: windows-latest, asset: shellint-windows-x64.exe }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - uses: ./.github/actions/setup-tjs
+        with:
+          node-version: ""
+
+      # The executable embeds web/dist, so the web bundle has to exist first.
+      - run: npm run build:web
+      - run: npm run build:txiki:executable
+
+      - name: Name the asset
+        run: |
+          src=.txiki/shellint
+          [ "$RUNNER_OS" = "Windows" ] && src=.txiki/shellint.exe
+          mv "$src" "${{ matrix.asset }}"
+
+      # The download page's headline is "One file. No Node. Under 5 MB." A
+      # silent creep past that turns the page into a lie, so it fails the build.
+      # macOS arm64 measured 4,506,881 B on 2026-08-25 — ~11% of margin, not
+      # much.
+      - name: Assert size under 5 MB
+        run: |
+          bytes=$(wc -c < "${{ matrix.asset }}")
+          echo "${{ matrix.asset }}: $bytes bytes"
+          if [ "$bytes" -gt 5242880 ]; then
+            echo "::error::${{ matrix.asset }} is $bytes bytes, over the 5 MB claim"
+            exit 1
+          fi
+
+      # A binary that does not start is worse than no release. Boots on a
+      # scratch port against a throwaway workspace and asks for one JSON route.
+      - name: Smoke-run the executable
+        run: |
+          chmod +x "${{ matrix.asset }}"
+          mkdir -p .tmp/release-smoke
+          SHELLINT_PORT=8791 \
+          SHELLINT_SCRIPT=.tmp/release-smoke/main.ts \
+          SHELLINT_DIST=.tmp/release-smoke/dist \
+            "./${{ matrix.asset }}" &
+          pid=$!
+          for _ in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:8791/api/checks; then
+              echo "booted and served /api/checks"
+              kill "$pid" 2>/dev/null || true
+              exit 0
+            fi
+            sleep 1
+          done
+          echo "::error::${{ matrix.asset }} did not serve /api/checks within 30s"
+          kill "$pid" 2>/dev/null || true
+          exit 1
+
+      - name: Checksum
+        run: shasum -a 256 "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.asset }}
+          path: |
+            ${{ matrix.asset }}
+            ${{ matrix.asset }}.sha256
+          if-no-files-found: error
+
+  draft:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+
+      # draft: true — the macOS and Windows binaries are unsigned, so the
+      # release notes have to carry the Gatekeeper/SmartScreen workaround before
+      # anyone sees them. Publishing stays a human act.
+      - uses: softprops/action-gh-release@v2
+        with:
+          draft: true
+          files: dist/shellint-*
+          fail_on_unmatched_files: true

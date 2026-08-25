@@ -75,11 +75,10 @@ Node.js remains the default runtime. txiki.js `v26.6.0` is supported as an
 opt-in server and CLI runtime. It runs a bundle because txiki does not resolve
 npm packages or parse TypeScript directly.
 
-Two txiki builds are needed, both vendored into gitignored `vendor/txiki/` and
-pinned by `mise.toml`: the slim `min` profile that ships inside the compiled
-executable (`SHELLINT_TJS_BIN`), and the full upstream build for the one
-`tjs bundle` step the slim one cannot do (`SHELLINT_TJS_BUNDLE_BIN`). Fetch
-them once — pinned release tags, sha256-verified:
+One txiki build is needed, vendored into gitignored `vendor/txiki/`: the slim
+`min` profile that ships inside the compiled executable. Bundling does not use
+it — that runs on the repo's own esbuild — so there is nothing to pair it with.
+Fetch it once, from a pinned release tag, sha256-verified:
 
 ```bash
 mise run vendor:txiki          # --force refetch, --check verify without network
@@ -88,9 +87,11 @@ mise run start:txiki
 ```
 
 `build:txiki`, `build:txiki:executable` and `test:txiki` depend on it, so a
-fresh clone needs no separate step. Assets are pinned for darwin-arm64 only;
-elsewhere point `SHELLINT_TJS_BIN` / `SHELLINT_TJS_BUNDLE_BIN` at your own
-builds (a repo-relative value resolves against the repo root).
+fresh clone needs no separate step, and none of them require mise — plain
+`npm run …` finds the vendored binary too. Assets are pinned for darwin-arm64,
+linux-x64 and win32-x64 (only the first has been run here); elsewhere point
+`SHELLINT_TJS_BIN` at your own build (a repo-relative value resolves against the
+repo root).
 
 Build one standalone native executable:
 

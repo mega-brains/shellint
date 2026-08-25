@@ -1,0 +1,63 @@
+name: Set up txiki.js
+description: >
+  Provision the pinned slim txiki.js binary into vendor/txiki/ and export
+  SHELLINT_TJS_BIN for later steps.
+
+# Deliberately a thin wrapper over scripts/vendor-txiki.mjs rather than a
+# reimplementation of asset selection in YAML. That script already holds the
+# release tag, the per-platform asset names and the sha256 of every extracted
+# binary, and it is what a developer runs locally — routing CI through it means
+# there is exactly one pinned, verified provisioning path, and a drift between
+# CI and a laptop is impossible by construction.
+#
+# It needs no compiler: since 2026-08-25 nothing is built from source here. The
+# `tjs bundle` half of the old pair is gone (bundling runs on the repo's own
+# esbuild), which is what made Linux possible at all — see
+# .claude/plans/2026-08-18_27_ci-deploy.md §4.
+
+inputs:
+  node-version:
+    description: Node version to set up. Empty skips setup-node entirely.
+    default: "22"
+
+outputs:
+  bin:
+    description: Absolute path to the provisioned tjs binary.
+    value: ${{ steps.vendor.outputs.bin }}
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v4
+      if: inputs.node-version != ''
+      with:
+        node-version: ${{ inputs.node-version }}
+
+    # Keyed on the release tag, read out of the script so a tag bump invalidates
+    # the cache without anyone remembering to edit this file. Saves a download,
+    # not minutes — nothing is compiled.
+    - id: pin
+      shell: bash
+      run: |
+        tag=$(node -e 'console.log(require("fs").readFileSync("scripts/vendor-txiki.mjs","utf8").match(/const TAG = "([^"]+)"/)[1])')
+        echo "tag=$tag" >> "$GITHUB_OUTPUT"
+
+    - uses: actions/cache@v4
+      with:
+        path: vendor/txiki
+        key: tjs-${{ runner.os }}-${{ runner.arch }}-${{ steps.pin.outputs.tag }}
+
+    # `unzip` is what vendor-txiki.mjs shells out to (Node ships no unzip, and
+    # GNU tar cannot read zip). Present on GitHub's ubuntu and macOS images;
+    # windows-latest has it via Git Bash, which `shell: bash` selects.
+    - id: vendor
+      shell: bash
+      run: |
+        node scripts/vendor-txiki.mjs
+        bin="$PWD/vendor/txiki/tjs"
+        [ "$RUNNER_OS" = "Windows" ] && bin="$PWD/vendor/txiki/tjs.exe"
+        echo "bin=$bin" >> "$GITHUB_OUTPUT"
+        # Exported for later steps even though txiki-test-util.mjs would find
+        # the vendored binary unaided: an explicit absolute path makes a
+        # provisioning failure surface here rather than three steps downstream.
+        echo "SHELLINT_TJS_BIN=$bin" >> "$GITHUB_ENV"

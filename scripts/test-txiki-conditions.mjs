@@ -2,7 +2,8 @@ import { spawnSync } from "node:child_process";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { resolveTjsBundleBin, runTjs } from "./txiki-test-util.mjs";
+import { runTjs } from "./txiki-test-util.mjs";
+import { bundleForTxiki } from "./txiki-bundle.mjs";
 
 function runNode(entry) {
   const result = spawnSync(process.execPath, [entry], {
@@ -41,7 +42,13 @@ try {
     throw new Error(`default condition selected ${nodeRuntime}, expected node`);
   }
 
-  runTjs(["bundle", "--conditions=txiki", entry, bundle], { bin: resolveTjsBundleBin() });
+  // The proof fixture is plain ESM with no `tjs:` imports, so the production
+  // define/target set would only add noise — `conditions` is the thing on trial.
+  await bundleForTxiki(entry, bundle, {
+    minifyIdentifiers: false,
+    minifySyntax: false,
+    define: {},
+  });
   const bundleText = readFileSync(bundle, "utf8");
   if (bundleText.includes('runtime = "node"')) {
     throw new Error("txiki bundle retained default runtime implementation");

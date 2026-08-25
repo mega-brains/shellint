@@ -22,7 +22,24 @@ with one worker). The oxlint step lints **shellint's own source only** —
 `server/`, `web/`, `scripts/`, `shared/`, `e2e/` — and **never Shelly device
 code**, which has its own five-tier engine in `server/lint/`; see the
 Project-source lint row below. It also caps cyclomatic complexity at 20;
-`check:lines` is the one place the 500-line limit lives.
+`check:lines` is the one place the 500-line limit lives. `npm run beforeCommit`
+is exactly equivalent — see the `vendor/` paragraph below for why that had to be
+made true.
+
+**CI (M27).** `.github/workflows/ci.yml` runs that same one command on
+`ubuntu-latest` **and** `macos-latest`, provisioning `tjs` through
+`.github/actions/setup-tjs` (a thin wrapper over `scripts/vendor-txiki.mjs`, so
+CI and a laptop share one pinned path) and setting `PW_CHANNEL=bundled` — the
+Playwright default is *system* Chrome, which no runner has, and the default must
+stay that way because the `-darwin` design baselines were shot against it.
+`release.yml` builds one executable per platform on a `v*` tag → **draft**
+release, asserting each stays under 5 MB and boots. `pages.yml` is gated on CI
+via `workflow_run`, so a red `main` cannot publish. **Design baselines have to
+exist twice** — `-chromium-darwin` (shot locally, committed) and
+`-chromium-linux`, which **does not exist yet**: it can only be shot by a
+`workflow_dispatch` run on a pushed repo (M29 phase E2), so until then the
+ubuntu leg fails on `design.spec.ts`. Once it lands, every deliberate design
+change has to refresh both — that dual refresh is the one recurring tax CI adds.
 
 Opt-in and deliberately outside that gate: `mise run test:e2e:lightpanda` runs
 the 11 of 31 tests that need neither layout nor screenshots against
@@ -67,7 +84,8 @@ process-per-test, for when a failure smells like cross-test module state.
 
 | Layer | Choice |
 |---|---|
-| Runtime | Node 22 via mise by default; txiki.js v26.6.0 through conditional runtime and builder adapters. Both `tjs` binaries are vendored (gitignored `vendor/txiki/`) and pinned in `mise.toml`. `SHELLINT_TJS_BIN` is the slim `min` profile — no FFI, no TLS, ~2.0 MB — from the [`lukasMega/txiki.js-with-slim-builds`](https://github.com/lukasMega/txiki.js-with-slim-builds/releases/tag/slim-v26.6.0-6) release (tag `slim-v26.6.0-6`), not a locally built fork, because that binary is what `tjs compile` embeds in the shipped executable. It drops the `bundle`, `eval`, `serve`, `test` and `app` **subcommands** (the `tjs.serve` *API* is still there, which is all the capability probe needs), so `SHELLINT_TJS_BUNDLE_BIN` carries the full upstream `saghul/txiki.js` v26.6.0 build for the one `tjs bundle` step |
+| Runtime | Node 22 via mise by default; txiki.js v26.6.0 through conditional runtime and builder adapters. **One** `tjs` binary, vendored (gitignored `vendor/txiki/`): the slim `min` profile — no FFI, no TLS, ~2.0 MB — from the [`lukasMega/txiki.js-with-slim-builds`](https://github.com/lukasMega/txiki.js-with-slim-builds/releases/tag/slim-v26.6.0-6) release (tag `slim-v26.6.0-6`), not a locally built fork, because that binary is what `tjs compile` embeds in the shipped executable. It drops the `bundle`, `eval`, `serve`, `test` and `app` **subcommands** (the `tjs.serve` *API* is still there, which is all the capability probe needs). Bundling therefore does **not** use `tjs bundle` — see the Bundling row |
+| Bundling (txiki) | `scripts/txiki-bundle.mjs` → the repo's own **esbuild** devDep, not `tjs bundle`. Forced, not preferred: `__TJS_BUNDLER__` is compiled out of *every* slim profile (tested — `slim-tls` and `slim-ffi-tls` reject `bundle` too, it is a switch independent of TLS) and upstream `saghul/txiki.js` v26.6.0 publishes **no Linux asset at all**, so no released txiki binary anywhere can bundle on Linux and CI could never run there. `tjs bundle` was only ever a wrapper that downloads esbuild into `~/.tjs/` and shells out. Equivalence measured 2026-08-25: identical 6.3 MB bundle, `tjs compile` output 4,506,842 B vs 4,506,881 B — **39 bytes** — and the executable boots and serves. Two flags `tjs bundle` supplied implicitly are now explicit: `format: "esm"` (default `iife` rejects the top-level `await` in `server/index.txiki.ts`) and `external: ["tjs:*"]` |
 | Task runner | mise (`start`/`dev`, `build`, `oxlint`, `lint`, `test`, `beforeCommit`, `probe`, `clean`) |
 | Device compile | `tsc` → ES5, `module: none`, `noEmitHelpers`, `noLib` + `types: []` |
 | Env gating | `meta.env` DCE → `*.raw.js`; then Terser minify → `*.js`; prod also shortens log strings into `dist/prod.logmap.json`, which the logs panel re-expands (M13) |
@@ -115,7 +133,7 @@ mise run beforeCommit     # oxlint → check:lines → typecheck → build:gate 
 mise run build:gate       # oxlint + fixture device build + web bundle (what the gate builds)
 mise run typecheck:script # typecheck your live scripts/main.ts (outside the gate)
 mise run start            # shellint server (alias: mise run dev)
-mise run vendor:txiki     # fetch/verify the pinned vendor/txiki pair (--force, --check)
+mise run vendor:txiki     # fetch/verify the pinned vendor/txiki/tjs (--force, --check)
 mise run build:txiki      # bundle txiki server and CLI entries
 mise run start:txiki      # start the txiki server bundle
 mise run test:txiki       # capabilities and Node/txiki HTTP parity
@@ -129,20 +147,25 @@ mise run profile:txiki
 mise run clean
 ```
 
-Also available via `npm run …` (`build:shelly`, `build:web`, `dev`, `beforeCommit`, …).
-`vendor/` is gitignored and both binaries are pinned by repo-relative path, so a
-fresh clone (or anything that wipes `vendor/`) has no `tjs` at all — that is what
-`scripts/vendor-txiki.mjs` fixes: pinned tags + sha256 of the extracted binary,
-darwin-arm64 only (upstream publishes no Linux asset for the bundler half).
-`build:txiki`, `build:txiki:executable` and `test:txiki` all depend on it, and a
-re-run with both binaries present spawns `--version` and touches no network.
-Set `SHELLINT_TJS_BIN` when `tjs` is not on `PATH` — it still overrides the
-vendored default, and a repo-relative value is resolved against the repo root
-(`scripts/txiki-test-util.mjs`), so moving the checkout does not break it.
-`SHELLINT_TJS_VERSION` is asserted against `--version` for *every* bin used, the
-bundler included. `tjs bundle` fetches esbuild into `~/.tjs/` on first use, so
-that step wants network and the TLS-capable full build. txiki needs bundles under
-`.txiki/`; npm installation, TypeScript, and Playwright stay on Node.
+Also available via `npm run …` (`build:shelly`, `build:web`, `dev`, `beforeCommit`, …)
+— and those spellings are **fully equivalent**: `scripts/txiki-test-util.mjs`
+holds the `TJS_VERSION` pin and falls back to `vendor/txiki/tjs` on its own, so
+nothing needs mise's `[env]` block. Until 2026-08-25 it did, and `npm run
+beforeCommit` died in a fresh shell with `txiki.js executable missing`.
+`vendor/` is gitignored, so a fresh clone (or anything that wipes `vendor/`) has
+no `tjs` at all — that is what `scripts/vendor-txiki.mjs` fixes: one pinned tag
++ sha256 of the extracted binary, for darwin-arm64, linux-x64 and win32-x64.
+**Only darwin-arm64 has ever been executed here**; the other two are
+digest-verified but unrun, and the first CI run on each is what proves them.
+darwin-x64 is absent because the slim release publishes no macOS x86_64 asset in
+any profile. `build:txiki`, `build:txiki:executable` and `test:txiki` all depend
+on it, and a re-run with the binary present spawns `--version` and touches no
+network. `SHELLINT_TJS_BIN` overrides the vendored default (a repo-relative
+value resolves against the repo root, so moving the checkout does not break it)
+and `SHELLINT_TJS_VERSION` overrides the pin; both are conveniences, not
+requirements. The version is asserted against `--version` for every bin used.
+txiki needs bundles under `.txiki/`; npm installation, TypeScript, and
+Playwright stay on Node.
 Build config: `tsconfig.shelly.base.json` (device compiler options; extended by
 `tsconfig.shelly.script.json` for `scripts/main.ts`, `tsconfig.shelly.fixture.json`
 for the gate's fixture, and by the config `build-shelly.mjs` generates for a

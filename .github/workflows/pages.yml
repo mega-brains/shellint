@@ -3,9 +3,16 @@ name: Deploy shellint static site
 # M17.8 — builds offline device-less shellint (scripts/build-static.mjs)
 # and publishes site/ to GitHub Pages. Independent of the server build; this
 # workflow never touches web/dist/ or dist/.
+#
+# M27 §7.2 — gated on CI rather than triggered by the push directly, so a red
+# main cannot publish. `workflow_run` was chosen over inlining part of the gate
+# here: re-running even the cheap half would duplicate work CI has already done,
+# and inlining the full one would double the e2e cost for no extra signal.
 on:
-  push:
+  workflow_run:
+    workflows: [CI]
     branches: [main]
+    types: [completed]
   workflow_dispatch:
 
 permissions:
@@ -22,6 +29,12 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # A `workflow_run` fires on failure too, so the conclusion has to be
+    # checked explicitly. `workflow_dispatch` has no source run and must still
+    # be allowed through.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event.workflow_run.conclusion == 'success'
     steps:
       - uses: actions/checkout@v4
 

@@ -1,0 +1,73 @@
+name: CI
+
+# M27 — the full local gate, on both runners. See
+# .claude/plans/2026-08-18_27_ci-deploy.md.
+#
+# One `run:` for the whole gate, deliberately: `npm run beforeCommit` is the
+# same chain a developer runs (oxlint → check:lines → typecheck → build:gate →
+# build:static → test → test:e2e → test:e2e:txiki), so there is no CI-only test
+# list to drift out of sync with it.
+#
+# Neither e2e suite touches a device — device-switch.spec.ts and
+# probe-required.spec.ts mock, and the gate compiles fixtures/device/main.ts in
+# a per-runner .tmp/ workspace, never scripts/main.ts. So CI is safe without
+# hardware and cannot write to anyone's Shelly.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  gate:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - uses: ./.github/actions/setup-tjs
+        with:
+          node-version: ""   # already set up above
+
+      # PW_CHANNEL=bundled below opts e2e/playwright.config.ts out of its
+      # default `channel: "chrome"`, which is system Chrome and does not exist
+      # on a runner. The darwin design baselines were shot against system
+      # Chrome, so the default must stay as it is and CI must opt out, not the
+      # other way round — that inversion was shipped once and reverted in
+      # d332ed4.
+      - run: npx playwright install --with-deps chromium
+
+      - run: npm run beforeCommit
+        env:
+          PW_CHANNEL: bundled
+          SHELLINT_REPO: ${{ github.repository }}
+
+      # Screenshot diffs are unreadable from logs; design.spec.ts failures are
+      # only diagnosable from the report.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-${{ matrix.os }}
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
+          if-no-files-found: ignore
