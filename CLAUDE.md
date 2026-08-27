@@ -15,7 +15,7 @@ tracked summary.
 - read [plans-in-project-dir](./.claude/memory/plans-in-project-dir.md)
 
 
-## Status: M0–M4 basic · M5–M10 done (lint Tier 1–5, incl. connected Tier 4) · M11 type-layer bans · M12 dashboard metrics · post-M12 UI (editor sidebar, permanent check indicator) · M13 tier-3 minify, prod log map, 104-probe capability run, artifact preview · M14 web bundle size (minify, CSS bundle, precompressed assets) · M14b device-pipeline minify knobs + `bench/` corpus · M15 multi-device + multi-script slot selection (device CRUD, digest auth, header device/slot pickers, per-device profile/probe mirroring) · M17 static GitHub Pages build (`site/`, offline, device-less) · M18 UI redesign (dark/light tokens, readiness rail, inspector tabs, measure-row grammar, fixed dock, shared modal frame) · M21 Node + txiki dual-runtime server and CLI
+## Status: M0–M4 basic · M5–M10 done (lint Tier 1–5, incl. connected Tier 4) · M11 type-layer bans · M12 dashboard metrics · post-M12 UI (editor sidebar, permanent check indicator) · M13 tier-3 minify, prod log map, 104-probe capability run, artifact preview · M14 web bundle size (minify, CSS bundle, precompressed assets) · M14b device-pipeline minify knobs + `bench/` corpus · M15 multi-device + multi-script slot selection (device CRUD, digest auth, header device/slot pickers, per-device profile/probe mirroring) · M17 static GitHub Pages build (`site/`, offline, device-less) · M18 UI redesign (dark/light tokens, readiness rail, inspector tabs, measure-row grammar, fixed dock, shared modal frame) · M21 Node + txiki dual-runtime server and CLI · M29 published at [mega-brains/shellint](https://github.com/mega-brains/shellint) (history rewritten, Pages live, CI green on both runners, `v0.0.1` released)
 
 Prefer **mise** tasks ([`mise.toml`](./mise.toml)). Verify with `ls` / `mise tasks`
 before assuming entrypoints exist.
@@ -40,12 +40,16 @@ Playwright default is *system* Chrome, which no runner has, and the default must
 stay that way because the `-darwin` design baselines were shot against it.
 `release.yml` builds one executable per platform on a `v*` tag → **draft**
 release, asserting each stays under 5 MB and boots. `pages.yml` is gated on CI
-via `workflow_run`, so a red `main` cannot publish. **Design baselines have to
-exist twice** — `-chromium-darwin` (shot locally, committed) and
-`-chromium-linux`, which **does not exist yet**: it can only be shot by a
-`workflow_dispatch` run on a pushed repo (M29 phase E2), so until then the
-ubuntu leg fails on `design.spec.ts`. Once it lands, every deliberate design
+via `workflow_run`, so a red `main` cannot publish. **Design baselines exist
+twice** — `-chromium-darwin` (shot locally) and `-chromium-linux` (bootstrapped
+2026-08-28 from the first CI run's `-actual` output, which is the only way to
+get them). Both are committed and both legs are green. Every deliberate design
 change has to refresh both — that dual refresh is the one recurring tax CI adds.
+
+`release.yml`'s checksum step must stay tool-agnostic: Windows' Git Bash has
+`sha256sum` and no `shasum`, macOS the reverse. It ran `shasum` alone once and
+failed the whole Windows row *after* the binary had built, passed the 5 MB
+assert and served a request.
 
 Opt-in and deliberately outside that gate: `mise run test:e2e:lightpanda` runs
 the 11 of 31 tests that need neither layout nor screenshots against

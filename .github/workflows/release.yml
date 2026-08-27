@@ -93,8 +93,17 @@ jobs:
           kill "$pid" 2>/dev/null || true
           exit 1
 
+      # Windows' Git Bash ships sha256sum but no shasum; macOS ships shasum but
+      # no sha256sum. Neither name is portable on its own — this step failed the
+      # whole Windows row once with `shasum: command not found`, after the
+      # binary had already built, passed the size assert and served a request.
       - name: Checksum
-        run: shasum -a 256 "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
+        run: |
+          if command -v shasum >/dev/null 2>&1; then
+            shasum -a 256 "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
+          else
+            sha256sum "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
+          fi
 
       - uses: actions/upload-artifact@v4
         with:

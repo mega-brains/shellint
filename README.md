@@ -217,9 +217,14 @@ pages, and the [changelog](https://shelly-api-docs.shelly.cloud/gen2/changelog)
 
 ## Status
 
-Working and in daily use by its author against real hardware. Pre-1.0: no
-release has been tagged yet, the API surface may move, and only macOS arm64 has
-been exercised end to end — Linux and Windows are built by CI but unproven.
+Working and in daily use by its author against real hardware. Pre-1.0: the API
+surface may move. `v0.0.1` is the first tagged release.
+
+The full gate (lint, typecheck, build, unit tests, and the e2e suite on both the
+Node server and the txiki executable) runs green on macOS and Linux in CI. Each
+release binary is built, size-asserted under 5 MB and boot-tested on its own
+platform, but only macOS arm64 has been exercised end to end by a human — treat
+the Linux and Windows binaries as working-but-unproven.
 
 ## Trademark
 
