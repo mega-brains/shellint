@@ -40,13 +40,21 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
 
       - run: npm ci
 
+      # COLLECTOR_ORIGIN is a repository *variable* (Settings → Secrets and
+      # variables → Actions → Variables), not a secret: it is baked into the
+      # published HTML as a `<script src>` any visitor can read, so hiding it
+      # would be theatre. It is kept out of the tree only so the source does not
+      # advertise the host. Unset — the default, and every fork — builds the
+      # site with no beacon at all; see withBeacon() in build-static.mjs.
       - run: npm run build:static
         env:
           SHELLINT_REPO: ${{ github.repository }}
+          COLLECTOR_ORIGIN: ${{ vars.COLLECTOR_ORIGIN }}
+          COLLECTOR_SITE_ID: ${{ vars.COLLECTOR_SITE_ID }}
 
       - uses: actions/upload-pages-artifact@v3
         with:

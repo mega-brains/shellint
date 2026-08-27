@@ -73,6 +73,54 @@ const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const siteDir = join(root, "site");
 const demoDir = join(siteDir, "demo");
 
+// ------------------------------------------------------- analytics beacon
+//
+// Origin of a deployed cookieless pageview collector, e.g.
+// `https://stats.example.com`. Read from the environment and deliberately NOT
+// hardcoded — not even split across expressions, which would still reconstruct
+// the host for anyone reading this file. Unset (the default, and every fork)
+// omits the beacon entirely, so `site/` builds and works with no analytics
+// rather than emitting a tag that 404s on every page.
+//
+// This only keeps the host out of *git*. Whatever value is set at build time is
+// baked into the published HTML as a `<script src>` every visitor can read — a
+// browser beacon URL cannot be secret. Point a custom domain at the collector if
+// the origin itself should stay unadvertised.
+//
+// Scheme is optional in the env var: a bare `stats.example.com` would otherwise
+// build a *relative* `<script src>` that resolves against the Pages host and
+// 404s, with no build error.
+const COLLECTOR_RAW = process.env.COLLECTOR_ORIGIN?.trim().replace(/\/+$/, "");
+const COLLECTOR = COLLECTOR_RAW
+  ? /^https?:\/\//.test(COLLECTOR_RAW)
+    ? COLLECTOR_RAW
+    : `https://${COLLECTOR_RAW}`
+  : undefined;
+
+// Must be an id the collector already knows: an unlisted id resolves to null and
+// the beacon then returns the same response while writing nothing, so a typo
+// here is silent. Verify against the collector, not against this file.
+const SITE_ID = process.env.COLLECTOR_SITE_ID ?? "shellint";
+
+/**
+ * Inject the beacon before `</head>`. No-op when COLLECTOR is unset, which is
+ * the default everywhere except the Pages deploy — so the local build, the
+ * gate's `test-static-bundle.mjs` byte budgets and a fork's output are all
+ * unchanged by this. `defer` so it never blocks first paint; the tag is
+ * cross-origin, so offline (the demo is a service-worker app) it simply fails
+ * to load and the page is unaffected.
+ */
+function withBeacon(html) {
+  if (!COLLECTOR) return html;
+  const tag = `    <script defer src="${COLLECTOR}/s.js" data-site="${SITE_ID}"></script>\n  </head>`;
+  const out = html.replace("</head>", tag);
+  if (out === html) {
+    console.error("FAIL: build-static.mjs found no </head> to inject the analytics beacon into");
+    process.exit(1);
+  }
+  return out;
+}
+
 rmSync(siteDir, { recursive: true, force: true });
 mkdirSync(siteDir, { recursive: true });
 mkdirSync(demoDir, { recursive: true });
@@ -174,7 +222,10 @@ const htmlOut = join(demoDir, "index.html");
     console.error("FAIL: web/index.html has no </head> or </body> to inject into");
     process.exit(1);
   }
-  writeFileSync(htmlOut, withSw);
+  // Before the sw.js precache hash below, which is computed over this file —
+  // so enabling the beacon busts the service-worker cache like any other
+  // change to the shell, instead of leaving repeat visitors on a stale copy.
+  writeFileSync(htmlOut, withBeacon(withSw));
 }
 
 writeFileSync(join(siteDir, ".nojekyll"), "");
@@ -263,7 +314,7 @@ await esbuild.build(
     sourcemap: false,
     logLevel: "info",
     define: {
-      __SHELLINT_REPO__: JSON.stringify(process.env.SHELLINT_REPO || "MegaS0ft/shellint"),
+      __SHELLINT_REPO__: JSON.stringify(process.env.SHELLINT_REPO || "mega-brains/shellint"),
     },
   }),
 );
@@ -277,12 +328,15 @@ await esbuild.build({
   logLevel: "info",
 });
 
-// web/site/{index,download}.html are shipped verbatim: they already carry
-// their own `<link href="./site.css">` and `<script src="./site.js">` tags
-// (unlike demo/index.html, there is no server-shared shell to inject markup
-// into here), so this is a plain copy, not a template step.
-copyFileSync(join(root, "web", "site", "index.html"), join(siteDir, "index.html"));
-copyFileSync(join(root, "web", "site", "download.html"), join(siteDir, "download.html"));
+// web/site/{index,download}.html already carry their own
+// `<link href="./site.css">` and `<script src="./site.js">` tags (unlike
+// demo/index.html, there is no server-shared shell to inject markup into here),
+// so this is a read-through, not a template step — the only edit is the
+// analytics beacon, and with COLLECTOR_ORIGIN unset it is a byte-for-byte copy.
+for (const page of ["index.html", "download.html"]) {
+  const src = readFileSync(join(root, "web", "site", page), "utf8");
+  writeFileSync(join(siteDir, page), withBeacon(src));
+}
 
 // The only images the site ships (M26 plan §5) — the landing hero screenshot
 // in both themes, since web/site/landing.tsx picks one off the visitor's
