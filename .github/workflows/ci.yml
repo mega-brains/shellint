@@ -38,7 +38,7 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           cache: npm
 
       - run: npm ci
@@ -51,8 +51,7 @@ jobs:
       # default `channel: "chrome"`, which is system Chrome and does not exist
       # on a runner. The darwin design baselines were shot against system
       # Chrome, so the default must stay as it is and CI must opt out, not the
-      # other way round — that inversion was shipped once and reverted in
-      # d332ed4.
+      # other way round — that inversion was shipped once and reverted.
       - run: npx playwright install --with-deps chromium
 
       - run: npm run beforeCommit

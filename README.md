@@ -13,7 +13,7 @@ is built around that.
 
 ![shellint](./shellint-header.png)
 
-**[Try it in your browser →](https://megas0ft.github.io/shellint/)** — the same
+**[Try it in your browser →](https://mega-brains.github.io/shellint/)** — the same
 UI, no server and no device, running the real compiler and the real check engine
 in a web worker. The 14 checks that need a device report `skipped`, never a
 false `pass`.
@@ -132,7 +132,7 @@ Every one is available as `npm run …` too, with identical behaviour.
 
 ## Optional txiki.js runtime
 
-Node 22 is the default. [txiki.js](https://github.com/saghul/txiki.js) `v26.6.0`
+Node 24 is the default. [txiki.js](https://github.com/saghul/txiki.js) `v26.6.0`
 is supported as an opt-in server and CLI runtime — it runs a bundle, because
 txiki resolves no npm packages and parses no TypeScript.
 
@@ -178,6 +178,19 @@ The *syntax* half of tier 1 is different: it needs no custom rule code at all.
 flat config you can copy into your own Shelly script repo, so your editor and CI
 flag the same dialect bans. It is a template — shellint neither installs nor
 runs ESLint.
+
+## Analytics
+
+The **hosted demo site only** may carry a cookieless pageview beacon — no
+cookies, no cross-site identifiers, nothing that follows you off the page. It is
+build-time opt-in: `scripts/build-static.mjs` injects it only when
+`COLLECTOR_ORIGIN` is set, which happens in this repo's Pages deploy and
+nowhere else.
+
+The tool itself never phones home. A local `mise run start`, a self-built
+`site/`, a release binary and every fork build with no beacon at all — the
+default is off, and there is no opt-out to configure because there is nothing
+to opt out of.
 
 ## Contributing
 

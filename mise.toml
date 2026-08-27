@@ -1,18 +1,10 @@
 [tools]
-node = "22"
+node = "24"
 
 [env]
-# Both vars are *overrides*, not the source of truth: scripts/txiki-test-util.mjs
-# pins TJS_VERSION and falls back to vendor/txiki/tjs on its own, so `npm run …`
-# works without mise. They stay here so that pointing mise at a local build is a
-# one-line edit. The path is repo-relative and gitignored — see /vendor/ in
-# .gitignore; `mise run vendor:txiki` is what fills it.
-#
-# The binary is the slim `min` build (no FFI, no TLS) from the
-# lukasMega/txiki.js-with-slim-builds release `slim-v26.6.0-6`, because that is
-# what `tjs compile` embeds in the shipped executable. It has no `tjs bundle`
-# subcommand and does not need one: bundling runs on the repo's own esbuild
-# devDep (scripts/txiki-bundle.mjs).
+# Overrides, not the source of truth: txiki-test-util.mjs pins the version and
+# falls back to vendor/txiki/tjs, so `npm run …` works without mise. Path is
+# repo-relative and gitignored; `mise run vendor:txiki` fills it.
 SHELLINT_TJS_VERSION = "26.6.0"
 SHELLINT_TJS_BIN = "vendor/txiki/tjs"
 
@@ -34,7 +26,7 @@ description = "Build web UI bundle"
 run = "npm run build:web"
 
 [tasks."vendor:txiki"]
-description = "Fetch/verify the pinned txiki.js pair in gitignored vendor/txiki (SHELLINT_TJS_BIN + _BUNDLE_BIN); --force refetches, --check verifies without network"
+description = "Fetch/verify the pinned txiki.js binary in gitignored vendor/txiki (SHELLINT_TJS_BIN); --force refetches, --check verifies without network"
 run = "npm run vendor:txiki -- \"$@\""
 
 [tasks."build:txiki"]
