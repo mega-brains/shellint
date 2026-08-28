@@ -33,6 +33,13 @@ No device required. With none configured, shellint starts read-only: editor,
 compiler, sizes and the offline check tiers all work; the device panels are
 inert.
 
+Or grab a release binary — one file, no Node, under 5 MB:
+
+```bash
+curl -fsSL -O https://github.com/mega-brains/shellint/releases/latest/download/shellint-macos-arm64.zip
+unzip shellint-macos-arm64.zip && chmod +x shellint && ./shellint
+```
+
 ## ⚠️ Security — read this before exposing it
 
 **shellint has no authentication of its own.** Anyone who can reach the port can
@@ -63,44 +70,51 @@ something.
 the *whole* library, since the device compile runs `noLib` with `types: []`.
 CodeMirror 6 editor, hover docs, type errors and check findings on the gutter.
 
-**Build.** `tsc` → ES5, `module: none`, flat emit, then `meta.env` dead-code
-elimination → Terser → optionally `espruino --minify`, producing
-`dist/{debug,prod}.{raw.js,js,adv.js}`. Production builds also shorten log
-strings and ship a map the logs panel re-expands, so prod logs stay readable.
-Any built artifact can be previewed read-only in the editor, including a
-unified `debug ↔ prod` diff.
+**Build.** `tsc` → ES5, flat emit, then `meta.env` dead-code elimination →
+Terser → optionally `espruino --minify`, producing
+`dist/{debug,prod}.{raw.js,js,adv.js}`. Production builds shorten log strings and
+ship a map the logs panel re-expands. Any artifact previews read-only in the
+editor, including a unified `debug ↔ prod` diff.
 
-**Checks.** 66 named checks in five tiers plus a post-compile dialect guard, run
-by **Check**. Every run reports pass / warn / fail / **skipped** per rule with a
-one-line rationale, and a script that does not parse or does not type-check says
-so instead of quietly passing over a recovered AST. Tiers 1–3 are offline; tier
-4 needs a device profile; the capability probe adds `probe-absent-api` from 104
-`Script.Eval` expressions run against real hardware. Two of the tier-3 findings
-carry autofixes, previewed as a diff before they apply.
+**Checks.** 66 named checks in five tiers plus a post-compile dialect guard.
+Every run reports pass / warn / fail / **skipped** per rule with a one-line
+rationale; a script that does not parse or type-check says so instead of quietly
+passing over a recovered AST. Tiers 1–3 are offline; tier 4 needs a device
+profile; the capability probe adds `probe-absent-api` from 104 `Script.Eval`
+expressions run against real hardware. Two tier-3 findings carry autofixes,
+previewed as a diff.
 
-**Dashboard.** Artifact sizes against the device caps, script counters (Shelly
-API calls, timers, strings, HTTP requests, logs) with click-to-highlight back
-into the source, a static **RAM estimate** from a JsVar cost model drawn against
-the device's measured `mem_peak` so the error stays visible, the **minimum
+**Dashboard.** Artifact sizes against the device caps, script counters with
+click-to-highlight back into the source, a static **RAM estimate** from a JsVar
+cost model drawn against the device's measured `mem_peak`, the **minimum
 firmware** the script's API use requires, and size + estimate over recent builds.
 
 **Device.** Deploy over WS `PutCode` — debug or prod, minified or raw. Live
 telemetry (script mem/cpu, RAM/FS, latency, RSSI), an eco toggle, and a streamed
-`ws://<ip>/debug/log` console. Numeric series chart themselves from a print
-convention:
+`ws://<ip>/debug/log` console. Numeric series chart themselves from
+`print("#m <series> <value>")`, in hand-rolled inline SVG — no charting
+dependency. Multiple devices and script slots switch from the header pickers
+(digest auth supported); switching is server-global and resets the device panel
+and log stream, so two devices' data never blend.
 
-```js
-print("#m temp " + tC); // "#m <series> <value>"
+## Commands
+
+```bash
+mise run start            # server (alias: dev)
+mise run build            # device artifacts + web bundle
+mise run test             # unit + smoke; accepts a name filter
+mise run deploy -- debug min    # or: prod raw
+mise run probe            # 104 capability probes → types/generated-probe.json
+mise run profile          # cache device capabilities for the tier-4 checks
+mise run beforeCommit     # the full gate: lint, lines, typecheck, build, test, e2e ×2
+mise run build:static     # the offline site/ build
 ```
 
-Charts are hand-rolled inline SVG — no charting dependency.
+Every one is available as `npm run …` too, with identical behaviour.
+`mise tasks` lists the rest.
 
-**Multiple devices and slots.** Add devices from the header picker; a second
-picker switches the active script slot on the active device. Digest auth is
-supported. Switching is server-global — this is a single-operator tool — and
-resets the device panel and log stream so two devices' data never blend.
-
-## Configuration
+<details>
+<summary><strong>Configuration</strong></summary>
 
 `shellint.json` at the repo root:
 
@@ -113,24 +127,10 @@ resets the device panel and log stream so two devices' data never blend.
 Devices are not configured here — add one from the UI's header picker
 (`+ Add device…`), which writes `.shellint/devices.json`.
 
-## Commands
+</details>
 
-```bash
-mise run build            # device artifacts + web bundle
-mise run start            # server (alias: dev)
-mise run check:lines      # source files ≤ 500 raw lines
-mise run test             # unit + smoke; accepts a name filter
-mise run deploy -- debug min    # or: prod raw
-mise run probe            # 104 capability probes → types/generated-probe.json
-mise run profile          # cache device capabilities for the tier-4 checks
-mise run beforeCommit     # the full gate: lint, lines, typecheck, build, test, e2e ×2
-mise run build:static     # the offline site/ build
-```
-
-Every one is available as `npm run …` too, with identical behaviour.
-`mise tasks` lists the rest.
-
-## Optional txiki.js runtime
+<details>
+<summary><strong>Optional txiki.js runtime and the standalone executable</strong></summary>
 
 Node 24 is the default. [txiki.js](https://github.com/saghul/txiki.js) `v26.6.0`
 is supported as an opt-in server and CLI runtime — it runs a bundle, because
@@ -144,46 +144,33 @@ it — that runs on the repo's own esbuild.
 mise run vendor:txiki          # pinned tag + sha256; --force refetch, --check offline verify
 mise run build:txiki
 mise run start:txiki
+mise run build:txiki:executable && ./.txiki/shellint
 ```
 
 `build:txiki`, `build:txiki:executable` and `test:txiki` all depend on the
 vendor step, so a fresh clone needs no separate command, and none of them
-require mise. Binaries are pinned for darwin-arm64, linux-x64 and win32-x64
-(only the first has been run by the maintainer); elsewhere point
-`SHELLINT_TJS_BIN` at your own build — a repo-relative value resolves against
-the repo root.
+require mise. Binaries are pinned for darwin-arm64, linux-x64 and win32-x64;
+elsewhere point `SHELLINT_TJS_BIN` at your own build (a repo-relative value
+resolves against the repo root).
 
-One standalone native executable, under 5 MB, no Node required:
-
-```bash
-mise run build:txiki:executable
-./.txiki/shellint
-```
-
-Releases ship that same binary as a one-file zip per platform —
+Releases ship that executable as a one-file zip per platform —
 `shellint-macos-arm64.zip`, `shellint-linux-x64.zip`,
-`shellint-windows-x64.zip`:
-
-```bash
-curl -fsSL -O https://github.com/mega-brains/shellint/releases/latest/download/shellint-macos-arm64.zip
-unzip shellint-macos-arm64.zip
-chmod +x shellint && ./shellint
-```
-
-It embeds the runtime, the server bundle and the browser assets, so the UI works
-with no checkout beside it. On first run in an empty directory it writes the
-files it has to be able to read back — `templates/main.example.ts`, the three
-`types/*.d.ts` that are the entire stdlib for device code, and `scripts/main.ts`
-from that template — and never overwrites one that already exists.
+`shellint-windows-x64.zip`. It embeds the runtime, the server bundle and the
+browser assets, so the UI works with no checkout beside it. On first run in an
+empty directory it writes the files it has to be able to read back —
+`templates/main.example.ts`, the three `types/*.d.ts` that are the entire stdlib
+for device code, and `scripts/main.ts` from that template — and never overwrites
+an existing one.
 
 shellint is still a workspace tool after that: `shellint.json`, `scripts/`,
-`dist/` and `.shellint/` live in the launch directory, which is where your work
-belongs. The peer CLI tasks are `deploy:txiki`, `probe:txiki`, `profile:txiki`
-and `test:txiki`.
+`dist/` and `.shellint/` live in the launch directory. Peer CLI tasks are
+`deploy:txiki`, `probe:txiki`, `profile:txiki` and `test:txiki`. npm install,
+TypeScript and Playwright stay on Node.
 
-npm install, TypeScript and Playwright stay on Node.
+</details>
 
-## Using the checks in your own editor
+<details>
+<summary><strong>Using the checks in your own editor</strong></summary>
 
 shellint's checks are hand-rolled TypeScript-AST passes, not lint rules — none
 of the cooperative scheduler, the RAM budget, `Shelly.*` existence or the live
@@ -195,26 +182,25 @@ flat config you can copy into your own Shelly script repo, so your editor and CI
 flag the same dialect bans. It is a template — shellint neither installs nor
 runs ESLint.
 
-## Analytics
+</details>
+
+<details>
+<summary><strong>Analytics</strong></summary>
 
 The **hosted demo site only** may carry a cookieless pageview beacon — no
 cookies, no cross-site identifiers, nothing that follows you off the page. It is
 build-time opt-in: `scripts/build-static.mjs` injects it only when
-`COLLECTOR_ORIGIN` is set, which happens in this repo's Pages deploy and
-nowhere else.
+`COLLECTOR_ORIGIN` is set, which happens in this repo's Pages deploy and nowhere
+else.
 
 The tool itself never phones home. A local `mise run start`, a self-built
 `site/`, a release binary and every fork build with no beacon at all — the
-default is off, and there is no opt-out to configure because there is nothing
-to opt out of.
+default is off, and there is nothing to opt out of.
 
-## Contributing
+</details>
 
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Short version: `mise run
-beforeCommit` must be green, source files stay under 500 lines, and design
-changes need baselines refreshed on both macOS and Linux.
-
-## Reference
+<details>
+<summary><strong>Reference — Shelly documentation</strong></summary>
 
 Shelly's own documentation is the authority on what the device accepts —
 in particular the
@@ -231,16 +217,24 @@ and [debug logs](https://shelly-api-docs.shelly.cloud/gen2/General/DebugLogs)
 pages, and the [changelog](https://shelly-api-docs.shelly.cloud/gen2/changelog)
 — the API moves.
 
+</details>
+
 ## Status
 
 Working and in daily use by its author against real hardware. Pre-1.0: the API
-surface may move. `v0.0.1` is the first tagged release.
+surface may move.
 
 The full gate (lint, typecheck, build, unit tests, and the e2e suite on both the
 Node server and the txiki executable) runs green on macOS and Linux in CI. Each
 release binary is built, size-asserted under 5 MB and boot-tested on its own
 platform, but only macOS arm64 has been exercised end to end by a human — treat
 the Linux and Windows binaries as working-but-unproven.
+
+## Contributing
+
+See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Short version: `mise run
+beforeCommit` must be green, source files stay under 500 lines, and design
+changes need baselines refreshed on both macOS and Linux.
 
 ## Trademark
 
