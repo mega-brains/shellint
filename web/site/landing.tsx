@@ -117,6 +117,76 @@ const FEATURES: { title: string; body: string }[] = [
   },
 ];
 
+/**
+ * The guided tour under the feature cards: one region of the real UI per row,
+ * with the copy that says what it is for.
+ *
+ * `figs` names crops under `site/figures/`, cut out of the same two hero
+ * screenshots by `scripts/crop-docs-figures.mjs` — so a tour image can never
+ * drift from the hero above it, and refreshing both is one capture plus one
+ * crop run. `-dark` suffix per theme, for the reason `HeroShot` explains.
+ *
+ * A row may carry more than one crop; they sit side by side at natural size,
+ * which is how the portrait inspector column is shown without a row that is
+ * three lines of copy next to 738 px of image.
+ */
+const TOUR: { key: string; figs: { src: string; alt: string }[]; title: string; body: string }[] = [
+  {
+    key: "toolbar",
+    title: "Your device, in the title bar",
+    body: "Pick the device and the script slot, watch the run state, and build, deploy or probe from the same row. Multiple devices and slots switch here; digest auth is supported.",
+    figs: [
+      {
+        src: "toolbar",
+        alt: "shellint toolbar: device picker, script slot, run state, Save, Build + Check, Deploy and Probe",
+      },
+    ],
+  },
+  {
+    key: "rail",
+    title: "Three gates, always visible",
+    body: "Built, checked and probed — the rail says which of the three is stale before you deploy something you have not re-checked. 66/66 means every rule ran, not that every rule passed silently.",
+    figs: [{ src: "rail", alt: "Readiness rail showing not built, checked 66/66 and probed" }],
+  },
+  {
+    key: "artifacts",
+    title: "Read what actually ships",
+    body: "Every built artifact previews read-only in the editor — the DCE output, the minified output, and a unified debug ↔ prod diff that shows exactly what the environment gating removed.",
+    figs: [
+      {
+        src: "artifacts",
+        alt: "Artifact chip strip: source, debug.raw, debug.min, prod.raw, prod.min, diff",
+      },
+    ],
+  },
+  {
+    key: "inspector",
+    title: "Bytes and RAM before the flash",
+    body: "Artifact sizes against the device caps, script counters that highlight their own lines in the editor, firmware limits on registrations and strings, the minimum firmware your API use needs, and a static RAM estimate drawn against the device's measured peak.",
+    figs: [
+      {
+        src: "inspector-sizes",
+        alt: "Inspector: artifact sizes for every build, and script counters for api calls, vars, functions and strings",
+      },
+      {
+        src: "inspector-memory",
+        alt: "Inspector: caps used against their limits, the RAM estimate by bucket, and estimate versus device peak",
+      },
+    ],
+  },
+  {
+    key: "dock",
+    title: "The device, while you work",
+    body: "Script memory and CPU, RAM, filesystem, temperature and RSSI, an eco toggle, and a streamed debug log. Numeric series chart themselves from print(\"#m <series> <value>\").",
+    figs: [
+      {
+        src: "dock",
+        alt: "Device dock: firmware, run state, memory, cpu, ram, filesystem, temperature and signal readouts",
+      },
+    ],
+  },
+];
+
 const SIGNALS = [
   ["66", "checks"],
   ["6", "artifacts"],
@@ -168,6 +238,39 @@ export function Landing() {
               <span class="feature-index" aria-hidden="true">0{index + 1}</span>
               <h2>{f.title}</h2>
               <p>{f.body}</p>
+            </article>
+          ))}
+        </section>
+
+        <section class="tour" aria-labelledby="tourTitle">
+          <header class="tour-heading">
+            <p class="tour-kicker">Inside shellint</p>
+            <h2 id="tourTitle">One workspace. Every signal.</h2>
+            <p>
+              Follow script from source to device. Each surface answers one
+              practical question before code ships.
+            </p>
+          </header>
+          {TOUR.map((t, index) => (
+            <article class="tour-row" key={t.key}>
+              <div class="tour-copy">
+                <span class="tour-index" aria-hidden="true">0{index + 1}</span>
+                <div>
+                  <h3>{t.title}</h3>
+                  <p>{t.body}</p>
+                </div>
+              </div>
+              <div class="tour-shots">
+                {t.figs.map((f) => (
+                  <div class="tour-shot" key={f.src}>
+                    <img
+                      src={`./figures/${f.src}${theme === "dark" ? "-dark" : ""}.png`}
+                      alt={f.alt}
+                      loading="lazy"
+                    />
+                  </div>
+                ))}
+              </div>
             </article>
           ))}
         </section>

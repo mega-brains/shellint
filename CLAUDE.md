@@ -167,6 +167,15 @@ overwrites tracked images). Both shots come from one helper and differ only by
 `/api/stats` mock, so its sidebar read "no stats yet" against a fully populated
 dark one. Run with `PW_CHANNEL=bundled`, like the baselines.
 
+The landing page's tour crops (`.github/assets/figures/*.png`) are **derived
+from that pair**, not shot: `mise run capture:figures` →
+`scripts/crop-docs-figures.mjs` cuts fixed rectangles out of the 1620×908 hero
+with macOS `sips`, so a tour image can never drift from the hero above it and a
+re-shoot is `capture:header` followed by `capture:figures`. Rectangles are named
+in that script; `web/site/landing.tsx`'s `TOUR` names the files, and
+`scripts/build-static.mjs` copies the whole directory, so adding a figure is a
+crop entry plus a `TOUR` entry.
+
 `release.yml` builds one executable per platform on a `v*` tag → **draft**
 release, asserting each stays under 5 MB and boots. Assets ship as
 `shellint-<platform>.zip` holding one file (`shellint`, `shellint.exe` on
