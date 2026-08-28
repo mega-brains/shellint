@@ -158,6 +158,15 @@ design baselines were shot against it. Design baselines therefore exist twice,
 `-chromium-darwin` and `-chromium-linux`; both are committed and a deliberate
 design change has to refresh both.
 
+The README/landing hero pair (`.github/assets/shellint-header{,-dark}.png`) is
+shot by `mise run capture:header` → `e2e/capture/header.spec.ts` on
+`e2e/playwright.capture.config.ts` (same server and mocks as the gate config it
+extends; the gate config `testIgnore`s `capture/**` because a capture run
+overwrites tracked images). Both shots come from one helper and differ only by
+`shellint.theme` in localStorage — the earlier light shot was taken without the
+`/api/stats` mock, so its sidebar read "no stats yet" against a fully populated
+dark one. Run with `PW_CHANNEL=bundled`, like the baselines.
+
 `release.yml` builds one executable per platform on a `v*` tag → **draft**
 release, asserting each stays under 5 MB and boots. Assets ship as
 `shellint-<platform>.zip` holding one file (`shellint`, `shellint.exe` on

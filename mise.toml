@@ -139,6 +139,10 @@ run = "pnpm run test:e2e:lightpanda"
 description = "Full e2e coverage split across Lightpanda shards + Chromium (measured slower than test:e2e — see scripts/e2e-hybrid.mjs)"
 run = "pnpm run test:e2e:hybrid -- \"$@\""
 
+[tasks."capture:header"]
+description = "Re-shoot the README hero screenshots (.github/assets/shellint-header{,-dark}.png) — writes tracked PNGs, outside the gate"
+run = "pnpm run capture:header"
+
 [tasks."test:txiki"]
 description = "Typecheck and verify txiki parity"
 run = "pnpm run test:txiki"
