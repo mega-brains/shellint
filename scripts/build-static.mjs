@@ -105,6 +105,10 @@ const COLLECTOR = COLLECTOR_RAW
 // here is silent. Verify against the collector, not against this file.
 const SITE_ID = process.env.COLLECTOR_SITE_ID ?? "shellint";
 
+// Feature events (web/static/analytics.ts) need no configuration here: they go
+// through `globalThis.__da.trackEvent`, published by the same s.js this tag
+// loads, which already carries the collector origin and the site id.
+
 /**
  * Inject the beacon before `</head>`. No-op when COLLECTOR is unset, which is
  * the default everywhere except the Pages deploy — so the local build, the

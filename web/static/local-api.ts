@@ -24,6 +24,7 @@ import type { BuildResult, StatsResult } from "./pipeline-protocol";
 import type { CheckProgress, CheckReport } from "../../server/lint/check.ts";
 import { pipelineRequest } from "./worker-client";
 import { SAMPLE_SCRIPT } from "./sample-script";
+import { track, type Feature } from "./analytics";
 
 /** Thrown for every route that would need a device on the network. */
 export class StaticModeError extends Error {
@@ -412,6 +413,29 @@ const ROUTES: Record<string, (ctx: RouteCtx) => unknown> = {
   "/api/artifact": ({ params }) => readArtifact(params),
 };
 
+/**
+ * Route → the feature event reaching it means the visitor tried (analytics.ts,
+ * a no-op unless the hosted demo's beacon tag is present). Kept as one table
+ * here rather than a `track()` call inside each handler: this router is already
+ * the single choke point every panel's request passes through.
+ *
+ * `/api/config` and `/api/script` are method-dependent — a GET of either is the
+ * page loading, not an action — so they are resolved in featureFor() instead.
+ */
+const FEATURE_BY_ROUTE: Record<string, Feature> = {
+  "/api/build": "build",
+  "/api/check": "check",
+  "/api/artifact": "artifact-preview",
+  "/api/script/checkpoint": "checkpoint",
+  "/api/script/restore": "restore",
+};
+
+function featureFor(pathname: string, method: string): Feature | undefined {
+  if (pathname === "/api/config") return method === "PATCH" ? "options-change" : undefined;
+  if (pathname === "/api/script") return method === "PUT" ? "script-edit" : undefined;
+  return FEATURE_BY_ROUTE[pathname];
+}
+
 async function route(path: string, init?: RequestInit): Promise<unknown> {
   const [pathname, query = ""] = path.split("?");
   const params = new URLSearchParams(query);
@@ -419,8 +443,14 @@ async function route(path: string, init?: RequestInit): Promise<unknown> {
   const body = init?.body ? JSON.parse(String(init.body)) : {};
 
   if (DEVICE_PREFIXES.some((p) => pathname.startsWith(p))) {
+    // Nothing here can succeed without a LAN device, but wanting one is the
+    // single most useful thing to know about the demo.
+    track("device-attempt");
     throw new StaticModeError(pathname);
   }
+
+  const feature = featureFor(pathname, method);
+  if (feature) track(feature);
 
   // Not a table entry: the id is an ISO timestamp, so it is not a fixed string.
   if (pathname.startsWith("/api/script/history/")) {
@@ -453,6 +483,9 @@ export async function apiStream<T>(
   if (path !== "/api/check/stream") {
     throw new Error(`no static stream handler for ${path}`);
   }
+  // The transport Check actually uses; the `/api/check` table entry above is
+  // the non-streaming fallback, so both have to report the one feature.
+  track("check");
   const report = await pipelineRequest<CheckReport>(
     { type: "check", source: loadSource(), artifacts },
     onProgress,

@@ -18,7 +18,15 @@
  * FileSystemWritableFileStream — does), so it's declared locally and
  * feature-detected at runtime; Firefox/Safari fall back to the always-legal
  * `<input type="file">` + Blob-download path.
+ *
+ * The one static-only module it does import is `./analytics`, which is inert
+ * (~0.4 KB, no network) unless the hosted demo's beacon tag is in the DOM — so
+ * it costs the server bundle bytes and nothing else, and reaching the same
+ * calls through the `api()` seam is not possible: opening and downloading a
+ * file never touches a route.
  */
+
+import { track } from "./analytics";
 
 declare global {
   interface FilePickerAcceptType {
@@ -58,6 +66,7 @@ export function supportsFilePicker(): boolean {
 
 /** Reads a plain `File` (from `<input>` or a drop event) — never carries a handle. */
 export async function openFromBlob(file: File): Promise<OpenedFile> {
+  track("file-open");
   const text = await file.text();
   return { name: file.name, text, kind: kindFromName(file.name) };
 }
@@ -80,6 +89,8 @@ export async function openFilePicker(): Promise<OpenedFile | null> {
       multiple: false,
     });
     if (!handle) return null;
+    // After the picker resolves, so a cancelled dialog is not "opened a file".
+    track("file-open");
     const file = await handle.getFile();
     const text = await file.text();
     return { name: file.name, text, kind: kindFromName(file.name), handle };
@@ -140,6 +151,7 @@ async function fetchArtifactCode(api: ApiFn, name: string): Promise<string | nul
 export async function downloadArtifact(api: ApiFn, name: string): Promise<void> {
   const code = await fetchArtifactCode(api, name);
   if (code === null) throw new Error(`${name} not built yet`);
+  track("artifact-download");
   downloadText(name, code, mimeFor(name));
 }
 
@@ -155,6 +167,7 @@ export async function downloadAllArtifacts(api: ApiFn): Promise<number> {
   for (const name of ARTIFACT_DOWNLOAD_NAMES) {
     const code = await fetchArtifactCode(api, name);
     if (code === null) continue;
+    track("artifact-download");
     downloadText(name, code, mimeFor(name));
     count++;
     await new Promise((resolve) => setTimeout(resolve, 120));
