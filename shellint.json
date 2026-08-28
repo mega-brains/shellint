@@ -5,7 +5,7 @@
   "minify": {
     "compress": true,
     "mangle": true,
-    "toplevel": true,
+    "toplevel": false,
     "keepFnames": false,
     "logMap": true,
     "debugLogMap": true,
