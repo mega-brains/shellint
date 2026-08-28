@@ -1,0 +1,12 @@
+# pnpm 11 defaults strictDepBuilds=true and reads settings here, not package.json.
+# These dependencies compile native bindings or resolve a platform binary.
+allowBuilds:
+  "@abandonware/noble": true
+  "@serialport/bindings-cpp": true
+  "bufferutil": true
+  "es5-ext": true
+  "esbuild": true
+  "usocket": true
+  "utf-8-validate": true
+  "wrtc": true
+  "xpc-connection": true

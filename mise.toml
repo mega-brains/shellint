@@ -1,43 +1,44 @@
 [tools]
 node = "24"
+pnpm = "11"
 
 [env]
 # Overrides, not the source of truth: txiki-test-util.mjs pins the version and
-# falls back to vendor/txiki/tjs, so `npm run …` works without mise. Path is
+# falls back to vendor/txiki/tjs, so `pnpm run …` works without mise. Path is
 # repo-relative and gitignored; `mise run vendor:txiki` fills it.
 SHELLINT_TJS_VERSION = "26.6.0"
 SHELLINT_TJS_BIN = "vendor/txiki/tjs"
 
 [tasks.install]
-description = "Install npm dependencies"
-run = "npm install"
+description = "Install pnpm dependencies"
+run = "pnpm install"
 
 [tasks.start]
 description = "Start shellint server (host/port from shellint.json)"
 alias = "dev"
-run = "npm run dev"
+run = "pnpm run dev"
 
 [tasks."build:shelly"]
 description = "Build Shelly dual artifacts"
-run = "npm run build:shelly"
+run = "pnpm run build:shelly"
 
 [tasks."build:web"]
 description = "Build web UI bundle"
-run = "npm run build:web"
+run = "pnpm run build:web"
 
 [tasks."vendor:txiki"]
 description = "Fetch/verify the pinned txiki.js binary in gitignored vendor/txiki (SHELLINT_TJS_BIN); --force refetches, --check verifies without network"
-run = "npm run vendor:txiki -- \"$@\""
+run = "pnpm run vendor:txiki -- \"$@\""
 
 [tasks."build:txiki"]
 description = "Build txiki server and CLI bundles"
 depends = "vendor:txiki"
-run = "npm run build:txiki"
+run = "pnpm run build:txiki"
 
 [tasks."build:txiki:executable"]
 description = "Build standalone txiki server executable"
 depends = "vendor:txiki"
-run = "npm run build:txiki:executable"
+run = "pnpm run build:txiki:executable"
 
 [tasks.build]
 description = "oxlint project source + build Shelly dual artifacts + web UI bundle (parallel)"
@@ -45,7 +46,7 @@ depends = ["oxlint", "build:shelly", "build:web"]
 
 [tasks."build:shelly:fixture"]
 description = "Build the device fixture (fixtures/device/main.ts) into its own scratch dist — the gate's device build"
-run = "npm run build:shelly:fixture"
+run = "pnpm run build:shelly:fixture"
 
 [tasks."build:gate"]
 description = "oxlint + fixture device build + web UI bundle — the build step of beforeCommit, independent of scripts/main.ts"
@@ -54,18 +55,18 @@ depends = ["oxlint", "build:shelly:fixture", "build:web"]
 [tasks."build:static"]
 description = "Build the GitHub Pages site into site/: landing + download at the root, the offline/device-less app under site/demo/ (M17, M26)"
 alias = "build:site"
-run = "npm run build:static"
+run = "pnpm run build:static"
 
 [tasks."preview:static"]
 description = "Serve site/ with a plain static file server — / landing, /demo/ app, /download.html; proves build:static needs no server (M17, M26)"
 alias = "preview:site"
 depends = "build:static"
-run = "npm run preview:static -- \"$@\""
+run = "pnpm run preview:static -- \"$@\""
 
 [tasks."start:txiki"]
 description = "Start bundled txiki server"
 depends = "build:txiki"
-run = "npm run start:txiki"
+run = "pnpm run start:txiki"
 
 [tasks.deploy]
 description = "Build then deploy (MODE=debug|prod, MINIFY=min|raw)"
@@ -73,17 +74,17 @@ description = "Build then deploy (MODE=debug|prod, MINIFY=min|raw)"
 run = """
 mode="${1:-${MODE:-debug}}"
 minify="${2:-${MINIFY:-min}}"
-npm run build:shelly
-npm run deploy -- --mode "$mode" --minify "$minify"
+pnpm run build:shelly
+pnpm run deploy -- --mode "$mode" --minify "$minify"
 """
 
 [tasks."deploy:txiki"]
 description = "Build and deploy through txiki"
-run = "npm run deploy:txiki -- \"$@\""
+run = "pnpm run deploy:txiki -- \"$@\""
 
 [tasks.oxlint]
 description = "oxlint over shellint's own source (server/web/scripts/shared/e2e) — never Shelly device code, which server/lint/ covers"
-run = "npm run oxlint"
+run = "pnpm run oxlint"
 
 [tasks.lint]
 description = "Typecheck Shelly script + server + web"
@@ -91,19 +92,19 @@ depends = ["typecheck"]
 
 [tasks."typecheck:shelly"]
 description = "Typecheck the device fixture (fixtures/device/main.ts) under the device compiler options"
-run = "npm run typecheck:shelly"
+run = "pnpm run typecheck:shelly"
 
 [tasks."typecheck:script"]
 description = "Typecheck your live scripts/main.ts — deliberately outside the gate"
-run = "npm run typecheck:script"
+run = "pnpm run typecheck:script"
 
 [tasks."typecheck:server"]
 description = "Typecheck server"
-run = "npm run typecheck:server"
+run = "pnpm run typecheck:server"
 
 [tasks."typecheck:web"]
 description = "Typecheck web"
-run = "npm run typecheck:web"
+run = "pnpm run typecheck:web"
 
 [tasks.typecheck]
 description = "Typecheck Shelly script + server + web (parallel)"
@@ -111,62 +112,62 @@ depends = ["typecheck:shelly", "typecheck:server", "typecheck:web"]
 
 [tasks."check:lines"]
 description = "Fail if any .ts/.tsx/.js/.mjs/.mts/.css source exceeds 500 lines"
-run = "npm run check:lines"
+run = "pnpm run check:lines"
 
 [tasks.bench]
 description = "Minify option benchmark over bench/*.ts (+ main.ts as reference)"
 # Usage: mise run bench   OR   mise run bench -- log-heavy   OR   mise run bench -- --json
-run = "npm run bench -- \"$@\""
+run = "pnpm run bench -- \"$@\""
 
 [tasks.test]
 description = "Shelly DCE/minify asserts + web bundle + server smoke"
-run = "npm run test"
+run = "pnpm run test"
 
 [tasks."test:e2e"]
 description = "Playwright e2e (Chromium) against local shellint UI"
-run = "npm run test:e2e"
+run = "pnpm run test:e2e"
 
 [tasks."test:e2e:txiki"]
 description = "Playwright e2e against the txiki single-file executable"
-run = "npm run test:e2e:txiki"
+run = "pnpm run test:e2e:txiki"
 
 [tasks."test:e2e:lightpanda"]
 description = "Playwright e2e against the Lightpanda browser (partial: no layout, no screenshots — see e2e/playwright.lightpanda.config.ts)"
-run = "npm run test:e2e:lightpanda"
+run = "pnpm run test:e2e:lightpanda"
 
 [tasks."test:e2e:hybrid"]
 description = "Full e2e coverage split across Lightpanda shards + Chromium (measured slower than test:e2e — see scripts/e2e-hybrid.mjs)"
-run = "npm run test:e2e:hybrid -- \"$@\""
+run = "pnpm run test:e2e:hybrid -- \"$@\""
 
 [tasks."test:txiki"]
 description = "Typecheck and verify txiki parity"
-run = "npm run test:txiki"
+run = "pnpm run test:txiki"
 
 [tasks.b]
 alias="beforeCommit"
 description = "Pre-commit gate: oxlint + line limit + typecheck + fixture build run in parallel, then static build, test, then e2e on Node and on the txiki executable"
 depends = ["oxlint", "check:lines", "typecheck", "build:gate"]
 run = """
-npm run build:static
-npm run test && npm run test:e2e && npm run test:e2e:txiki
+pnpm run build:static
+pnpm run test && pnpm run test:e2e && pnpm run test:e2e:txiki
 """
 
 [tasks.probe]
 description = "Run Script.Eval capability probe against device"
-run = "npm run probe"
+run = "pnpm run probe"
 
 [tasks."probe:txiki"]
 description = "Run capability probe through txiki"
-run = "npm run probe:txiki"
+run = "pnpm run probe:txiki"
 
 [tasks.profile]
 description = "Cache the device capability profile (ListMethods + components) for Tier 4 lint"
-run = "npm run profile"
+run = "pnpm run profile"
 
 [tasks."profile:txiki"]
 description = "Cache device profile through txiki"
-run = "npm run profile:txiki"
+run = "pnpm run profile:txiki"
 
 [tasks.clean]
 description = "Remove Shelly + web build artifacts"
-run = "npm run clean"
+run = "pnpm run clean"
