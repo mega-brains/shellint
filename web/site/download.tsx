@@ -26,14 +26,17 @@ const CAP_BYTES = 5 * 1024 * 1024;
 /*
  * One row per asset `.github/workflows/release.yml` actually builds — the two
  * lists have to move together or a link here 404s against the release matrix.
+ * Every asset is a `.zip` holding one file (`shellint`, `shellint.exe` on
+ * Windows); the size row above is the *unzipped* binary, which is what the
+ * 5 MB cap is asserted against.
  * macOS x64 is absent on purpose: the slim txiki release publishes no macOS
  * x86_64 asset in any profile, so that row could only ship the full ~5.6 MB
  * build and falsify this page's own headline.
  */
 const PLATFORMS: { label: string; asset: string; note?: string }[] = [
-  { label: "macOS arm64", asset: "shellint-macos-arm64" },
-  { label: "Linux x64", asset: "shellint-linux-x64", note: "unproven" },
-  { label: "Windows x64", asset: "shellint-windows-x64.exe", note: "unproven" },
+  { label: "macOS arm64", asset: "shellint-macos-arm64.zip" },
+  { label: "Linux x64", asset: "shellint-linux-x64.zip", note: "unproven" },
+  { label: "Windows x64", asset: "shellint-windows-x64.zip", note: "unproven" },
 ];
 
 const LOCAL_ADDS = [
@@ -114,7 +117,10 @@ export function Download() {
         <section class="quickstart">
           <Group title="Quick start" id="quickstart">
             <ol>
-              <li>Download the binary for your platform</li>
+              <li>Download the zip for your platform</li>
+              <li>
+                <code>unzip shellint-macos-arm64.zip</code>
+              </li>
               <li>
                 <code>chmod +x shellint</code>
               </li>
@@ -126,7 +132,7 @@ export function Download() {
               </li>
             </ol>
             <pre class="curl-line">
-              <code>curl -fsSL -o shellint {releaseAssetUrl("shellint-macos-arm64")}{"\n"}chmod +x shellint && ./shellint</code>
+              <code>curl -fsSL -O {releaseAssetUrl("shellint-macos-arm64.zip")}{"\n"}unzip shellint-macos-arm64.zip{"\n"}chmod +x shellint && ./shellint</code>
             </pre>
           </Group>
         </section>

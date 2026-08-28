@@ -39,7 +39,15 @@ CI and a laptop share one pinned path) and setting `PW_CHANNEL=bundled` — the
 Playwright default is *system* Chrome, which no runner has, and the default must
 stay that way because the `-darwin` design baselines were shot against it.
 `release.yml` builds one executable per platform on a `v*` tag → **draft**
-release, asserting each stays under 5 MB and boots. `pages.yml` is gated on CI
+release, asserting each stays under 5 MB and boots. Assets ship as
+`shellint-<platform>.zip` holding one file (`shellint`, `shellint.exe` on
+Windows) — a bare binary served over HTTPS loses its exec bit in Safari and is
+awkward on Windows; the size assert and standalone smoke run happen on the raw
+binary, zipping is the last step before the checksum. Unix uses Info-ZIP `zip
+-X` (the only one of the two that stores the exec bit), Windows' Git Bash has no
+`zip` and falls back to the preinstalled 7-Zip. Asset names live in two places —
+the `release.yml` matrix and `web/site/download.tsx`'s `PLATFORMS` — and must
+move together or the download page 404s. `pages.yml` is gated on CI
 via `workflow_run`, so a red `main` cannot publish. **Design baselines exist
 twice** — `-chromium-darwin` (shot locally) and `-chromium-linux` (bootstrapped
 2026-08-28 from the first CI run's `-actual` output, which is the only way to

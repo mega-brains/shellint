@@ -1,8 +1,16 @@
 name: Release
 
-# M27 §8 — one single-file native executable per platform, attached to a
-# **draft** release for a human to publish. See
+# M27 §8 — one single-file native executable per platform, zipped and attached
+# to a **draft** release for a human to publish. See
 # .claude/plans/2026-08-18_27_ci-deploy.md.
+#
+# Every asset ships as `<asset>.zip` holding one file — `shellint`, or
+# `shellint.exe` on Windows. A bare binary served over HTTPS is what browsers
+# and macOS treat worst: Safari strips the exec bit, and both macOS and Windows
+# tag the download itself with quarantine/MoTW. A zip keeps the executable bit
+# on unix and gives Windows users something Explorer can open. The build,
+# size-assert and standalone smoke run all still happen on the *raw* binary —
+# zipping is the last step before checksumming.
 #
 # Matrix note: macOS x64 is deliberately absent. The slim release publishes no
 # macOS x86_64 asset in any profile, so that row could only ship the ~5.6 MB
@@ -25,9 +33,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - { os: macos-latest,   asset: shellint-macos-arm64 }
-          - { os: ubuntu-latest,  asset: shellint-linux-x64 }
-          - { os: windows-latest, asset: shellint-windows-x64.exe }
+          - { os: macos-latest,   asset: shellint-macos-arm64,   bin: shellint }
+          - { os: ubuntu-latest,  asset: shellint-linux-x64,     bin: shellint }
+          - { os: windows-latest, asset: shellint-windows-x64,   bin: shellint.exe }
     runs-on: ${{ matrix.os }}
     timeout-minutes: 20
     defaults:
@@ -51,11 +59,8 @@ jobs:
       - run: npm run build:web
       - run: npm run build:txiki:executable
 
-      - name: Name the asset
-        run: |
-          src=.txiki/shellint
-          [ "$RUNNER_OS" = "Windows" ] && src=.txiki/shellint.exe
-          mv "$src" "${{ matrix.asset }}"
+      - name: Stage the binary
+        run: mv ".txiki/${{ matrix.bin }}" "${{ matrix.bin }}"
 
       # The download page's headline is "One file. No Node. Under 5 MB." A
       # silent creep past that turns the page into a lie, so it fails the build.
@@ -63,7 +68,7 @@ jobs:
       # much.
       - name: Assert size under 5 MB
         run: |
-          bytes=$(wc -c < "${{ matrix.asset }}")
+          bytes=$(wc -c < "${{ matrix.bin }}")
           echo "${{ matrix.asset }}: $bytes bytes"
           if [ "$bytes" -gt 5242880 ]; then
             echo "::error::${{ matrix.asset }} is $bytes bytes, over the 5 MB claim"
@@ -85,8 +90,8 @@ jobs:
       # proves the embedded types/*.d.ts materialised and the device compile ran.
       - name: Smoke-run the executable standalone
         run: |
-          chmod +x "${{ matrix.asset }}"
-          bin="$PWD/${{ matrix.asset }}"
+          chmod +x "${{ matrix.bin }}"
+          bin="$PWD/${{ matrix.bin }}"
           smoke="$(mktemp -d)"
           cd "$smoke"
           SHELLINT_PORT=8791 "$bin" &
@@ -122,6 +127,20 @@ jobs:
           kill "$pid" 2>/dev/null || true
           exit $fail
 
+      # Info-ZIP `zip` is the only one of these that stores the unix executable
+      # bit, and it is present on the macOS and Linux runners but not in
+      # Windows' Git Bash — there 7-Zip (preinstalled on the runner) does, and
+      # the exec bit is meaningless on Windows anyway. One file per archive,
+      # stored flat: `unzip shellint-macos-arm64.zip` yields `shellint`.
+      - name: Zip the executable
+        run: |
+          if command -v zip >/dev/null 2>&1; then
+            zip -q -X "${{ matrix.asset }}.zip" "${{ matrix.bin }}"
+          else
+            7z a -tzip -bso0 -bsp0 "${{ matrix.asset }}.zip" "${{ matrix.bin }}"
+          fi
+          ls -l "${{ matrix.asset }}.zip"
+
       # Windows' Git Bash ships sha256sum but no shasum; macOS ships shasum but
       # no sha256sum. Neither name is portable on its own — this step failed the
       # whole Windows row once with `shasum: command not found`, after the
@@ -129,17 +148,17 @@ jobs:
       - name: Checksum
         run: |
           if command -v shasum >/dev/null 2>&1; then
-            shasum -a 256 "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
+            shasum -a 256 "${{ matrix.asset }}.zip" > "${{ matrix.asset }}.zip.sha256"
           else
-            sha256sum "${{ matrix.asset }}" > "${{ matrix.asset }}.sha256"
+            sha256sum "${{ matrix.asset }}.zip" > "${{ matrix.asset }}.zip.sha256"
           fi
 
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset }}
           path: |
-            ${{ matrix.asset }}
-            ${{ matrix.asset }}.sha256
+            ${{ matrix.asset }}.zip
+            ${{ matrix.asset }}.zip.sha256
           if-no-files-found: error
 
   draft:

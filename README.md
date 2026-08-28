@@ -160,6 +160,16 @@ mise run build:txiki:executable
 ./.txiki/shellint
 ```
 
+Releases ship that same binary as a one-file zip per platform —
+`shellint-macos-arm64.zip`, `shellint-linux-x64.zip`,
+`shellint-windows-x64.zip`:
+
+```bash
+curl -fsSL -O https://github.com/mega-brains/shellint/releases/latest/download/shellint-macos-arm64.zip
+unzip shellint-macos-arm64.zip
+chmod +x shellint && ./shellint
+```
+
 It embeds the runtime, the server bundle and the browser assets, so the UI works
 with no checkout beside it. On first run in an empty directory it writes the
 files it has to be able to read back — `templates/main.example.ts`, the three
