@@ -18,6 +18,7 @@
  * See .claude/plans/2026-08-18_27_ci-deploy.md §4.
  */
 import * as esbuild from "esbuild";
+import { resolve } from "node:path";
 
 /**
  * The flags `tjs bundle` passed implicitly and esbuild will not infer:
@@ -55,13 +56,49 @@ const SHARED = {
   },
 };
 
-/** Bundles `entry` to `outfile` for txiki.js. Returns esbuild's result. */
+/**
+ * Redirects `server/core/embedded-assets.ts` to a generated replacement, so the
+ * server bundle carries the browser assets instead of reading `web/dist` from
+ * the working directory. Only the server entry passes `embeddedAssets`; the
+ * three CLI bundles have no UI and stay small.
+ *
+ * An esbuild alias rather than a `package.json` `imports` condition (the
+ * mechanism `#shellint/runtime` uses) because the generated module is a build
+ * output under `.txiki/`: a condition would point TypeScript at a file that
+ * does not exist in a clean checkout and break `typecheck:server`.
+ */
+function aliasEmbeddedAssets(realPath, generatedPath) {
+  return {
+    name: "shellint-embedded-assets",
+    setup(build) {
+      const filter = /(^|[\\/])embedded-assets\.ts$/;
+      build.onResolve({ filter }, (args) => {
+        const resolved = resolve(args.resolveDir, args.path);
+        return resolved === realPath ? { path: generatedPath } : null;
+      });
+    },
+  };
+}
+
+/**
+ * Bundles `entry` to `outfile` for txiki.js. Returns esbuild's result.
+ *
+ * `embeddedAssets` (server entry only) is the generated module described above;
+ * the `.br` loader is what lets it `import` the precompressed bundles as bytes.
+ * esbuild emits its own base64 decoder for those, which matters because SHARED
+ * defines `Buffer` and `process` as `undefined` — there is no `atob` to lean on.
+ */
 export async function bundleForTxiki(entry, outfile, overrides = {}) {
+  const { embeddedAssets, ...rest } = overrides;
   return esbuild.build({
     ...SHARED,
     ...IMPLICIT,
     entryPoints: [entry],
     outfile,
-    ...overrides,
+    loader: { ".br": "binary", ".html": "text" },
+    plugins: embeddedAssets
+      ? [aliasEmbeddedAssets(embeddedAssets.realPath, embeddedAssets.generatedPath)]
+      : [],
+    ...rest,
   });
 }

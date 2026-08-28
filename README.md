@@ -160,10 +160,16 @@ mise run build:txiki:executable
 ./.txiki/shellint
 ```
 
-It embeds the runtime and the server bundle, but shellint stays a workspace
-tool: `shellint.json`, `scripts/`, `types/`, `dist/`, `web/dist/` and
-`.shellint/` are still read from the launch directory. The peer CLI tasks are
-`deploy:txiki`, `probe:txiki`, `profile:txiki` and `test:txiki`.
+It embeds the runtime, the server bundle and the browser assets, so the UI works
+with no checkout beside it. On first run in an empty directory it writes the
+files it has to be able to read back — `templates/main.example.ts`, the three
+`types/*.d.ts` that are the entire stdlib for device code, and `scripts/main.ts`
+from that template — and never overwrites one that already exists.
+
+shellint is still a workspace tool after that: `shellint.json`, `scripts/`,
+`dist/` and `.shellint/` live in the launch directory, which is where your work
+belongs. The peer CLI tasks are `deploy:txiki`, `probe:txiki`, `profile:txiki`
+and `test:txiki`.
 
 npm install, TypeScript and Playwright stay on Node.
 

@@ -51,6 +51,24 @@ change has to refresh both — that dual refresh is the one recurring tax CI add
 failed the whole Windows row *after* the binary had built, passed the 5 MB
 assert and served a request.
 
+**The single-file executable is self-contained, and that is not free.**
+`server/core/paths.ts` resolves `ROOT` to `process.cwd()`, so a released binary
+would otherwise read `web/`, `templates/` and `types/` out of whatever directory
+it was started in — v0.0.2 shipped exactly that: it answered `/api/*` but gave
+`web/index.html missing` (500) on `/`, and crashed with ENOENT at startup
+anywhere without a `templates/`. `server/core/embedded-assets.ts` is the fix and
+is **empty on purpose** — the Node build must keep its filesystem path — while
+`scripts/build-txiki.mjs` generates a populated replacement that
+`scripts/txiki-bundle.mjs` swaps in by esbuild alias (not a `package.json`
+condition, which would point `typecheck:server` at a build output). Two halves:
+the four browser assets are embedded as bytes and served (brotli for the three
+big ones — raw is 715 KB against 736 KB of headroom under the 5 MB assert, so it
+would not fit), and `templates/main.example.ts` plus the three `types/*.d.ts`
+are embedded as text and **materialised to disk on first run**, never
+overwriting. The device compile is `noLib`/`types: []`, so those declarations
+are its entire stdlib and `/api/build` cannot work without them. Adding a file
+the binary reads at runtime means adding it to one of those two lists.
+
 Opt-in and deliberately outside that gate: `mise run test:e2e:lightpanda` runs
 the 11 of 31 tests that need neither layout nor screenshots against
 [Lightpanda](https://lightpanda.io) (`test:e2e:hybrid` splits the whole suite
@@ -94,7 +112,7 @@ process-per-test, for when a failure smells like cross-test module state.
 
 | Layer | Choice |
 |---|---|
-| Runtime | Node 24 via mise by default; txiki.js v26.6.0 through conditional runtime and builder adapters. **One** `tjs` binary, vendored (gitignored `vendor/txiki/`): the slim `min` profile — no FFI, no TLS, ~2.0 MB — from the [`lukasMega/txiki.js-with-slim-builds`](https://github.com/lukasMega/txiki.js-with-slim-builds/releases/tag/slim-v26.6.0-6) release (tag `slim-v26.6.0-6`), not a locally built fork, because that binary is what `tjs compile` embeds in the shipped executable. It drops the `bundle`, `eval`, `serve`, `test` and `app` **subcommands** (the `tjs.serve` *API* is still there, which is all the capability probe needs). Bundling therefore does **not** use `tjs bundle` — see the Bundling row |
+| Runtime | Node 24 via mise by default; txiki.js v26.6.0 through conditional runtime and builder adapters. **One** `tjs` binary, vendored (gitignored `vendor/txiki/`): the slim `min` profile — no FFI, no TLS, ~2.0 MB — from the [`lukasMega/txiki.js-with-slim-builds`](https://github.com/lukasMega/txiki.js-with-slim-builds/releases/tag/slim-v26.6.0-8) release (tag `slim-v26.6.0-8`), not a locally built fork, because that binary is what `tjs compile` embeds in the shipped executable. It drops the `bundle`, `eval`, `serve`, `test` and `app` **subcommands** (the `tjs.serve` *API* is still there, which is all the capability probe needs). Bundling therefore does **not** use `tjs bundle` — see the Bundling row |
 | Bundling (txiki) | `scripts/txiki-bundle.mjs` → the repo's own **esbuild** devDep, not `tjs bundle`. Forced, not preferred: `__TJS_BUNDLER__` is compiled out of *every* slim profile (tested — `slim-tls` and `slim-ffi-tls` reject `bundle` too, it is a switch independent of TLS) and upstream `saghul/txiki.js` v26.6.0 publishes **no Linux asset at all**, so no released txiki binary anywhere can bundle on Linux and CI could never run there. `tjs bundle` was only ever a wrapper that downloads esbuild into `~/.tjs/` and shells out. Equivalence measured 2026-08-25: identical 6.3 MB bundle, `tjs compile` output 4,506,842 B vs 4,506,881 B — **39 bytes** — and the executable boots and serves. Two flags `tjs bundle` supplied implicitly are now explicit: `format: "esm"` (default `iife` rejects the top-level `await` in `server/index.txiki.ts`) and `external: ["tjs:*"]` |
 | Task runner | mise (`start`/`dev`, `build`, `oxlint`, `lint`, `test`, `beforeCommit`, `probe`, `clean`) |
 | Device compile | `tsc` → ES5, `module: none`, `noEmitHelpers`, `noLib` + `types: []` |

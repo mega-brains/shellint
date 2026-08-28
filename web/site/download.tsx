@@ -16,7 +16,11 @@ import { SiteHeader, SiteFooter } from "./landing";
 import { releaseAssetUrl, releasesUrl } from "./release";
 
 /* Local .txiki/shellint, macOS arm64, measured 2026-08-18 (M26 plan §2.4). */
-const BINARY_BYTES = 4_194_304; // 4.0 MB (MiB) as reported by `ls -lh`
+// Measured on the v0.0.3 macOS arm64 build (the largest row is Windows at
+// 4,922,-odd KB). Grew from 4,506,842 B when the browser assets and the
+// device-type declarations moved inside the binary — see release.yml's
+// standalone smoke step for why they had to.
+const BINARY_BYTES = 4_714_345;
 const CAP_BYTES = 5 * 1024 * 1024;
 
 /*

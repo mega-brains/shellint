@@ -1,12 +1,32 @@
 import type { Context } from "./context.ts";
 import { runtime } from "#shellint/runtime";
 import { ROOT, WEB_DIR } from "./paths.ts";
+import { embeddedAsset } from "./embedded-assets.ts";
 
 const { join, normalize, relative } = runtime.path;
 const DIST = join(WEB_DIR, "dist");
 
 async function readBody(file: string): Promise<ArrayBuffer> {
   return (await runtime.fs.readBytes(file)).slice().buffer as ArrayBuffer;
+}
+
+/**
+ * Serve `path` from the assets compiled into the executable, if it has any.
+ * Returns `undefined` in every other build, which is what keeps the filesystem
+ * path below the normal one — see embedded-assets.ts.
+ *
+ * The brotli bodies are served even to a client that did not advertise `br`.
+ * In the single-file binary there is no identity copy to fall back to, and the
+ * only client that fetches these four paths is a browser, all of which send
+ * `Accept-Encoding: br`. A checkout never reaches this branch at all.
+ */
+function sendEmbedded(c: Context, path: string): Response | undefined {
+  const asset = embeddedAsset(path);
+  if (!asset) return undefined;
+  c.header("Content-Type", asset.type);
+  c.header("Vary", "Accept-Encoding");
+  if (asset.encoding) c.header("Content-Encoding", asset.encoding);
+  return c.body(asset.bytes.slice().buffer as ArrayBuffer);
 }
 
 /**
@@ -37,6 +57,8 @@ export async function sendAsset(c: Context, file: string, contentType: string) {
 
 /** GET /app.js — the bundled SPA. */
 export async function appJs(c: Context) {
+  const packed = sendEmbedded(c, "/app.js");
+  if (packed) return packed;
   const js = join(DIST, "app.js");
   if (!(await runtime.fs.exists(js))) {
     return c.text(
@@ -60,6 +82,8 @@ export async function appJsMap(c: Context) {
  * bundled into app.js. Served from web/dist when built, else from types/.
  */
 export async function apiDocsJson(c: Context) {
+  const packed = sendEmbedded(c, "/api-docs.json");
+  if (packed) return packed;
   const built = join(DIST, "api-docs.json");
   if (await runtime.fs.exists(built)) return sendAsset(c, built, "application/json");
   const source = join(ROOT, "types", "api-docs.json");
@@ -74,6 +98,8 @@ export async function apiDocsJson(c: Context) {
  * checkout still renders.
  */
 export async function css(c: Context, name: string) {
+  const packed = sendEmbedded(c, `/${name}`);
+  if (packed) return packed;
   const built = join(DIST, name);
   if (await runtime.fs.exists(built)) {
     return sendAsset(c, built, "text/css; charset=utf-8");

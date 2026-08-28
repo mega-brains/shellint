@@ -5,6 +5,7 @@ import { registerDeviceRoutes } from "./device/routes.ts";
 import { registerProbeRoutes } from "./probe/routes.ts";
 import { registerScriptBuildRoutes } from "./script/routes.ts";
 import { apiDocsJson, appJs, appJsMap, css, webAsset } from "./core/static-assets.ts";
+import { embeddedAsset } from "./core/embedded-assets.ts";
 
 export function createApp() {
   const app = new Router();
@@ -14,6 +15,13 @@ export function createApp() {
   registerProbeRoutes(app);
 
   app.get("/", async (c) => {
+    // The released single-file executable carries index.html inside it; a
+    // checkout has none embedded and reads web/index.html off disk.
+    const embedded = embeddedAsset("/");
+    if (embedded) {
+      c.header("Content-Type", embedded.type);
+      return c.body(embedded.bytes.slice().buffer as ArrayBuffer);
+    }
     const index = runtime.path.join(WEB_DIR, "index.html");
     if (!(await runtime.fs.exists(index))) {
       return c.text("web/index.html missing", 500);

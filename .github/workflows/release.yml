@@ -70,28 +70,57 @@ jobs:
             exit 1
           fi
 
-      # A binary that does not start is worse than no release. Boots on a
-      # scratch port against a throwaway workspace and asks for one JSON route.
-      - name: Smoke-run the executable
+      # A binary that does not start is worse than no release — and one that
+      # starts but cannot show its UI is what v0.0.2 actually shipped.
+      #
+      # Runs from an **empty directory outside the checkout**, with no env
+      # overrides, because that is the only shape that tests what a user
+      # downloads. The old version ran in the repo root with SHELLINT_SCRIPT
+      # pointed at a scratch path, so it passed while `/` was answering
+      # `web/index.html missing` (500) and startup was crashing with ENOENT
+      # anywhere else: web/, templates/ and types/ were all being read out of
+      # the checkout it happened to be standing in.
+      #
+      # Asserting `/` serves HTML is the specific regression guard; /api/build
+      # proves the embedded types/*.d.ts materialised and the device compile ran.
+      - name: Smoke-run the executable standalone
         run: |
           chmod +x "${{ matrix.asset }}"
-          mkdir -p .tmp/release-smoke
-          SHELLINT_PORT=8791 \
-          SHELLINT_SCRIPT=.tmp/release-smoke/main.ts \
-          SHELLINT_DIST=.tmp/release-smoke/dist \
-            "./${{ matrix.asset }}" &
+          bin="$PWD/${{ matrix.asset }}"
+          smoke="$(mktemp -d)"
+          cd "$smoke"
+          SHELLINT_PORT=8791 "$bin" &
           pid=$!
+          ok=""
           for _ in $(seq 1 30); do
-            if curl -fsS -o /dev/null http://127.0.0.1:8791/api/checks; then
-              echo "booted and served /api/checks"
-              kill "$pid" 2>/dev/null || true
-              exit 0
-            fi
+            if curl -fsS -o /dev/null http://127.0.0.1:8791/api/checks; then ok=1; break; fi
             sleep 1
           done
-          echo "::error::${{ matrix.asset }} did not serve /api/checks within 30s"
+          if [ -z "$ok" ]; then
+            echo "::error::${{ matrix.asset }} did not boot in an empty dir within 30s"
+            kill "$pid" 2>/dev/null || true
+            exit 1
+          fi
+          fail=0
+          body=$(curl -fsS http://127.0.0.1:8791/ || true)
+          case "$body" in
+            *"<!DOCTYPE html>"*) echo "  / serves the embedded UI" ;;
+            *) echo "::error::/ did not serve HTML (got: $(printf '%s' "$body" | head -c 80))"; fail=1 ;;
+          esac
+          for route in /app.js /styles.css /api-docs.json; do
+            if curl -fsS -o /dev/null "http://127.0.0.1:8791$route"; then
+              echo "  $route ok"
+            else
+              echo "::error::$route did not serve from the embedded assets"; fail=1
+            fi
+          done
+          if curl -fsS -o /dev/null -X POST http://127.0.0.1:8791/api/build; then
+            echo "  /api/build compiled a device script"
+          else
+            echo "::error::/api/build failed — embedded types/*.d.ts likely missing"; fail=1
+          fi
           kill "$pid" 2>/dev/null || true
-          exit 1
+          exit $fail
 
       # Windows' Git Bash ships sha256sum but no shasum; macOS ships shasum but
       # no sha256sum. Neither name is portable on its own — this step failed the
