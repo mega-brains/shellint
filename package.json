@@ -76,13 +76,13 @@
     "@txikijs/types": "^26.6.0",
     "@types/node": "^22.13.0",
     "@types/ws": "^8.5.14",
-    "esbuild": "^0.25.0",
+    "esbuild": "^0.28.1",
     "espruino": "^0.1.67",
     "oxlint": "1.79.0",
     "playwright": "^1.62.1",
     "preact": "^10.29.8",
     "terser": "^5.49.2",
-    "tsx": "^4.19.0",
+    "tsx": "^4.23.9",
     "typescript": "^5.9.2"
   }
 }

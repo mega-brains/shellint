@@ -38,11 +38,14 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
       - uses: actions/setup-node@v4
         with:
           node-version: 24
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
       # COLLECTOR_ORIGIN is a repository *variable* (Settings → Secrets and
       # variables → Actions → Variables), not a secret: it is baked into the
@@ -50,7 +53,7 @@ jobs:
       # would be theatre. It is kept out of the tree only so the source does not
       # advertise the host. Unset — the default, and every fork — builds the
       # site with no beacon at all; see withBeacon() in build-static.mjs.
-      - run: npm run build:static
+      - run: pnpm run build:static
         env:
           SHELLINT_REPO: ${{ github.repository }}
           COLLECTOR_ORIGIN: ${{ vars.COLLECTOR_ORIGIN }}

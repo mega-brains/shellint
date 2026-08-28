@@ -9,7 +9,7 @@ so the fastest way to get a change merged is to keep it inside that.
 One command has to be green before anything is committed:
 
 ```bash
-mise run beforeCommit     # or: npm run beforeCommit — identical
+mise run beforeCommit     # or: pnpm run beforeCommit — identical
 ```
 
 It runs, in order: oxlint → line limit → typecheck (device, server, web) →

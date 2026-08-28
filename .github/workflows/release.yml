@@ -44,20 +44,23 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11
       - uses: actions/setup-node@v4
         with:
           node-version: 24
-          cache: npm
+          cache: pnpm
 
-      - run: npm ci
+      - run: pnpm install --frozen-lockfile
 
       - uses: ./.github/actions/setup-tjs
         with:
           node-version: ""
 
       # The executable embeds web/dist, so the web bundle has to exist first.
-      - run: npm run build:web
-      - run: npm run build:txiki:executable
+      - run: pnpm run build:web
+      - run: pnpm run build:txiki:executable
 
       # chmod here, not in the smoke step: the mode this file carries now is
       # the mode `zip` stores and `unzip` restores, so it is what decides
