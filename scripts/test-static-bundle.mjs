@@ -30,7 +30,15 @@ if (!existsSync(SITE)) fail("site/ missing — run `npm run build:static` first"
 
 // ------------------------------------------------------------- required files
 
-const REQUIRED_ROOT = ["index.html", "download.html", "site.js", "site.css", ".nojekyll"];
+const REQUIRED_ROOT = [
+  "index.html",
+  "download.html",
+  "docs.html",
+  "checks.html",
+  "site.js",
+  "site.css",
+  ".nojekyll",
+];
 for (const f of REQUIRED_ROOT) {
   if (!existsSync(join(SITE, f))) fail(`site/${f} missing`);
 }
@@ -90,7 +98,12 @@ if (siteJsBytes > 60_000) fail(`site/site.js is ${siteJsBytes} B, over its 60000
 
 const siteCssPath = join(SITE, "site.css");
 const siteCssBytes = statSync(siteCssPath).size;
-if (siteCssBytes > 12_000) fail(`site/site.css is ${siteCssBytes} B, over its 12000 B budget`);
+// Rebaselined from 12000 B when the docs and checks pages landed: site.entry.css
+// now bundles web/site/docs.css and web/ui/option-tip.css (the checks page
+// reuses the app's rule tip verbatim) on top of the landing/download rules,
+// taking ~11.7 KB to ~13.6 KB. ~10% above that, per the convention in
+// scripts/test-web-assets.mjs.
+if (siteCssBytes > 15_000) fail(`site/site.css is ${siteCssBytes} B, over its 15000 B budget`);
 
 const appSource = readFileSync(join(DEMO, "app.js"), "utf8");
 const siteJsSource = readFileSync(siteJsPath, "utf8");
@@ -121,7 +134,7 @@ if (siteJsSource.includes("cm-content")) {
 
 console.log(
   `  budgets: app.js ${appBytes} B (≤700000), worker ${workerBytes} B raw / ${workerGz} B gz (≤5000000 / ≤1350000), ` +
-    `site.js ${siteJsBytes} B (≤60000), site.css ${siteCssBytes} B (≤12000), worker/compiler/editor not leaked into site.js`,
+    `site.js ${siteJsBytes} B (≤60000), site.css ${siteCssBytes} B (≤15000), worker/compiler/editor not leaked into site.js`,
 );
 
 // ------------------------------------------------------------------ leakage
@@ -183,11 +196,13 @@ console.log("  leakage: no node:/bare require(/unguarded process. reference in d
 
 // A root-relative reference (leading "/", not "./" or "//host/…") would
 // resolve to the Pages user/org root instead of "/<repo>/" and 404. Checked
-// over all three shipped HTML files — the landing/download shell as well as
-// the demo, which used to be the only page.
+// over every shipped HTML file — the landing/download/docs/checks shells as
+// well as the demo, which used to be the only page.
 for (const [label, path] of [
   ["index.html", join(SITE, "index.html")],
   ["download.html", join(SITE, "download.html")],
+  ["docs.html", join(SITE, "docs.html")],
+  ["checks.html", join(SITE, "checks.html")],
   ["demo/index.html", join(DEMO, "index.html")],
 ]) {
   const html = readFileSync(path, "utf8");
@@ -202,7 +217,7 @@ for (const name of ["app.js", "styles.css", "sw.js", "manifest.webmanifest"]) {
   if (!demoHtml.includes(`"./${name}"`)) fail(`site/demo/index.html has no relative reference to ./${name}`);
 }
 
-console.log("  html: relative asset paths only across index.html, download.html and demo/index.html");
+console.log("  html: relative asset paths only across index.html, download.html, docs.html, checks.html and demo/index.html");
 
 // Cross-page navigation contract (M26 plan §4): the landing must link into
 // the demo and the download page; the demo must link back out to the landing.
@@ -217,6 +232,8 @@ const siteJs = readFileSync(join(SITE, "site.js"), "utf8");
 for (const [href, what] of [
   ['"./demo/"', "the demo"],
   ['"./download.html"', "the download page"],
+  ['"./docs.html"', "the docs page"],
+  ['"./checks.html"', "the checks reference"],
 ]) {
   if (!siteJs.includes(href)) fail(`site/site.js has no ${href} link to ${what}`);
 }
@@ -229,6 +246,6 @@ if (!appSource.includes('"../"') && !appSource.includes("'../'")) {
   fail('site/demo/app.js has no "../" href — the back-link target is wrong or non-relative');
 }
 
-console.log("  cross-page links: landing -> demo/download, demo -> landing");
+console.log("  cross-page links: landing -> demo/download/docs/checks, demo -> landing");
 
 console.log("OK: site/ present, within budget, leak-free, and Pages-subpath-safe");

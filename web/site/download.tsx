@@ -1,43 +1,27 @@
 /*
  * Download page (`site/download.html`, M26 plan §6.3). The visual thesis is
- * the size claim — the txiki single-file executable rendered with the same
- * MeasureRow grammar the app uses for artifact sizes, so "one file, no Node,
- * under 5 MB" is shown how shellint shows every other size, not just
- * asserted in prose.
- *
- * The release table is honest about where the project actually is:
- * `scripts/compile-txiki.mjs` only builds for the host platform, and no
- * release workflow exists yet (M26 plan §9), so every release link 404s
- * until the first tag. Ship that plainly rather than dressing up dead links.
+ * Release assets come from GitHub's latest-release API. Names, URLs, and
+ * compressed sizes therefore always match what is currently downloadable.
  */
 import { Fragment } from "preact";
-import { MeasureRow, MeasureList, Group } from "../ui/measure";
+import { useEffect, useState } from "preact/hooks";
+import { Group } from "../ui/measure";
+import { useTheme } from "../shell/theme";
 import { SiteHeader, SiteFooter } from "./landing";
-import { releaseAssetUrl, releasesUrl } from "./release";
+import { latestReleaseApiUrl, releaseAssetUrl, releasesUrl } from "./release";
 
-/* Local .txiki/shellint, macOS arm64, measured 2026-08-18 (M26 plan §2.4). */
-// Measured on the v0.0.3 macOS arm64 build (the largest row is Windows at
-// 4,922,-odd KB). Grew from 4,506,842 B when the browser assets and the
-// device-type declarations moved inside the binary — see release.yml's
-// standalone smoke step for why they had to.
-const BINARY_BYTES = 4_714_345;
-const CAP_BYTES = 5 * 1024 * 1024;
+type ReleaseAsset = {
+  name: string;
+  size: number;
+  browser_download_url: string;
+};
 
-/*
- * One row per asset `.github/workflows/release.yml` actually builds — the two
- * lists have to move together or a link here 404s against the release matrix.
- * Every asset is a `.zip` holding one file (`shellint`, `shellint.exe` on
- * Windows); the size row above is the *unzipped* binary, which is what the
- * 5 MB cap is asserted against.
- * macOS x64 is absent on purpose: the slim txiki release publishes no macOS
- * x86_64 asset in any profile, so that row could only ship the full ~5.6 MB
- * build and falsify this page's own headline.
- */
-const PLATFORMS: { label: string; asset: string; note?: string }[] = [
-  { label: "macOS arm64", asset: "shellint-macos-arm64.zip" },
-  { label: "Linux x64", asset: "shellint-linux-x64.zip", note: "unproven" },
-  { label: "Windows x64", asset: "shellint-windows-x64.zip", note: "unproven" },
-];
+type LatestRelease = {
+  tag_name: string;
+  published_at: string;
+  html_url: string;
+  assets: ReleaseAsset[];
+};
 
 const LOCAL_ADDS = [
   "Device connection over the LAN, with digest auth to the box",
@@ -48,9 +32,37 @@ const LOCAL_ADDS = [
 ];
 
 export function Download() {
+  const [theme, toggleTheme] = useTheme();
+  const [release, setRelease] = useState<LatestRelease | null>(null);
+  const [releaseFailed, setReleaseFailed] = useState(false);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(latestReleaseApiUrl(), {
+      headers: {
+        Accept: "application/vnd.github+json",
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+      signal: controller.signal,
+    })
+      .then((response) => {
+        if (!response.ok) throw new Error(`GitHub returned ${response.status}`);
+        return response.json() as Promise<LatestRelease>;
+      })
+      .then(setRelease)
+      .catch((error: unknown) => {
+        if (!(error instanceof DOMException && error.name === "AbortError")) {
+          setReleaseFailed(true);
+        }
+      });
+    return () => controller.abort();
+  }, []);
+
+  const assets = release?.assets.filter((asset) => asset.name.endsWith(".zip")) ?? [];
+
   return (
     <Fragment>
-      <SiteHeader />
+      <SiteHeader theme={theme} toggle={toggleTheme} />
 
       <main class="site-main">
         <section class="hero hero-download">
@@ -61,53 +73,42 @@ export function Download() {
             <code>npm install</code> required.
           </p>
 
-          <Group title="Binary size" id="sizeGroup" caption="actual vs. 5 MB cap">
-            <MeasureList labelWidth={104}>
-              <MeasureRow
-                label="shellint"
-                value={fmtBytes(BINARY_BYTES)}
-                fraction={BINARY_BYTES / CAP_BYTES}
-                tone="accent"
-                soft
-                title={`${fmtBytes(BINARY_BYTES)} of a 5 MB advisory cap (macOS arm64)`}
-                ariaLabel={`shellint binary, ${fmtBytes(BINARY_BYTES)} of a 5 megabyte cap`}
-              />
-            </MeasureList>
-          </Group>
         </section>
 
         <section class="downloads">
-          <Group title="Releases" id="releases">
-            <p class="release-note">
-              Every binary is built, size-checked and then boot-tested from an
-              empty directory on its own platform — it has to serve the UI and
-              compile a device script before it can be released. Only macOS
-              arm64 has been run by a human, so Linux and Windows are marked
-              unproven: working, but not yet used in anger.
-            </p>
-            <table id="downloadTable">
-              <thead>
-                <tr>
-                  <th>Platform</th>
-                  <th>Asset</th>
-                </tr>
-              </thead>
-              <tbody>
-                {PLATFORMS.map((p) => (
-                  <tr key={p.asset}>
-                    <td>
-                      {p.label}
-                      {p.note ? <span class="muted"> · {p.note}</span> : null}
-                    </td>
-                    <td>
-                      <a href={releaseAssetUrl(p.asset)}>{p.asset}</a>
-                    </td>
+          <Group
+            title="Latest release"
+            id="releases"
+            caption={release ? `${release.tag_name} · ${fmtDate(release.published_at)}` : "GitHub"}
+          >
+            {!release && !releaseFailed ? (
+              <p class="release-note" role="status">Loading release assets…</p>
+            ) : null}
+            {releaseFailed ? (
+              <p class="release-note">GitHub release data unavailable.</p>
+            ) : null}
+            {release ? (
+              <table id="downloadTable">
+                <thead>
+                  <tr>
+                    <th>Platform</th>
+                    <th>Asset</th>
+                    <th>Size</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {assets.map((asset) => (
+                    <tr key={asset.name}>
+                      <td>{platformLabel(asset.name)}</td>
+                      <td><a href={asset.browser_download_url}>{asset.name}</a></td>
+                      <td>{fmtBytes(asset.size)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            ) : null}
             <p>
-              <a href={releasesUrl()} target="_blank" rel="noreferrer">
+              <a href={release?.html_url ?? releasesUrl()} target="_blank" rel="noreferrer">
                 All releases on GitHub
               </a>
             </p>
@@ -119,8 +120,7 @@ export function Download() {
             <ol>
               <li>Download the zip for your platform</li>
               <li>
-                <code>unzip shellint-macos-arm64.zip</code> — the zip stores the
-                executable bit, so no <code>chmod</code> is needed
+                <code>unzip shellint-macos-arm64.zip</code>
               </li>
               <li>
                 <code>./shellint</code>
@@ -132,17 +132,6 @@ export function Download() {
             <pre class="curl-line">
               <code>curl -fsSL -O {releaseAssetUrl("shellint-macos-arm64.zip")}{"\n"}unzip shellint-macos-arm64.zip{"\n"}./shellint</code>
             </pre>
-          </Group>
-        </section>
-
-        <section class="build-from-source">
-          <Group title="Build from source" id="buildFromSource">
-            <p>
-              <code>mise run build:txiki:executable</code> compiles the
-              single-file executable for your host platform. If <code>tjs</code>{" "}
-              is not on <code>PATH</code>, point{" "}
-              <code>SHELLINT_TJS_BIN</code> at a txiki.js build first.
-            </p>
           </Group>
         </section>
 
@@ -167,5 +156,18 @@ export function Download() {
 }
 
 function fmtBytes(n: number): string {
-  return `${(n / (1024 * 1024)).toFixed(1)} MB`;
+  return `${(n / (1024 * 1024)).toFixed(2)} MB`;
+}
+
+function fmtDate(value: string): string {
+  return new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(value));
+}
+
+function platformLabel(asset: string): string {
+  const labels: Record<string, string> = {
+    "shellint-macos-arm64.zip": "macOS arm64",
+    "shellint-linux-x64.zip": "Linux x64",
+    "shellint-windows-x64.zip": "Windows x64",
+  };
+  return labels[asset] ?? asset.replace(/^shellint-/, "").replace(/\.zip$/, "");
 }

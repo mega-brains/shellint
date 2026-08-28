@@ -15,7 +15,7 @@
 import { Fragment } from "preact";
 import { Button } from "../ui/button";
 import { Group } from "../ui/measure";
-import { useTheme } from "../shell/theme";
+import { useTheme, type Theme } from "../shell/theme";
 import { repoUrl } from "./release";
 
 /**
@@ -32,23 +32,28 @@ import { repoUrl } from "./release";
  * Both files are 1620×908; the box crops the bottom (see `.hero-shot` in
  * site.css), which is why the dashboard rail sits high in the frame.
  */
-function HeroShot() {
-  const [theme] = useTheme();
+function HeroShot({ theme }: { theme: Theme }) {
   return (
-    <div class="hero-shot" style={{ aspectRatio: "1620 / 660" }}>
-      <img
-        src={theme === "dark" ? "./shellint-header-dark.png" : "./shellint-header.png"}
-        width={1620}
-        height={908}
-        alt="shellint editor, build dashboard and device dock"
-        loading="eager"
-      />
+    <div class="hero-window">
+      <div class="hero-window-bar" aria-hidden="true">
+        <span class="window-lights"><i /><i /><i /></span>
+        <span>scripts/main.ts</span>
+        <span class="window-state">ready</span>
+      </div>
+      <div class="hero-shot" style={{ aspectRatio: "1620 / 660" }}>
+        <img
+          src={theme === "dark" ? "./shellint-header-dark.png" : "./shellint-header.png"}
+          width={1620}
+          height={908}
+          alt="shellint editor, build dashboard and device dock"
+          loading="eager"
+        />
+      </div>
     </div>
   );
 }
 
-export function SiteHeader() {
-  const [theme, toggle] = useTheme();
+export function SiteHeader({ theme, toggle }: { theme: Theme; toggle: () => void }) {
   const next = theme === "dark" ? "light" : "dark";
   return (
     <header class="site-top">
@@ -57,7 +62,9 @@ export function SiteHeader() {
         <span>shellint</span>
       </a>
       <nav class="site-nav">
-        <a href="./demo/">Demo</a>
+        <a class="chip" href="./demo/">Demo <span aria-hidden="true">→</span></a>
+        <a href="./docs.html">Docs</a>
+        <a href="./checks.html">Checks</a>
         <a href="./download.html">Download</a>
         <a href={repoUrl()} target="_blank" rel="noreferrer">
           GitHub
@@ -93,21 +100,27 @@ export function SiteFooter() {
 
 const FEATURES: { title: string; body: string }[] = [
   {
-    title: "66 compliance checks, five tiers",
-    body: "Source lint through post-compile dialect guard, including device-profile- and capability-probe-aware rules. Parse and type errors land on the editor gutter, not just a status line.",
+    title: "Lint for Shelly",
+    body: "66 checks catch Espruino, device, and firmware limits.",
   },
   {
-    title: "Size is a first-class metric",
-    body: "Debug/prod × raw/minified/advanced artifacts, a size sparkline over history, and a JsVar memory estimate checked against the device's live mem_peak.",
+    title: "Know what fits",
+    body: "Track script bytes, JsVars, and live peak memory.",
   },
   {
-    title: "Build-time env gating",
-    body: "meta.env.debug/meta.env.prod dead-code-eliminate whole branches; production also shortens log strings into a map the log panel re-expands.",
+    title: "Ship lean builds",
+    body: "Compare debug, production, and advanced artifacts.",
   },
   {
-    title: "A real device loop",
-    body: "Multi-device and slot selection, WS PutCode deploy, live status and eco toggle, streamed debug logs, and a 104-probe capability scan of what the box actually supports.",
+    title: "Stay near hardware",
+    body: "Deploy, stream logs, and probe real capabilities.",
   },
+];
+
+const SIGNALS = [
+  ["66", "checks"],
+  ["6", "artifacts"],
+  ["104", "probes"],
 ];
 
 /**
@@ -115,35 +128,44 @@ const FEATURES: { title: string; body: string }[] = [
  * fills it (a fragment, not a wrapping div) so the root's id stays unique.
  */
 export function Landing() {
+  const [theme, toggle] = useTheme();
   return (
     <Fragment>
-      <SiteHeader />
+      <SiteHeader theme={theme} toggle={toggle} />
 
       <main class="site-main">
         <section class="hero">
-          <h1>
-            Author Shelly Gen2 scripts in TypeScript. Lint them against the
-            Espruino subset. Watch the size budget.
-          </h1>
-          <p class="hero-sub">
-            A local development playground for Shelly Gen2 device scripts —
-            type safety, device-aware linting and a memory/size dashboard, in
-            front of a real device or entirely offline.
-          </p>
-          <div class="hero-cta">
-            <a class="site-btn site-btn-primary" id="ctaDemo" href="./demo/">
-              Try it in the browser
-            </a>
-            <a class="site-btn" id="ctaDownload" href="./download.html">
-              Download
-            </a>
+          <div class="hero-copy">
+            <p class="hero-kicker">Shelly Gen2+ · TypeScript · Espruino</p>
+            <h1>Write smarter scripts. Keep them small.</h1>
+            <p class="hero-sub">
+              Type safety, device-aware linting, size budgets, and deployment.
+              One local workspace.
+            </p>
+            <div class="hero-cta">
+              <a class="site-btn site-btn-primary" id="ctaDemo" href="./demo/">
+                Open browser demo <span aria-hidden="true">→</span>
+              </a>
+              <a class="site-btn" id="ctaDownload" href="./download.html">
+                Download
+              </a>
+            </div>
+            <dl class="hero-signals" aria-label="shellint capabilities">
+              {SIGNALS.map(([value, label]) => (
+                <div key={label}>
+                  <dt>{value}</dt>
+                  <dd>{label}</dd>
+                </div>
+              ))}
+            </dl>
           </div>
-          <HeroShot />
+          <HeroShot theme={theme} />
         </section>
 
         <section class="features">
-          {FEATURES.map((f) => (
+          {FEATURES.map((f, index) => (
             <article class="feature" key={f.title}>
+              <span class="feature-index" aria-hidden="true">0{index + 1}</span>
               <h2>{f.title}</h2>
               <p>{f.body}</p>
             </article>
@@ -153,12 +175,8 @@ export function Landing() {
         <section class="limits">
           <Group title="What the demo cannot do" id="limits">
             <p>
-              The demo at <code>./demo/</code> runs entirely in your browser — no
-              server, no device, works offline. The 14 lint rules that need a
-              device profile or capability probe report <em>skipped</em>, not
-              pass or fail, and there is no live device panel, deploy or logs.
-              <a href="./download.html"> Download the local version</a> for the
-              full loop.
+              Browser demo works offline. Device-only checks, deploys, and logs
+              need <a href="./download.html">local version</a>.
             </p>
           </Group>
         </section>

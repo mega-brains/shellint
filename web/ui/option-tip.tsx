@@ -180,6 +180,10 @@ export function OptTip(props: OptTipProps) {
       >
         <p class="opt-tip-name">{props.content.name}</p>
         <p class="opt-tip-blurb">{props.content.blurb}</p>
+        {/* Rules with no fixed code shape (the inputs group, the dynamic
+            capability checks) carry no example — dropping the block entirely
+            beats rendering an empty tinted strip under the blurb. */}
+        {props.content.before.length || props.content.after.length ? (
         <div class="opt-tip-diff" aria-hidden="true">
           {props.content.before.map((line, i) => (
             <div key={`b${i}`} class="opt-tip-line diff-del">
@@ -194,6 +198,7 @@ export function OptTip(props: OptTipProps) {
             </div>
           ))}
         </div>
+        ) : null}
       </div>
     </BodyPortal>
   );

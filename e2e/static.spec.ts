@@ -194,11 +194,27 @@ test.describe("presentation site (M26)", () => {
   });
 
   test("landing loads and the download CTA reaches /download.html", async ({ page }) => {
+    await page.route("https://api.github.com/repos/mega-brains/shellint/releases/latest", (route) =>
+      route.fulfill({
+        json: {
+          tag_name: "v9.8.7",
+          published_at: "2026-08-28T09:20:16Z",
+          html_url: "https://github.com/mega-brains/shellint/releases/tag/v9.8.7",
+          assets: [{
+            name: "shellint-macos-arm64.zip",
+            size: 3_759_339,
+            browser_download_url: "https://example.test/shellint-macos-arm64.zip",
+          }],
+        },
+      }),
+    );
     await page.goto(`${STATIC_BASE}/`);
     await expect(page.locator("#site")).toBeVisible();
     await page.locator("#ctaDownload").click();
     await expect(page).toHaveURL(`${STATIC_BASE}/download.html`);
     await expect(page.locator("#downloadTable")).toBeVisible();
+    await expect(page.locator("#releases")).toContainText("v9.8.7");
+    await expect(page.locator("#downloadTable")).toContainText("3.59 MB");
   });
 
   test("theme toggled on the landing persists into the demo", { tag: "@browser-api" }, async ({ page }) => {
@@ -208,6 +224,9 @@ test.describe("presentation site (M26)", () => {
     // "shellint.theme" key — web/shell/theme.ts).
     await page.goto(`${STATIC_BASE}/`);
     await page.evaluate(() => localStorage.removeItem("shellint.theme"));
+    await expect
+      .poll(() => page.evaluate(() => document.documentElement.dataset.theme))
+      .toBeDefined();
     const before = await page.evaluate(() => document.documentElement.dataset.theme);
 
     await page.locator("#themeToggle").click();
@@ -222,5 +241,68 @@ test.describe("presentation site (M26)", () => {
     await page.goto(`${STATIC_BASE}/demo/`);
     await expect(page.locator("#editor .cm-content")).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.dataset.theme)).toBe(after);
+  });
+
+  test("docs page renders its sections and the TOC links into them", async ({ page }) => {
+    await page.goto(`${STATIC_BASE}/docs.html`);
+    await expect(page.locator("#docs")).toBeVisible();
+    // The security warning is the one section whose absence would be a real
+    // problem — it is the reason the page links from the download page at all.
+    await expect(page.locator("#security")).toContainText("no authentication of its own");
+    await page.locator('.docs-toc a[href="#commands"]').click();
+    await expect(page).toHaveURL(`${STATIC_BASE}/docs.html#commands`);
+    await expect(page.locator("#commands")).toBeVisible();
+  });
+
+  test("checks page lists the catalog and filters it", async ({ page }) => {
+    await page.goto(`${STATIC_BASE}/checks.html`);
+    // Rendered from server/lint/check-catalog.ts, so the count is whatever the
+    // engine currently ships; asserting a floor keeps this from becoming a
+    // second place to update when a rule is added.
+    const rows = page.locator(".checks-table tbody tr");
+    const total = await rows.count();
+    expect(total).toBeGreaterThan(40);
+    await expect(page.locator("#checkCount")).toContainText(`${total} of ${total}`);
+
+    await page.locator("#checkSearch").fill("probe-absent-api");
+    await expect(rows).toHaveCount(1);
+    await expect(page.locator("#check-probe-absent-api")).toBeVisible();
+
+    await page.locator("#checkSearch").fill("no-such-rule-anywhere");
+    await expect(page.locator("#checkEmpty")).toBeVisible();
+  });
+
+  test("the example badge reveals a rule's before/after on hover", async ({ page }) => {
+    await page.goto(`${STATIC_BASE}/checks.html`);
+
+    // no-regexp carries a RULE_TIPS example (web/check/check-tips.ts): a badge
+    // in the Example column, and a card that only paints while it is hovered.
+    const row = page.locator("#check-no-regexp");
+    const card = row.locator(".check-ex-card");
+    await expect(card).toBeHidden();
+    await row.locator(".check-ex-badge").hover();
+    await expect(card).toBeVisible();
+    await expect(card.locator(".check-ex-line.diff-del")).toHaveCount(1);
+    await expect(card.locator(".check-ex-line.diff-add")).toHaveCount(1);
+    await expect(card).toContainText("charAt");
+    // web/site/code-highlight.tsx: `var` is a keyword, "0"/"9" are strings.
+    await expect(card.locator(".tok-keyword").first()).toHaveText("var");
+    await expect(card.locator(".tok-string").first()).toHaveText('"0"');
+
+    // Hovering the row itself is not the trigger — only the badge is.
+    await page.locator("#check-no-regexp td").first().hover();
+    await expect(card).toBeHidden();
+
+    // syntax-error has no fixed code shape, so it gets no badge at all.
+    await expect(page.locator("#check-syntax-error .check-ex-badge")).toHaveCount(0);
+  });
+
+  test("header nav reaches the docs and checks pages", async ({ page }) => {
+    await page.goto(`${STATIC_BASE}/`);
+    await page.locator('.site-nav a[href="./docs.html"]').click();
+    await expect(page).toHaveURL(`${STATIC_BASE}/docs.html`);
+    await page.locator('.site-nav a[href="./checks.html"]').click();
+    await expect(page).toHaveURL(`${STATIC_BASE}/checks.html`);
+    await expect(page.locator(".checks-table").first()).toBeVisible();
   });
 });

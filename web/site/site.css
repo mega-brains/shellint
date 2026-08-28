@@ -7,7 +7,7 @@
  * dock, no inspector, and pulling in panels.css (~35 KB) for two small pages
  * would blow the 12 KB site.css budget for nothing. The `.chip`/button rules
  * (for the theme toggle) and the `.measures`/`.group` rules (for the download
- * page's size row) below are the minimum subset copied out of
+ * page's groups) below are the minimum subset copied out of
  * web/shell/panels.css and web/shell/styles.css that those two imported
  * components (Button, MeasureRow/MeasureList/Group) need to render correctly.
  */
@@ -26,7 +26,14 @@ html {
   font-size: 16px;
 }
 
-body { padding: 0; }
+body {
+  padding: 0;
+  background:
+    radial-gradient(circle at 78% 18%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 28rem),
+    linear-gradient(color-mix(in srgb, var(--faint) 7%, transparent) 1px, transparent 1px),
+    linear-gradient(90deg, color-mix(in srgb, var(--faint) 7%, transparent) 1px, transparent 1px);
+  background-size: auto, 32px 32px, 32px 32px;
+}
 
 a { color: inherit; }
 
@@ -42,7 +49,9 @@ code, pre {
   gap: 20px;
   height: 52px;
   padding: 0 20px;
-  background: var(--surface);
+  border-bottom: 1px solid color-mix(in srgb, var(--faint) 18%, transparent);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  backdrop-filter: blur(14px);
 }
 
 .site-wordmark {
@@ -136,15 +145,17 @@ button.chip-icon:hover { color: var(--ink); }
   font-size: 14px;
   font-weight: 600;
   text-decoration: none;
-  transition: background-color 120ms ease-out, color 120ms ease-out;
+  border: 1px solid color-mix(in srgb, var(--faint) 22%, transparent);
+  transition: transform 120ms ease-out, background-color 120ms ease-out, color 120ms ease-out;
 }
 
-.site-btn:hover { color: var(--accent); }
+.site-btn:hover { color: var(--accent); transform: translateY(-1px); }
 .site-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 .site-btn-primary,
 .site-btn-primary:hover {
   background: var(--accent);
+  border-color: var(--accent);
   color: var(--accent-ink);
 }
 
@@ -153,30 +164,49 @@ button.chip-icon:hover { color: var(--ink); }
 .site-main {
   display: flex;
   flex-direction: column;
-  gap: 56px;
-  max-width: 880px;
+  gap: 64px;
+  max-width: 1120px;
   margin: 0 auto;
-  padding: 48px 20px 80px;
+  padding: 72px 24px 88px;
 }
 
 .hero {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.78fr) minmax(520px, 1.22fr);
+  align-items: center;
+  gap: 48px;
+}
+
+.hero-copy {
   display: flex;
   flex-direction: column;
-  gap: 18px;
+  align-items: flex-start;
+  gap: 20px;
+}
+
+.hero-kicker {
+  margin: 0;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
 }
 
 .hero h1 {
   margin: 0;
-  font-size: 32px;
-  line-height: 1.25;
-  letter-spacing: -0.01em;
+  max-width: 12ch;
+  font-size: clamp(38px, 4.4vw, 58px);
+  line-height: 1.04;
+  letter-spacing: -0.045em;
 }
 
 .hero-sub {
   margin: 0;
-  max-width: 60ch;
+  max-width: 43ch;
   font-size: 15px;
-  line-height: 1.6;
+  line-height: 1.55;
   color: var(--muted);
 }
 
@@ -185,11 +215,47 @@ button.chip-icon:hover { color: var(--ink); }
   gap: 12px;
 }
 
+.hero-signals {
+  display: flex;
+  gap: 28px;
+  margin: 4px 0 0;
+}
+
+.hero-signals div { display: grid; gap: 2px; }
+.hero-signals dt { font-family: var(--mono); font-size: 17px; font-weight: 700; }
+.hero-signals dd { margin: 0; color: var(--faint); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; }
+
+.hero-window {
+  min-width: 0;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--faint) 24%, transparent);
+  border-radius: 12px;
+  background: var(--surface);
+  box-shadow: 0 24px 60px color-mix(in srgb, var(--bg) 65%, transparent);
+}
+
+.hero-window-bar {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+  height: 34px;
+  padding: 0 12px;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 9px;
+}
+
+.window-lights { display: flex; gap: 5px; }
+.window-lights i { width: 6px; height: 6px; border-radius: 50%; background: var(--neutral-bar); }
+.window-lights i:first-child { background: var(--danger); }
+.window-lights i:nth-child(2) { background: var(--warn); }
+.window-lights i:last-child { background: var(--ok); }
+.window-state { justify-self: end; color: var(--ok); }
+
 .hero-shot {
   position: relative;
   overflow: hidden;
-  border-radius: 10px;
-  background: var(--surface);
+  background: var(--surface-3);
 }
 
 .hero-shot img {
@@ -204,23 +270,22 @@ button.chip-icon:hover { color: var(--ink); }
 
 .features {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 20px;
-}
-
-@media (max-width: 640px) {
-  .features { grid-template-columns: 1fr; }
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 12px;
 }
 
 .feature {
-  padding: 16px;
-  border-radius: 8px;
-  background: var(--surface);
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--faint) 18%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
 }
+
+.feature-index { display: block; margin-bottom: 24px; color: var(--accent); font-family: var(--mono); font-size: 10px; }
 
 .feature h2 {
   margin: 0 0 6px;
-  font-size: 14px;
+  font-size: 15px;
 }
 
 .feature p {
@@ -231,7 +296,7 @@ button.chip-icon:hover { color: var(--ink); }
 }
 
 /* ---------------------------------------------------------------- groups */
-/* Subset of web/shell/panels.css's group + measure rules. */
+/* Subset of web/shell/panels.css's group rules. */
 
 .group {
   display: flex;
@@ -258,63 +323,35 @@ button.chip-icon:hover { color: var(--ink); }
 
 .group-caption { font-weight: 400; }
 
-.measures {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  gap: 6px;
-}
-
-.measure {
-  display: grid;
-  grid-template-columns: var(--measure-label, 76px) minmax(0, 1fr) var(--measure-value, 62px);
-  align-items: center;
-  gap: 8px;
-  min-width: 0;
-}
-
-.measure-label {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11.5px;
-  color: var(--muted);
-}
-
-.measure.soft .measure-label { font-style: italic; }
-
-.measure-track {
-  height: 6px;
-  border-radius: 3px;
-  background: var(--surface-2);
-  overflow: hidden;
-}
-
-.measure-fill {
-  height: 100%;
-  border-radius: 3px;
-  background: var(--accent);
-}
-
-.tone-neutral { background: var(--neutral-bar); }
-.tone-warn { background: var(--warn); }
-.tone-danger { background: var(--danger); }
-
-.measure-value {
-  font-family: var(--mono);
-  font-size: 11.5px;
-  color: var(--ink);
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-}
-
 /* -------------------------------------------------------------- limits */
 
 .limits p, .limits li {
   font-size: 13.5px;
   line-height: 1.6;
   color: var(--muted);
+}
+
+.limits {
+  padding: 18px 20px;
+  border-left: 2px solid var(--accent);
+  background: color-mix(in srgb, var(--surface) 70%, transparent);
+}
+
+@media (max-width: 900px) {
+  .site-main { padding-top: 48px; }
+  .hero { grid-template-columns: 1fr; }
+  .hero h1 { max-width: 14ch; }
+  .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 560px) {
+  .site-nav { gap: 10px; }
+  .site-main { padding: 40px 16px 64px; }
+  .hero { gap: 34px; }
+  .hero h1 { font-size: 40px; }
+  .hero-cta { width: 100%; flex-direction: column; }
+  .site-btn { justify-content: center; }
+  .features { grid-template-columns: 1fr; }
 }
 
 /* -------------------------------------------------------------- table */

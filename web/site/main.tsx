@@ -6,15 +6,21 @@
  * mounts the matching component into #site.
  */
 import { render } from "preact";
+import type { ComponentType } from "preact";
 import { Landing } from "./landing";
 import { Download } from "./download";
+import { Docs } from "./docs";
+import { Checks } from "./checks";
 
 const root = document.getElementById("site");
 if (!root) throw new Error("#site missing");
 
-const page = document.body.dataset.page;
-if (page === "download") {
-  render(<Download />, root);
-} else {
-  render(<Landing />, root);
-}
+/** Keys are the `data-page` values in web/site/*.html; landing is the default. */
+const PAGES: Record<string, ComponentType> = {
+  download: Download,
+  docs: Docs,
+  checks: Checks,
+};
+
+const Page = PAGES[document.body.dataset.page ?? ""] ?? Landing;
+render(<Page />, root);
