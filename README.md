@@ -1,4 +1,4 @@
-# shellint
+# <img src="./.github/assets/shellint-icon.svg" alt="" width="28" height="28" valign="middle"> shellint
 
 A local development playground for [Shelly Gen2 device scripts](https://shelly-api-docs.shelly.cloud/gen2/Scripts/Overview):
 write them in TypeScript, see what they will cost in RAM and bytes before they
@@ -11,7 +11,7 @@ memory is the binding constraint, the dialect is a subset, and most of what a
 general JavaScript toolchain tells you is either irrelevant or wrong. shellint
 is built around that.
 
-![shellint](./shellint-header.png)
+![shellint](./.github/assets/shellint-header.png)
 
 **[Try it in your browser →](https://mega-brains.github.io/shellint/)** — the same
 UI, no server and no device, running the real compiler and the real check engine
@@ -61,7 +61,7 @@ toggle eco mode and reboot the device.
   tunnel, or in front of the internet. There is nothing in it that would survive
   a hostile network.
 
-See [`SECURITY.md`](./SECURITY.md) for the threat model and how to report
+See [`SECURITY.md`](./.github/SECURITY.md) for the threat model and how to report
 something.
 
 ## What it does
@@ -232,7 +232,7 @@ the Linux and Windows binaries as working-but-unproven.
 
 ## Contributing
 
-See [`CONTRIBUTING.md`](./CONTRIBUTING.md). Short version: `mise run
+See [`CONTRIBUTING.md`](./.github/CONTRIBUTING.md). Short version: `mise run
 beforeCommit` must be green, source files stay under 500 lines, and design
 changes need baselines refreshed on both macOS and Linux.
 

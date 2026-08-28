@@ -10,10 +10,10 @@
     "allowImportingTsExtensions": true,
     "rewriteRelativeImportExtensions": false
   },
-  "include": ["server/**/*.ts"],
+  "include": ["../server/**/*.ts"],
   "exclude": [
-    "server/index.txiki.ts",
-    "server/runtime/txiki.ts",
-    "server/build/txiki-runtime.ts"
+    "../server/index.txiki.ts",
+    "../server/runtime/txiki.ts",
+    "../server/build/txiki-runtime.ts"
   ]
 }

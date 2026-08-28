@@ -172,7 +172,7 @@ if (same("debug.raw.js", "debug.js")) {
   writeFileSync(
     config,
     JSON.stringify({
-      extends: "./tsconfig.shelly.base.json",
+      extends: "./config/tsconfig.shelly.base.json",
       compilerOptions: { noEmit: true },
       include: ["scripts/banned-globals.fixture.ts", "types/**/*.d.ts"],
     }),

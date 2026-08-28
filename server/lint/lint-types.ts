@@ -131,7 +131,7 @@ export function lintSyntax(source: string): Finding[] {
 
 /**
  * Every `tsc` error the device build would report, under exactly the options
- * `tsconfig.shelly.base.json` uses (`DEVICE_COMPILER_OPTIONS`), so a Check error and
+ * `config/tsconfig.shelly.base.json` uses (`DEVICE_COMPILER_OPTIONS`), so a Check error and
  * a Build failure never disagree.
  *
  * Returns nothing when no `types/*.d.ts` were readable: with the device stdlib

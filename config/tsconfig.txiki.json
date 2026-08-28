@@ -12,14 +12,14 @@
     "allowImportingTsExtensions": true
   },
   "include": [
-    "server/**/*.ts",
-    "shared/**/*.d.mts",
-    "web/static/minify-adv-browser.ts"
+    "../server/**/*.ts",
+    "../shared/**/*.d.mts",
+    "../web/static/minify-adv-browser.ts"
   ],
   "exclude": [
-    "server/index.ts",
-    "server/core/node-server.ts",
-    "server/build/node-builder-entry.ts",
-    "server/runtime/node.ts"
+    "../server/index.ts",
+    "../server/core/node-server.ts",
+    "../server/build/node-builder-entry.ts",
+    "../server/runtime/node.ts"
   ]
 }

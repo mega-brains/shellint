@@ -1,7 +1,7 @@
 # `types/`
 
 The whole standard library device code gets. The Shelly compile runs with
-`noLib` and `types: []` (see `tsconfig.shelly.base.json`), so nothing here is
+`noLib` and `types: []` (see `config/tsconfig.shelly.base.json`), so nothing here is
 optional — if a global is not declared in this directory, device code cannot
 use it.
 

@@ -10,7 +10,7 @@
  * (web/static/node-shims/) hand it in place of a real disk.
  *
  * Uses `self.onmessage`/`postMessage` through narrow casts rather than the
- * `WebWorker` lib: tsconfig.web.json sets `lib: [...,"DOM",...]` for the rest
+ * `WebWorker` lib: config/tsconfig.web.json sets `lib: [...,"DOM",...]` for the rest
  * of web/ (Preact + browser globals), and TypeScript cannot mix the DOM and
  * WebWorker libs in one program (both declare a conflicting global `self`).
  * The casts touch only the one call that actually differs at the type level

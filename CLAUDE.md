@@ -3,7 +3,7 @@
 Guidance for Claude Code (claude.ai/code) working in this repository.
 
 Read alongside: [`README.md`](./README.md) (what it is, how to run it),
-[`CONTRIBUTING.md`](./CONTRIBUTING.md) (the gate and the rules it enforces).
+[`CONTRIBUTING.md`](./.github/CONTRIBUTING.md) (the gate and the rules it enforces).
 This file is the architecture map — keep it accurate when you change what it
 describes.
 
@@ -51,10 +51,10 @@ mise run typecheck:script # your live scripts/main.ts — deliberately outside t
 txiki variants (`build:txiki`, `start:txiki`, `test:txiki`, `test:e2e:txiki`,
 `vendor:txiki`) mirror the Node ones — see the runtime section below.
 
-Build config: `tsconfig.shelly.base.json` (device compiler options; extended by
-`tsconfig.shelly.script.json` for `scripts/main.ts` and
-`tsconfig.shelly.fixture.json` for the gate's fixture) / `tsconfig.server.json` /
-`tsconfig.web.json`. Entry `scripts/main.ts`, pipeline `scripts/build-shelly.mjs`.
+Build config: `config/tsconfig.shelly.base.json` (device compiler options; extended by
+`config/tsconfig.shelly.script.json` for `scripts/main.ts` and
+`config/tsconfig.shelly.fixture.json` for the gate's fixture) / `config/tsconfig.server.json` /
+`config/tsconfig.web.json`. Entry `scripts/main.ts`, pipeline `scripts/build-shelly.mjs`.
 
 ## Stack
 

@@ -12,5 +12,5 @@
     "jsx": "react-jsx",
     "jsxImportSource": "preact"
   },
-  "include": ["web/**/*.ts", "web/**/*.tsx"]
+  "include": ["../web/**/*.ts", "../web/**/*.tsx"]
 }

@@ -64,7 +64,7 @@ const TSC_OUT_JS = path.join(
   TSC_OUT_DIR,
   `${path.basename(MAIN_TS, path.extname(MAIN_TS))}.js`,
 );
-const TSCONFIG = path.join(root, "tsconfig.shelly.script.json");
+const TSCONFIG = path.join(root, "config", "tsconfig.shelly.script.json");
 const DEVICE_PROFILE_PATH = path.join(root, DEVICE_PROFILE_ENV);
 
 export function loadConfig() {
@@ -136,7 +136,7 @@ function writeGeneratedTsconfig() {
     file,
     JSON.stringify(
       {
-        extends: path.join(root, "tsconfig.shelly.base.json"),
+        extends: path.join(root, "config", "tsconfig.shelly.base.json"),
         compilerOptions: { rootDir: path.dirname(MAIN_TS), outDir: TSC_OUT_DIR },
         include: [MAIN_TS, path.join(root, "types", "*.d.ts")],
         exclude: [path.join(root, "types", "generated.d.ts")],

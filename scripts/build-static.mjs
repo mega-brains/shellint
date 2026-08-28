@@ -7,8 +7,8 @@
  *   download.html         releases page                       (new, M26)
  *   site.js               landing+download Preact bundle       (new, M26)
  *   site.css              tokens.css + site-only layout CSS    (new, M26)
- *   shellint-header.png        hero screenshot, light  (from repo root, M26)
- *   shellint-header-dark.png   hero screenshot, dark   (from repo root, M26)
+ *   shellint-header.png        hero screenshot, light  (from .github/assets, M26)
+ *   shellint-header-dark.png   hero screenshot, dark   (from .github/assets, M26)
  *   .nojekyll              stop Pages' Jekyll step from touching `_`-prefixed
  *                          paths — applies to the whole publish, stays at root
  *   demo/
@@ -340,10 +340,11 @@ for (const page of ["index.html", "download.html"]) {
 
 // The only images the site ships (M26 plan §5) — the landing hero screenshot
 // in both themes, since web/site/landing.tsx picks one off the visitor's
-// current theme. Committed at the repo root rather than under web/ so they
-// aren't mistaken for something the app bundle needs.
+// current theme. Committed under .github/assets/ rather than under web/ so they
+// aren't mistaken for something the app bundle needs; they land flat at the
+// site root, which is the path landing.tsx asks for.
 for (const img of ["shellint-header.png", "shellint-header-dark.png"]) {
-  copyFileSync(join(root, img), join(siteDir, img));
+  copyFileSync(join(root, ".github", "assets", img), join(siteDir, img));
 }
 
 // ------------------------------------------------------------------ report

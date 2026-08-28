@@ -3,9 +3,9 @@
   // work-in-progress scripts/main.ts can never fail lint/build/test.
   "extends": "./tsconfig.shelly.base.json",
   "compilerOptions": {
-    "rootDir": "./fixtures/device",
-    "outDir": "./.tsc-out"
+    "rootDir": "../fixtures/device",
+    "outDir": "../.tsc-out"
   },
-  "include": ["fixtures/device/main.ts", "types/**/*.d.ts"],
-  "exclude": ["types/generated.d.ts"]
+  "include": ["../fixtures/device/main.ts", "../types/**/*.d.ts"],
+  "exclude": ["../types/generated.d.ts"]
 }

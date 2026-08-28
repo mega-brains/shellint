@@ -39,7 +39,7 @@ export function distDir() {
  */
 export function scriptTsconfig() {
   return scriptPath() === path.join(ROOT, "scripts", "main.ts")
-    ? path.join(ROOT, "tsconfig.shelly.script.json")
+    ? path.join(ROOT, "config", "tsconfig.shelly.script.json")
     : path.join(distDir(), ".tsc-out", "tsconfig.json");
 }
 
