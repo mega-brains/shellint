@@ -295,6 +295,137 @@ button.chip-icon:hover { color: var(--ink); }
   color: var(--muted);
 }
 
+/* ------------------------------------------------------------------ tour */
+/* One region of the real UI per row. Each crop stays inside a shared visual
+   stage, so narrow toolbar slices and taller inspector panels still read as
+   parts of the same workspace. */
+
+.tour {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.tour-heading {
+  max-width: 680px;
+  margin-bottom: 10px;
+}
+
+.tour-kicker {
+  margin: 0 0 10px;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.tour-heading h2 {
+  margin: 0 0 10px;
+  font-size: clamp(28px, 4vw, 42px);
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+
+.tour-heading > p:last-child {
+  margin: 0;
+  max-width: 58ch;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.tour-row {
+  position: relative;
+  display: grid;
+  gap: 22px;
+  padding: 24px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--faint) 20%, transparent);
+  border-radius: 14px;
+  background:
+    linear-gradient(135deg, color-mix(in srgb, var(--surface) 96%, transparent), color-mix(in srgb, var(--surface-2) 78%, transparent));
+}
+
+.tour-row::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 2px;
+  background: linear-gradient(180deg, var(--accent), transparent 72%);
+  content: "";
+}
+
+.tour-shots {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 12px;
+  overflow: hidden;
+  border: 1px solid color-mix(in srgb, var(--faint) 14%, transparent);
+  border-radius: 10px;
+  background:
+    radial-gradient(circle at 88% 10%, color-mix(in srgb, var(--accent) 10%, transparent), transparent 18rem),
+    color-mix(in srgb, var(--bg) 72%, transparent);
+}
+
+.tour-copy {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 14px;
+  align-items: start;
+  max-width: 78ch;
+}
+
+.tour-index {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border: 1px solid color-mix(in srgb, var(--accent) 38%, transparent);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.tour-copy h3 {
+  margin: 1px 0 7px;
+  font-size: 19px;
+  letter-spacing: -0.015em;
+}
+
+.tour-copy p {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+/* Same frame as .hero-shot, minus the window chrome: the crops carry no
+   border of their own, so without one a light shot bleeds into the page. */
+.tour-shot {
+  flex: 1 1 auto;
+  overflow: hidden;
+  /* Shrink-wrap: the crops differ in width (500 px for the artifact strip,
+     1600 for the toolbar) and upscaling a small one blows its 11 px UI type up
+     to headline size, which reads as a different app. */
+  max-width: fit-content;
+  border: 1px solid color-mix(in srgb, var(--faint) 18%, transparent);
+  border-radius: 7px;
+  background: var(--surface-3);
+}
+
+.tour-shot img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+}
+
 /* ---------------------------------------------------------------- groups */
 /* Subset of web/shell/panels.css's group rules. */
 
@@ -352,6 +483,11 @@ button.chip-icon:hover { color: var(--ink); }
   .hero-cta { width: 100%; flex-direction: column; }
   .site-btn { justify-content: center; }
   .features { grid-template-columns: 1fr; }
+  .tour-row { padding: 18px; }
+  .tour-copy { grid-template-columns: 30px minmax(0, 1fr); gap: 11px; }
+  .tour-index { width: 30px; height: 30px; border-radius: 8px; }
+  .tour-copy h3 { font-size: 17px; }
+  .tour-shots { margin-inline: -6px; padding: 8px; }
 }
 
 /* -------------------------------------------------------------- table */

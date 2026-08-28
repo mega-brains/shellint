@@ -143,6 +143,10 @@ run = "pnpm run test:e2e:hybrid -- \"$@\""
 description = "Re-shoot the README hero screenshots (.github/assets/shellint-header{,-dark}.png) — writes tracked PNGs, outside the gate"
 run = "pnpm run capture:header"
 
+[tasks."capture:figures"]
+description = "Re-cut the landing tour crops (.github/assets/figures/) out of the hero screenshots — run after capture:header, macOS only (sips)"
+run = "pnpm run capture:figures"
+
 [tasks."test:txiki"]
 description = "Typecheck and verify txiki parity"
 run = "pnpm run test:txiki"

@@ -61,6 +61,7 @@ import {
   copyFileSync,
   existsSync,
   mkdirSync,
+  readdirSync,
   readFileSync,
   rmSync,
   statSync,
@@ -349,6 +350,16 @@ for (const img of ["shellint-header.png", "shellint-header-dark.png"]) {
   copyFileSync(join(root, ".github", "assets", img), join(siteDir, img));
 }
 
+// The landing tour's crops, cut out of those same two shots by
+// scripts/crop-docs-figures.mjs and committed next to them. Copied as a
+// directory listing rather than a hard-coded list so adding a figure to
+// landing.tsx's TOUR means re-running the crop script and nothing here.
+const figuresSrc = join(root, ".github", "assets", "figures");
+mkdirSync(join(siteDir, "figures"), { recursive: true });
+for (const img of readdirSync(figuresSrc)) {
+  copyFileSync(join(figuresSrc, img), join(siteDir, "figures", img));
+}
+
 // ------------------------------------------------------------------ report
 
 for (const f of [
@@ -360,6 +371,8 @@ for (const f of [
   "site.css",
   "shellint-header.png",
   "shellint-header-dark.png",
+  "figures/inspector-sizes.png",
+  "figures/inspector-sizes-dark.png",
   ".nojekyll",
 ]) {
   const p = join(siteDir, f);

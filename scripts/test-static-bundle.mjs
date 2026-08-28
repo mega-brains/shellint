@@ -98,12 +98,13 @@ if (siteJsBytes > 60_000) fail(`site/site.js is ${siteJsBytes} B, over its 60000
 
 const siteCssPath = join(SITE, "site.css");
 const siteCssBytes = statSync(siteCssPath).size;
-// Rebaselined from 12000 B when the docs and checks pages landed: site.entry.css
-// now bundles web/site/docs.css and web/ui/option-tip.css (the checks page
-// reuses the app's rule tip verbatim) on top of the landing/download rules,
-// taking ~11.7 KB to ~13.6 KB. ~10% above that, per the convention in
-// scripts/test-web-assets.mjs.
-if (siteCssBytes > 15_000) fail(`site/site.css is ${siteCssBytes} B, over its 15000 B budget`);
+// Rebaselined twice: from 12000 B when the docs and checks pages landed
+// (site.entry.css picked up web/site/docs.css and web/ui/option-tip.css, the
+// checks page reusing the app's rule tip verbatim), then from 15000 B for the
+// landing tour — five screenshot rows with their own stage, index badges and
+// gradients, taking ~13.6 KB to ~16.2 KB. ~10% above that, per the convention
+// in scripts/test-web-assets.mjs.
+if (siteCssBytes > 17_800) fail(`site/site.css is ${siteCssBytes} B, over its 17800 B budget`);
 
 const appSource = readFileSync(join(DEMO, "app.js"), "utf8");
 const siteJsSource = readFileSync(siteJsPath, "utf8");
@@ -134,7 +135,7 @@ if (siteJsSource.includes("cm-content")) {
 
 console.log(
   `  budgets: app.js ${appBytes} B (≤700000), worker ${workerBytes} B raw / ${workerGz} B gz (≤5000000 / ≤1350000), ` +
-    `site.js ${siteJsBytes} B (≤60000), site.css ${siteCssBytes} B (≤15000), worker/compiler/editor not leaked into site.js`,
+    `site.js ${siteJsBytes} B (≤60000), site.css ${siteCssBytes} B (≤17800), worker/compiler/editor not leaked into site.js`,
 );
 
 // ------------------------------------------------------------------ leakage
