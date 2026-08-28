@@ -1,5 +1,7 @@
 # <img src="./.github/assets/shellint-icon.svg" alt="" width="28" height="28" valign="middle"> shellint
 
+[![views](https://tst.lukasmega.deno.net/badge?site=shellint)](https://lukasmega.github.io/deno-kv-analytics/badge)
+
 A local development playground for [Shelly Gen2 device scripts](https://shelly-api-docs.shelly.cloud/gen2/Scripts/Overview):
 write them in TypeScript, see what they will cost in RAM and bytes before they
 reach the device, and have them checked against the Espruino dialect the device
