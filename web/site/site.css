@@ -336,6 +336,83 @@ button.chip-icon:hover { color: var(--ink); }
   line-height: 1.6;
 }
 
+.probe-spotlight {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(420px, 0.95fr);
+  gap: 32px;
+  padding: 32px;
+  border: 1px solid color-mix(in srgb, var(--accent) 34%, transparent);
+  border-radius: 16px;
+  background: linear-gradient(135deg, var(--surface), color-mix(in srgb, var(--accent) 10%, var(--surface-2)));
+}
+
+.probe-eyebrow {
+  margin: 0 0 12px;
+  color: var(--accent);
+  font-family: var(--mono);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.probe-copy h3 {
+  margin: 0 0 12px;
+  font-size: clamp(26px, 3.5vw, 38px);
+  letter-spacing: -0.035em;
+  line-height: 1.08;
+}
+
+.probe-copy > p:last-of-type {
+  margin: 0;
+  max-width: 54ch;
+  color: var(--muted);
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.probe-flow {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr auto 1fr;
+  gap: 10px;
+  align-items: center;
+  align-self: center;
+  padding: 18px;
+  border: 1px solid color-mix(in srgb, var(--faint) 18%, transparent);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+}
+
+.probe-node {
+  display: grid;
+  gap: 4px;
+  padding: 14px 10px;
+  border: 1px solid color-mix(in srgb, var(--faint) 18%, transparent);
+  border-radius: 9px;
+  text-align: center;
+}
+
+.probe-node-active {
+  border-color: color-mix(in srgb, var(--accent) 48%, transparent);
+}
+
+.probe-node span {
+  color: var(--accent);
+  font-size: 9px;
+}
+
+.probe-node strong { font-size: 12px; }
+.probe-node small { color: var(--faint); font-size: 9.5px; }
+.probe-arrow { color: var(--accent); }
+
+.probe-note {
+  grid-column: 1 / -1;
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 11px;
+  text-align: center;
+}
+
 .tour-row {
   position: relative;
   display: grid;
@@ -473,6 +550,7 @@ button.chip-icon:hover { color: var(--ink); }
   .hero { grid-template-columns: 1fr; }
   .hero h1 { max-width: 14ch; }
   .features { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .probe-spotlight { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 560px) {
@@ -483,6 +561,9 @@ button.chip-icon:hover { color: var(--ink); }
   .hero-cta { width: 100%; flex-direction: column; }
   .site-btn { justify-content: center; }
   .features { grid-template-columns: 1fr; }
+  .probe-spotlight { gap: 24px; padding: 22px 18px; }
+  .probe-flow { grid-template-columns: 1fr; }
+  .probe-arrow { transform: rotate(90deg); text-align: center; }
   .tour-row { padding: 18px; }
   .tour-copy { grid-template-columns: 30px minmax(0, 1fr); gap: 11px; }
   .tour-index { width: 30px; height: 30px; border-radius: 8px; }

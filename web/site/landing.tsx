@@ -251,6 +251,39 @@ export function Landing() {
               practical question before code ships.
             </p>
           </header>
+          <article class="probe-spotlight" aria-labelledby="probeTitle">
+            <div class="probe-copy">
+              <p class="probe-eyebrow">● Device truth</p>
+              <h3 id="probeTitle">Probe firmware. Remove guesswork.</h3>
+              <p>
+                Shellint checks 104 runtime capabilities. Each probe runs
+                on-device. Results stay device and firmware specific. Generated
+                typings expose supported APIs. Lint flags confirmed missing APIs.
+              </p>
+            </div>
+            <div class="probe-flow" aria-label="Probe workflow">
+              <div class="probe-node">
+                <span>01</span>
+                <strong>Shelly device</strong>
+                <small>model + firmware</small>
+              </div>
+              <span class="probe-arrow" aria-hidden="true">→</span>
+              <div class="probe-node probe-node-active">
+                <span>02</span>
+                <strong>Script.Eval</strong>
+                <small>104 live checks</small>
+              </div>
+              <span class="probe-arrow" aria-hidden="true">→</span>
+              <div class="probe-node">
+                <span>03</span>
+                <strong>Safer code</strong>
+                <small>types + lint</small>
+              </div>
+              <p class="probe-note">
+                Missing APIs become lint findings. Problems surface before deployment.
+              </p>
+            </div>
+          </article>
           {TOUR.map((t, index) => (
             <article class="tour-row" key={t.key}>
               <div class="tour-copy">
