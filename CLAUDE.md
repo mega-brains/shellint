@@ -163,8 +163,12 @@ release, asserting each stays under 5 MB and boots. Assets ship as
 `shellint-<platform>.zip` holding one file (`shellint`, `shellint.exe` on
 Windows) — a bare binary served over HTTPS loses its exec bit in Safari. The
 size assert and smoke run happen on the raw binary; zipping is the last step
-before the checksum. Unix uses Info-ZIP `zip -X` (the only one that stores the
-exec bit), Windows' Git Bash has no `zip` and falls back to 7-Zip, and the
+before the checksum. Unix uses Info-ZIP `zip -X`, which stores the mode the
+staged binary carries (`chmod 755` is explicit at stage time for exactly that
+reason) and which `unzip`/Archive Utility/`ditto` restore — so the documented
+quick start has no `chmod` step, and a round-trip assert in the workflow fails
+the build if that ever stops being true. Windows' Git Bash has no `zip` and
+falls back to 7-Zip (no exec bit to lose there), and the
 checksum step must stay tool-agnostic (Git Bash has `sha256sum` and no `shasum`,
 macOS the reverse). Asset names live in **two** places — the `release.yml` matrix
 and `web/site/download.tsx`'s `PLATFORMS` — and must move together or the

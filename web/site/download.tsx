@@ -119,10 +119,8 @@ export function Download() {
             <ol>
               <li>Download the zip for your platform</li>
               <li>
-                <code>unzip shellint-macos-arm64.zip</code>
-              </li>
-              <li>
-                <code>chmod +x shellint</code>
+                <code>unzip shellint-macos-arm64.zip</code> — the zip stores the
+                executable bit, so no <code>chmod</code> is needed
               </li>
               <li>
                 <code>./shellint</code>
@@ -132,7 +130,7 @@ export function Download() {
               </li>
             </ol>
             <pre class="curl-line">
-              <code>curl -fsSL -O {releaseAssetUrl("shellint-macos-arm64.zip")}{"\n"}unzip shellint-macos-arm64.zip{"\n"}chmod +x shellint && ./shellint</code>
+              <code>curl -fsSL -O {releaseAssetUrl("shellint-macos-arm64.zip")}{"\n"}unzip shellint-macos-arm64.zip{"\n"}./shellint</code>
             </pre>
           </Group>
         </section>

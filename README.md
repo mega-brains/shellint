@@ -37,7 +37,7 @@ Or grab a release binary — one file, no Node, under 5 MB:
 
 ```bash
 curl -fsSL -O https://github.com/mega-brains/shellint/releases/latest/download/shellint-macos-arm64.zip
-unzip shellint-macos-arm64.zip && chmod +x shellint && ./shellint
+unzip shellint-macos-arm64.zip && ./shellint
 ```
 
 ## ⚠️ Security — read this before exposing it

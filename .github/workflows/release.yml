@@ -59,8 +59,14 @@ jobs:
       - run: npm run build:web
       - run: npm run build:txiki:executable
 
+      # chmod here, not in the smoke step: the mode this file carries now is
+      # the mode `zip` stores and `unzip` restores, so it is what decides
+      # whether a user has to run chmod after unpacking. Do not let it be a
+      # side effect of a later step.
       - name: Stage the binary
-        run: mv ".txiki/${{ matrix.bin }}" "${{ matrix.bin }}"
+        run: |
+          mv ".txiki/${{ matrix.bin }}" "${{ matrix.bin }}"
+          chmod 755 "${{ matrix.bin }}"
 
       # The download page's headline is "One file. No Node. Under 5 MB." A
       # silent creep past that turns the page into a lie, so it fails the build.
@@ -127,11 +133,14 @@ jobs:
           kill "$pid" 2>/dev/null || true
           exit $fail
 
-      # Info-ZIP `zip` is the only one of these that stores the unix executable
-      # bit, and it is present on the macOS and Linux runners but not in
-      # Windows' Git Bash — there 7-Zip (preinstalled on the runner) does, and
-      # the exec bit is meaningless on Windows anyway. One file per archive,
-      # stored flat: `unzip shellint-macos-arm64.zip` yields `shellint`.
+      # Info-ZIP `zip` writes the unix mode into the entry's external
+      # attributes, and `unzip`, macOS' Archive Utility and `ditto` all restore
+      # it — so the download runs with no `chmod`, which is the whole point of
+      # shipping a zip rather than a bare binary. It is present on the macOS and
+      # Linux runners but not in Windows' Git Bash; there 7-Zip (preinstalled)
+      # writes the archive and the exec bit is meaningless anyway. One file per
+      # archive, stored flat: `unzip shellint-macos-arm64.zip` yields
+      # `shellint`.
       - name: Zip the executable
         run: |
           if command -v zip >/dev/null 2>&1; then
@@ -140,6 +149,21 @@ jobs:
             7z a -tzip -bso0 -bsp0 "${{ matrix.asset }}.zip" "${{ matrix.bin }}"
           fi
           ls -l "${{ matrix.asset }}.zip"
+
+      # The README and the download page both tell users to unzip and run, with
+      # no chmod in between. That is only true if the stored mode is executable
+      # — assert it against a real round-trip rather than trusting `zip`'s
+      # defaults. Windows has no `unzip` in Git Bash and no exec bit to lose.
+      - name: Assert the unzipped binary is executable
+        if: runner.os != 'Windows'
+        run: |
+          out="$(mktemp -d)"
+          unzip -q "${{ matrix.asset }}.zip" -d "$out"
+          if [ ! -x "$out/${{ matrix.bin }}" ]; then
+            echo "::error::${{ matrix.asset }}.zip unpacks non-executable ($(ls -l "$out/${{ matrix.bin }}")) — users would need chmod"
+            exit 1
+          fi
+          echo "  unzip restores mode $(ls -l "$out/${{ matrix.bin }}" | cut -d' ' -f1)"
 
       # Windows' Git Bash ships sha256sum but no shasum; macOS ships shasum but
       # no sha256sum. Neither name is portable on its own — this step failed the
