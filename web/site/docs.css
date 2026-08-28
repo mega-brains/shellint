@@ -1,0 +1,393 @@
+/*
+ * Layout for the two reference pages, `site/docs.html` and `site/checks.html`.
+ *
+ * Separate from site.css purely because of the ≤500-line source limit
+ * (scripts/check-line-limit.mjs counts .css too) — both files bundle into the
+ * one site.css via site.entry.css, and both draw on the same tokens.css
+ * custom properties as the app, so the docs read as the same product.
+ */
+
+/* Utility, defined here because the site is the first thing in the repo to
+   need it: a label that exists for the accessibility tree only. */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
+.docs-main {
+  display: grid;
+  gap: 28px;
+  align-content: start;
+}
+
+.docs-head {
+  display: grid;
+  gap: 10px;
+  max-width: 62ch;
+}
+
+.docs-head h1 {
+  margin: 0;
+  font-size: 30px;
+  line-height: 1.15;
+  letter-spacing: -0.02em;
+}
+
+.docs-body {
+  display: grid;
+  grid-template-columns: 190px minmax(0, 1fr);
+  gap: 40px;
+  align-items: start;
+}
+
+.docs-toc {
+  position: sticky;
+  top: 24px;
+  display: grid;
+  gap: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--surface-2);
+  border-radius: 10px;
+  background: var(--surface-3);
+}
+
+.docs-toc-title {
+  margin: 0;
+  color: var(--faint);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.docs-toc ol {
+  display: grid;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  counter-reset: toc;
+}
+
+.docs-toc a {
+  color: var(--muted);
+  font-size: 12px;
+  text-decoration: none;
+}
+
+.docs-toc a:hover { color: var(--accent); }
+
+.docs-article {
+  display: grid;
+  gap: 34px;
+  max-width: 74ch;
+}
+
+.docs-section { display: grid; gap: 12px; }
+
+.docs-section h2 {
+  position: relative;
+  margin: 0;
+  font-size: 18px;
+  letter-spacing: -0.01em;
+  /* The anchor sits in the gutter, so scroll-margin keeps a jumped-to heading
+     clear of nothing in particular — there is no fixed header — but of the
+     viewport edge. */
+  scroll-margin-top: 20px;
+}
+
+.docs-anchor {
+  position: absolute;
+  left: -18px;
+  color: var(--surface-2);
+  font-family: var(--mono);
+  text-decoration: none;
+}
+
+.docs-section h2:hover .docs-anchor { color: var(--accent); }
+
+.docs-section p,
+.docs-section li {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.65;
+}
+
+.docs-section ul,
+.docs-section ol {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding-left: 20px;
+}
+
+.docs-section code,
+.checks-table code {
+  padding: 1px 5px;
+  border-radius: 4px;
+  background: var(--surface-3);
+  color: var(--code-ink);
+  font-family: var(--mono);
+  font-size: 11.5px;
+}
+
+.docs-code {
+  margin: 2px 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  border: 1px solid var(--surface-2);
+  border-radius: 8px;
+  background: var(--surface-3);
+}
+
+.docs-code code {
+  padding: 0;
+  background: none;
+  font-size: 11.5px;
+  line-height: 1.7;
+  white-space: pre;
+}
+
+.docs-warn {
+  padding: 12px 14px;
+  border: 1px solid var(--warn);
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--warn) 10%, transparent);
+}
+
+.docs-warn span { color: var(--warn); }
+
+.docs-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+}
+
+.docs-table th {
+  padding: 7px 10px 7px 0;
+  border-bottom: 1px solid var(--surface-2);
+  color: var(--faint);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.docs-table td {
+  padding: 9px 10px 9px 0;
+  border-bottom: 1px solid var(--surface-3);
+  color: var(--muted);
+  line-height: 1.55;
+  vertical-align: top;
+}
+
+/* ----------------------------------------------------------- checks page */
+
+.checks-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  align-items: center;
+}
+
+.checks-search { flex: 1 1 260px; }
+
+.checks-search input,
+.checks-group select {
+  width: 100%;
+  padding: 7px 10px;
+  border: 1px solid var(--surface-2);
+  border-radius: 7px;
+  background: var(--surface-3);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 12.5px;
+}
+
+.checks-search input:focus-visible,
+.checks-group select:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.checks-count {
+  margin: 0;
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 11px;
+}
+
+.checks-tier {
+  display: grid;
+  gap: 6px;
+  scroll-margin-top: 20px;
+}
+
+.checks-tier h2 {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin: 0;
+  font-size: 14px;
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+}
+
+.checks-tier-count {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 11px;
+  font-weight: 400;
+}
+
+.checks-tier-about {
+  margin: 0 0 4px;
+  color: var(--faint);
+  font-size: 12px;
+}
+
+/* One table per tier, so the columns only line up down the page if they are
+   fixed — otherwise each tier sizes its own and the "Needs" column walks left
+   and right as you scroll. */
+.checks-table { table-layout: fixed; }
+.checks-table tbody tr { background: var(--surface); }
+.checks-table tbody tr:hover { background: var(--surface-2); }
+.checks-table th, .checks-table td { padding-left: 10px; }
+/* 250px is `require-capability-array-buffer` — the longest rule in the
+   catalog — at 11.5px mono plus the cell and <code> padding. Narrower and it
+   overflows into the rationale column, since the names never wrap. */
+.checks-table th:first-child, .checks-table td:first-child { width: 250px; }
+.checks-table th:nth-child(3), .checks-table td:nth-child(3) { width: 120px; }
+.checks-table th:nth-child(4), .checks-table td:nth-child(4) { width: 84px; }
+
+/* A rule name never wraps mid-identifier: a broken one is unusable as
+   something to paste into the app's check pane. */
+.checks-table td:first-child { white-space: nowrap; }
+
+/* ------------------------------------------------- example (±) column
+ *
+ * A rule's wrong/right pair, revealed by hovering or focusing the badge. No
+ * JS: the cell is the positioning context, the card is absolute inside it and
+ * only painted on :hover / :focus-within. The app's own tip
+ * (web/ui/option-tip.tsx) is a body portal positioned against the editor
+ * column, which does not exist here — this is the site's own, deliberately.
+ */
+
+.checks-ex-head, .checks-ex-cell { text-align: center; }
+.checks-ex-none { color: var(--faint); }
+
+.check-ex {
+  position: relative;
+  display: inline-block;
+}
+
+.check-ex-badge {
+  padding: 0 6px;
+  border: 1px solid var(--surface-2);
+  border-radius: 5px;
+  background: var(--surface-3);
+  color: var(--muted);
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+  cursor: help;
+}
+
+.check-ex-badge:hover,
+.check-ex:focus-within .check-ex-badge {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+/* The same badge inline in prose, as a legend. Not interactive there. */
+.check-ex-inline { cursor: default; }
+
+.check-ex-card {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 5;
+  display: none;
+  width: max-content;
+  max-width: min(460px, 60vw);
+  padding: 6px;
+  border-radius: 7px;
+  /* Opaque: --surface-2 carries alpha in the light theme, --surface does not. */
+  background: var(--surface);
+  box-shadow: var(--shadow-modal);
+  text-align: left;
+}
+
+.check-ex-badge:hover + .check-ex-card,
+.check-ex:focus-within .check-ex-card { display: grid; }
+
+.check-ex-line {
+  display: flex;
+  gap: 0.35rem;
+  padding: 2px 6px;
+  font-family: var(--mono);
+  font-size: 11.5px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.check-ex-line:first-child { border-radius: 4px 4px 0 0; }
+.check-ex-line:last-child { border-radius: 0 0 4px 4px; }
+
+.check-ex-line code {
+  padding: 0;
+  background: none;
+  color: var(--ink);
+  font-family: inherit;
+  font-size: inherit;
+}
+
+/* web/site/code-highlight.tsx. Same three treatments the editor uses
+   (web/editor/cm-theme.ts), so a snippet reads the same in both places. The
+   diff fill sits behind them, hence --code-* rather than any bespoke colour. */
+.tok-comment { color: var(--faint); font-style: italic; }
+.tok-string { color: var(--code-string); }
+.tok-keyword { color: var(--code-keyword); }
+
+/* Fills and inks come from tokens.css directly rather than from
+   web/diff/diff.css — the site imports no app CSS, and pulling in the whole
+   diff-table stylesheet for two backgrounds would be the wrong trade. */
+.check-ex-line.diff-del { background: var(--diff-del-fill); }
+.check-ex-line.diff-add { background: var(--diff-add-fill); }
+.check-ex-line.diff-del .check-ex-sign { color: var(--diff-del-ink); }
+.check-ex-line.diff-add .check-ex-sign { color: var(--diff-add-ink); }
+
+.check-ex-sign {
+  flex: 0 0 0.9rem;
+  text-align: center;
+  user-select: none;
+}
+
+.checks-needs {
+  color: var(--faint);
+  font-size: 11.5px;
+}
+
+.checks-foot {
+  max-width: 74ch;
+  margin: 0;
+  color: var(--faint);
+  font-size: 12.5px;
+  line-height: 1.6;
+}
+
+@media (max-width: 860px) {
+  .docs-body { grid-template-columns: minmax(0, 1fr); gap: 20px; }
+  .docs-toc { position: static; }
+  .docs-anchor { display: none; }
+  .checks-table td:first-child { white-space: normal; }
+}

@@ -25,3 +25,8 @@ export function releaseAssetUrl(asset: string): string {
 export function releasesUrl(): string {
   return `https://github.com/${REPO}/releases`;
 }
+
+/** Latest public release metadata, including asset sizes and download URLs. */
+export function latestReleaseApiUrl(): string {
+  return `https://api.github.com/repos/${REPO}/releases/latest`;
+}

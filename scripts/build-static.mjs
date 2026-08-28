@@ -5,7 +5,9 @@
  *
  *   index.html            landing page                       (new, M26)
  *   download.html         releases page                       (new, M26)
- *   site.js               landing+download Preact bundle       (new, M26)
+ *   docs.html             prose documentation
+ *   checks.html           the check catalog, rendered from server/lint/
+ *   site.js               Preact bundle for all four site pages (new, M26)
  *   site.css              tokens.css + site-only layout CSS    (new, M26)
  *   shellint-header.png        hero screenshot, light  (from .github/assets, M26)
  *   shellint-header-dark.png   hero screenshot, dark   (from .github/assets, M26)
@@ -295,8 +297,8 @@ writeFileSync(join(demoDir, "sw.js"), swSource);
 
 // --------------------------------------------------------------- site/*.{js,css}
 //
-// The landing+download shell, wholly independent of demo/. One JS bundle (two
-// pages, chosen at runtime off `document.body.dataset.page` — see
+// The landing/download/docs/checks shell, wholly independent of demo/. One JS
+// bundle (four pages, chosen at runtime off `document.body.dataset.page` — see
 // web/site/main.tsx) and one CSS bundle, both built straight into site/ (not
 // site/demo/) since they are the outer shell the demo lives inside of.
 //
@@ -333,7 +335,7 @@ await esbuild.build({
 // demo/index.html, there is no server-shared shell to inject markup into here),
 // so this is a read-through, not a template step — the only edit is the
 // analytics beacon, and with COLLECTOR_ORIGIN unset it is a byte-for-byte copy.
-for (const page of ["index.html", "download.html"]) {
+for (const page of ["index.html", "download.html", "docs.html", "checks.html"]) {
   const src = readFileSync(join(root, "web", "site", page), "utf8");
   writeFileSync(join(siteDir, page), withBeacon(src));
 }
@@ -352,6 +354,8 @@ for (const img of ["shellint-header.png", "shellint-header-dark.png"]) {
 for (const f of [
   "index.html",
   "download.html",
+  "docs.html",
+  "checks.html",
   "site.js",
   "site.css",
   "shellint-header.png",

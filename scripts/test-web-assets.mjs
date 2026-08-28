@@ -90,12 +90,20 @@ if (existsSync(join(ROOT, "web/dist/app.js"))) {
 // not a hard requirement of a plain `npm run test`.
 //
 // M26 moved the app one level down into `site/demo/` and put the presentation
-// site (landing + download) at the root; the deep checks live in
+// site (landing, download, docs, checks) at the root; the deep checks live in
 // scripts/test-static-bundle.mjs, this stays the light budget guard.
 const siteDir = join(ROOT, "site");
 const demoDir = join(siteDir, "demo");
 if (existsSync(siteDir)) {
-  for (const f of ["index.html", "download.html", "site.js", "site.css", ".nojekyll"]) {
+  for (const f of [
+    "index.html",
+    "download.html",
+    "docs.html",
+    "checks.html",
+    "site.js",
+    "site.css",
+    ".nojekyll",
+  ]) {
     if (!existsSync(join(siteDir, f))) fail(`site/${f} missing`);
   }
   for (const f of [

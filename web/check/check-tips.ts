@@ -257,6 +257,48 @@ export const RULE_TIPS: Record<string, RuleTip> = {
     after: ["/** @meta … */  // kept — minify config preserves this comment shape"],
   },
 
+  // connected (tier 4) — keyed by `Capability.rule` in
+  // server/lint/capabilities.ts, which is where the generation and firmware
+  // floors quoted below come from. "after" shows the portable shape: either a
+  // meta.device guard (build-time DCE, so the branch is gone on a device that
+  // cannot run it) or the older API the firmware floor replaced.
+  "require-capability-aes": {
+    before: ["var enc = AES.encrypt(key, data);"],
+    after: ["if (meta.device.gen >= 3) {", "  var enc = AES.encrypt(key, data);", "}"],
+  },
+  "require-capability-array-buffer": {
+    before: ["var buf = new ArrayBuffer(16);"],
+    after: ["if (meta.device.gen >= 3) {", "  var buf = new ArrayBuffer(16);", "}"],
+  },
+  "require-capability-storage": {
+    before: ['Script.storage.setItem("k", v);  // fw 1.2.0+'],
+    after: ['Shelly.call("KVS.Set", { key: "k", value: v });'],
+  },
+  "require-capability-virtual": {
+    before: ['Shelly.call("Virtual.Add", spec);'],
+    after: ["// fw 1.4.0+ and Virtual.* in ListMethods — gate or drop the call"],
+  },
+  "require-capability-meta-vc": {
+    before: ['/** @meta { "vc": [{ "role": "switch" }] } */'],
+    after: ['// fw 2.0.0+ only — below that, create components with Virtual.Add'],
+  },
+  "require-capability-rpc-handler": {
+    before: ['Script.addRpcHandler("Toggle", cb);  // fw 1.5.0+'],
+    after: ['HTTPServer.registerEndpoint("toggle", cb);'],
+  },
+  "require-capability-uptime": {
+    before: ["var up = Shelly.getUptimeMs();  // fw 1.5.0+"],
+    after: ['Shelly.call("Sys.GetStatus", {}, function (r) {', "  var up = r.uptime * 1000;", "});"],
+  },
+  "require-capability-timer-info": {
+    before: ["var info = Timer.getInfo(handle);  // fw 1.5.0+"],
+    after: ["var running = handle !== null;  // track the handle yourself"],
+  },
+  "require-capability-mqtt-wildcard": {
+    before: ['MQTT.subscribe("shelly/+/status", cb);  // fw 1.1.0+'],
+    after: ['MQTT.subscribe("shelly/1/status", cb);'],
+  },
+
   // emit (post-compile guard, on dist/*.raw.js)
   "no-arrow-functions": {
     before: ["var f = (x) => x + 1;"],
