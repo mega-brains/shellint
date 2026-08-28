@@ -45,7 +45,7 @@ import { join } from "node:path";
 import { TJS_VERSION as VERSION, VENDOR_DIR } from "./txiki-test-util.mjs";
 
 const REPO = "lukasMega/txiki.js-with-slim-builds";
-const TAG = "slim-v26.6.0-6";
+const TAG = "slim-v26.6.0-8";
 
 /**
  * Pinned release assets, by `${platform()}-${arch()}`.
@@ -54,7 +54,7 @@ const TAG = "slim-v26.6.0-6";
  * sha256 of the *extracted* binary is pinned on top of that so a re-cut tag or
  * a mangled download is loud rather than silently shipped. Every digest below
  * was computed here from the downloaded zip and independently cross-checked
- * against the release's own SHA256SUMS.txt asset (2026-08-25).
+ * against the release's own SHA256SUMS.txt asset (2026-08-28).
  *
  * ⚠️ Only `darwin-arm64` has ever been **executed** on this machine. The
  * linux-x64 and win32-x64 entries are digest-verified but unrun — they exist so
@@ -71,17 +71,17 @@ const PIN = {
   "darwin-arm64": {
     asset: "txiki-slim-min-macos-arm64.zip",
     member: "txiki-slim-min-macos-arm64/tjs",
-    sha256: "c4f2497c4f2e09a2707e42edc0daae5e0a1d5a329bbb08ee4a8c5ea8ebaea0d7",
+    sha256: "c69ef945aa04880f066d9c6fdcd61e2257d0f710e4f20286ae4e48d7eee650b9",
   },
   "linux-x64": {
     asset: "txiki-slim-min-linux-x86_64.zip",
     member: "txiki-slim-min-linux-x86_64/tjs",
-    sha256: "8cfcffb8269a5d88858b62d9c255f0c4feb225a5ce3ed84396b5b3499f70419e",
+    sha256: "0562f20c52c494c1083388729922165ca29f76c28f11e4d471cf259ea000a6ae",
   },
   "win32-x64": {
     asset: "txiki-slim-min-windows-x86_64.zip",
     member: "txiki-slim-min-windows-x86_64/tjs.exe",
-    sha256: "a5c8d01246538076d0f479831903b8f92642a7984556a4494fa56df246c0acbf",
+    sha256: "76b6ef6a288338f7d2fda1f2b97ce1425fc47c5cc92a99329c93b5048c3f42db",
   },
 };
 
@@ -148,6 +148,12 @@ function extract(zipBytes, member, dest) {
     const zip = join(work, "asset.zip");
     writeFileSync(zip, zipBytes);
     execFileSync("unzip", ["-o", "-q", zip, member, "-d", work], { stdio: "inherit" });
+    // Unlink first, never overwrite in place: on macOS the kernel caches a
+    // Mach-O's code signature against the vnode, so writing different signed
+    // bytes into an existing path makes every later exec die with SIGKILL
+    // (exit 137) even though `codesign -v` on the file passes. Hit on the
+    // slim-v26.6.0-6 → -8 bump; a fresh path always worked.
+    rmSync(dest, { force: true });
     copyFileSync(join(work, member), dest);
     chmodSync(dest, 0o755);
   } finally {
