@@ -32,7 +32,7 @@ const CAP_BYTES = 5 * 1024 * 1024;
  */
 const PLATFORMS: { label: string; asset: string; note?: string }[] = [
   { label: "macOS arm64", asset: "shellint-macos-arm64" },
-  { label: "Linux x64", asset: "shellint-linux-x64" },
+  { label: "Linux x64", asset: "shellint-linux-x64", note: "unproven" },
   { label: "Windows x64", asset: "shellint-windows-x64.exe", note: "unproven" },
 ];
 
@@ -76,10 +76,11 @@ export function Download() {
         <section class="downloads">
           <Group title="Releases" id="releases">
             <p class="release-note">
-              First release pending — the release workflow exists but no tag has
-              been pushed through it yet, so the links below 404 until then.
-              Build from source in the meantime (next section). The Windows
-              build has never been run anywhere; treat it as unproven.
+              Every binary is built, size-checked and then boot-tested from an
+              empty directory on its own platform — it has to serve the UI and
+              compile a device script before it can be released. Only macOS
+              arm64 has been run by a human, so Linux and Windows are marked
+              unproven: working, but not yet used in anger.
             </p>
             <table id="downloadTable">
               <thead>
