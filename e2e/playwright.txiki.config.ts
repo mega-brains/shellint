@@ -29,13 +29,16 @@ export default defineConfig({
   // server under test, so running it here re-asserts the base config's
   // findings against identical bytes — and pays for the second webServer
   // (`build:static` + preview) to do it. The base config still runs it once.
-  testIgnore: ["**/static.spec.ts"],
-  // One worker, unlike the Node config's four: txiki.js runs one event loop and
-  // its builder type-checks *in process*, so four browsers each triggering a
-  // Build/Check at once serialize behind each other and blow the per-assertion
-  // timeouts. What this suite is for is the runtime's behaviour, not its
-  // concurrency.
-  workers: 1,
+  // `capture/**` too, and not by accident: overriding testIgnore drops the base
+  // config's entry, and this leg was running the hero-screenshot spec — writing
+  // tracked PNGs from inside the gate.
+  testIgnore: ["**/static.spec.ts", "capture/**"],
+  // Two locally, one on CI — both under the Node config's four: txiki.js runs
+  // one event loop and type-checks *in process*, so four concurrent
+  // Build/Checks serialize and blow the per-assertion timeouts. Two measured
+  // ~20% faster than one on a 4-perf-core laptop; two-core CI runners have no
+  // such margin.
+  workers: process.env.CI ? 1 : 2,
   use: { ...base.use, baseURL: BASE },
   webServer: [
     {

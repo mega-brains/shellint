@@ -41,7 +41,8 @@ mise run start            # server (alias: dev)
 mise run build            # oxlint + device artifacts + web bundle
 mise run test             # DCE/minify asserts + web + server smoke
                           # takes a name filter, and --isolated for process-per-test
-mise run typecheck        # device fixture + server + web
+mise run typecheck        # device fixture + server + web (parallel — the npm
+                          # script fans out through scripts/typecheck-all.mjs)
 mise run check:lines      # ≤500 raw lines per source file
 mise run build:static     # site/ for GitHub Pages
 mise run probe / profile  # capability probe / device profile (needs a device)
@@ -152,9 +153,13 @@ executable per platform, asserted under 5 MB by `release.yml`.
 `.github/workflows/ci.yml` runs the one gate command on `ubuntu-latest` and
 `macos-latest`, provisioning `tjs` through `.github/actions/setup-tjs` (a thin
 wrapper over `scripts/vendor-txiki.mjs`, so CI and a laptop share one pinned
-path) and setting `PW_CHANNEL=bundled` — the Playwright default is *system*
-Chrome, which no runner has, and it must stay that way because the `-darwin`
-design baselines were shot against it. Design baselines therefore exist twice,
+path), installing `chromium-headless-shell` rather than full `chromium` (the
+suite never launches a headed browser) and setting `PW_CHANNEL=bundled`.
+`e2e/helpers/browser-channel.ts` picks the bundled headless shell whenever it is
+found in Playwright's browser registry and falls back to *system* Chrome
+otherwise, so a checkout that cannot reach Google's CDN still runs the gate;
+CI has no Chrome, hence the explicit opt-in. Both engines satisfy the committed
+baselines. Design baselines exist twice,
 `-chromium-darwin` and `-chromium-linux`; both are committed and a deliberate
 design change has to refresh both.
 

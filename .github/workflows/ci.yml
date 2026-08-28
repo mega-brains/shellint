@@ -50,12 +50,11 @@ jobs:
         with:
           node-version: ""   # already set up above
 
-      # PW_CHANNEL=bundled below opts e2e/playwright.config.ts out of its
-      # default `channel: "chrome"`, which is system Chrome and does not exist
-      # on a runner. The darwin design baselines were shot against system
-      # Chrome, so the default must stay as it is and CI must opt out, not the
-      # other way round — that inversion was shipped once and reverted.
-      - run: pnpm exec playwright install --with-deps chromium
+      # `chromium-headless-shell`, not `chromium`: the suite only runs headless,
+      # so the full download is never launched. PW_CHANNEL=bundled below selects
+      # it — e2e/helpers/browser-channel.ts otherwise falls back to system
+      # Chrome, which no runner ships, so the opt-in stays explicit.
+      - run: pnpm exec playwright install --with-deps chromium-headless-shell
 
       - run: pnpm run beforeCommit
         env:

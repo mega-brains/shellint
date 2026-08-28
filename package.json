@@ -42,7 +42,7 @@
     "typecheck:server": "tsc -p config/tsconfig.server.json",
     "typecheck:web": "tsc -p config/tsconfig.web.json",
     "typecheck:txiki": "tsc -p config/tsconfig.txiki.json",
-    "typecheck": "npm run typecheck:shelly && npm run typecheck:server && npm run typecheck:web",
+    "typecheck": "node scripts/typecheck-all.mjs",
     "lint": "npm run typecheck",
     "oxlint": "oxlint server web scripts shared e2e",
     "bench": "node scripts/bench-minify.mjs",

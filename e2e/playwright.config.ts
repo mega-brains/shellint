@@ -1,6 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
+import { chromiumChannel } from "./helpers/browser-channel.ts";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 // Not 8787: that is the dev server's port, and a dev server serves the user's
@@ -70,20 +71,13 @@ export default defineConfig({
   projects: [
     {
       name: "chromium",
-      // Default: system Chrome, because it is the only engine every checkout
-      // is guaranteed to have — `npx playwright install chromium` needs to
-      // reach Google's CDN, which fails outright behind a TLS-inspecting proxy.
-      // `PW_CHANNEL=bundled` opts into Playwright's own Chromium, which runs
-      // this suite in roughly half the wall time (the headless shell is a
-      // lighter build than Chrome-in-headless-mode) and matches the design
-      // baselines; CI sets it, since no runner ships Chrome. Any other value is
-      // taken as a channel name.
+      // Bundled headless shell when installed, system Chrome otherwise — see
+      // e2e/helpers/browser-channel.ts. Both engines satisfy the baselines;
+      // the bundled one is ~40% faster.
       use: {
         ...devices["Desktop Chrome"],
         viewport: { width: 1440, height: 900 },
-        ...(process.env.PW_CHANNEL === "bundled"
-          ? {}
-          : { channel: (process.env.PW_CHANNEL as "chrome") || "chrome" }),
+        ...chromiumChannel(),
       },
     },
   ],
