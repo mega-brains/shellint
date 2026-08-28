@@ -39,6 +39,9 @@ const STATIC_BASE = `http://127.0.0.1:${STATIC_PORT}`;
 
 export default defineConfig({
   testDir: ".",
+  // `capture/` holds the README hero screenshots, which write tracked PNGs
+  // rather than assert them — `e2e/playwright.capture.config.ts` runs those.
+  testIgnore: ["capture/**"],
   // Per-test, not per-file: with file granularity the whole run waits on the
   // longest single file (smoke-panels, ~26s of the 38s wall). Every spec boots
   // its own page through openApp() and mocks its own device APIs, so no test

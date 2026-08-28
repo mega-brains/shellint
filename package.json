@@ -53,6 +53,7 @@
     "test:e2e:txiki": "playwright test -c e2e/playwright.txiki.config.ts",
     "test:e2e:lightpanda": "playwright test -c e2e/playwright.lightpanda.config.ts",
     "test:e2e:hybrid": "node scripts/e2e-hybrid.mjs",
+    "capture:header": "playwright test -c e2e/playwright.capture.config.ts",
     "install:lightpanda": "node scripts/install-lightpanda.mjs",
     "test:txiki": "npm run vendor:txiki && npm run typecheck:txiki && npm run build:web && node scripts/test-txiki-runtime.mjs",
     "beforeCommit": "npm run oxlint && npm run check:lines && npm run typecheck && npm run build:gate && npm run build:static && npm run test && npm run test:e2e && npm run test:e2e:txiki"
@@ -61,28 +62,28 @@
     "node": ">=20"
   },
   "dependencies": {
-    "ws": "^8.18.0"
+    "ws": "8.21.3"
   },
   "devDependencies": {
-    "@codemirror/autocomplete": "^6.20.3",
-    "@codemirror/commands": "^6.8.0",
-    "@codemirror/lang-javascript": "^6.2.2",
-    "@codemirror/language": "^6.10.8",
-    "@codemirror/search": "^6.7.1",
-    "@codemirror/state": "^6.5.2",
-    "@codemirror/view": "^6.36.2",
-    "@lezer/highlight": "^1.2.3",
-    "@playwright/test": "^1.62.1",
-    "@txikijs/types": "^26.6.0",
-    "@types/node": "^22.13.0",
-    "@types/ws": "^8.5.14",
-    "esbuild": "^0.28.1",
-    "espruino": "^0.1.67",
-    "oxlint": "1.79.0",
-    "playwright": "^1.62.1",
-    "preact": "^10.29.8",
-    "terser": "^5.49.2",
-    "tsx": "^4.23.9",
-    "typescript": "^5.9.2"
+    "@codemirror/autocomplete": "6.20.3",
+    "@codemirror/commands": "6.10.4",
+    "@codemirror/lang-javascript": "6.2.5",
+    "@codemirror/language": "6.12.4",
+    "@codemirror/search": "6.7.1",
+    "@codemirror/state": "6.7.1",
+    "@codemirror/view": "6.43.8",
+    "@lezer/highlight": "1.2.3",
+    "@playwright/test": "1.62.1",
+    "@txikijs/types": "26.6.0",
+    "@types/node": "22.20.1",
+    "@types/ws": "8.18.1",
+    "esbuild": "0.28.2",
+    "espruino": "0.1.67",
+    "oxlint": "1.80.0",
+    "playwright": "1.62.1",
+    "preact": "10.29.8",
+    "terser": "5.49.2",
+    "tsx": "4.23.12",
+    "typescript": "5.9.3"
   }
 }
