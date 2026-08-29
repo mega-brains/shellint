@@ -9,6 +9,8 @@
  *   checks.html           the check catalog, rendered from server/lint/
  *   probe.html            the capability probe explained, plus its catalog,
  *                         rendered from server/probe/
+ *   faq.html              the questions people actually arrive with
+ *   stack.html            the open-source projects this is built on
  *   site.js               Preact bundle for every site page       (new, M26)
  *   site.css              tokens.css + site-only layout CSS    (new, M26)
  *   shellint-header.png        hero screenshot, light  (from .github/assets, M26)
@@ -342,7 +344,15 @@ await esbuild.build({
 // demo/index.html, there is no server-shared shell to inject markup into here),
 // so this is a read-through, not a template step — the only edit is the
 // analytics beacon, and with COLLECTOR_ORIGIN unset it is a byte-for-byte copy.
-for (const page of ["index.html", "download.html", "docs.html", "checks.html", "probe.html"]) {
+for (const page of [
+  "index.html",
+  "download.html",
+  "docs.html",
+  "checks.html",
+  "probe.html",
+  "faq.html",
+  "stack.html",
+]) {
   const src = readFileSync(join(root, "web", "site", page), "utf8");
   writeFileSync(join(siteDir, page), withBeacon(src));
 }
@@ -374,6 +384,8 @@ for (const f of [
   "docs.html",
   "checks.html",
   "probe.html",
+  "faq.html",
+  "stack.html",
   "site.js",
   "site.css",
   "shellint-header.png",

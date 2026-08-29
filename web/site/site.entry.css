@@ -11,3 +11,5 @@
    rules it owns, and those have to come after their own base declarations. */
 @import "./tour.css";
 @import "./docs.css";
+/* After docs.css: the FAQ and stack pages reuse its frame and only override. */
+@import "./pages.css";

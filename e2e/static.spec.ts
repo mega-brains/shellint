@@ -306,6 +306,31 @@ test.describe("presentation site (M26)", () => {
     await expect(page.locator(".checks-table").first()).toBeVisible();
   });
 
+  test("the FAQ page answers from the nav, and deep-links per question", async ({ page }) => {
+    await page.goto(`${STATIC_BASE}/`);
+    await page.locator('.site-nav a[href="./faq.html"]').click();
+    await expect(page).toHaveURL(`${STATIC_BASE}/faq.html`);
+    await expect(page.locator("#faq")).toBeVisible();
+    // Every question carries its own id so an answer can be linked to; the
+    // history one is also the answer the docs page no longer holds.
+    await expect(page.locator("#history")).toContainText("last 10 saved versions");
+    await page.locator('.docs-toc a[href="#project"]').click();
+    await expect(page).toHaveURL(`${STATIC_BASE}/faq.html#project`);
+  });
+
+  test("the stack page credits the dependencies it ships", async ({ page }) => {
+    await page.goto(`${STATIC_BASE}/stack.html`);
+    await expect(page.locator("#stack")).toBeVisible();
+    // One runtime dependency is the claim the page opens with, so the table
+    // that backs it has exactly one row — this fails if package.json grows one.
+    await expect(page.locator("#runtime .stack-table tbody tr")).toHaveCount(1);
+    await expect(page.locator("#runtime")).toContainText("ws");
+    // Footer is the only link in; it is not in the header nav.
+    await page.goto(`${STATIC_BASE}/`);
+    await page.locator('.site-footer a[href="./stack.html"]').click();
+    await expect(page).toHaveURL(`${STATIC_BASE}/stack.html`);
+  });
+
   test("the landing probe spotlight reaches the probe page", async ({ page }) => {
     // The spotlight is the page's only entry into probe.html — it deliberately
     // is not a sixth item in the header nav, so this link is the contract.
