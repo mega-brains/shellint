@@ -305,4 +305,47 @@ test.describe("presentation site (M26)", () => {
     await expect(page).toHaveURL(`${STATIC_BASE}/checks.html`);
     await expect(page.locator(".checks-table").first()).toBeVisible();
   });
+
+  test("the landing probe spotlight reaches the probe page", async ({ page }) => {
+    // The spotlight is the page's only entry into probe.html — it deliberately
+    // is not a sixth item in the header nav, so this link is the contract.
+    await page.goto(`${STATIC_BASE}/`);
+    await page.locator("#ctaProbe").click();
+    await expect(page).toHaveURL(`${STATIC_BASE}/probe.html`);
+    await expect(page.locator(".probe-flow")).toBeVisible();
+    // The always-visible before/after pair, unlike the checks page's hover card.
+    await expect(page.locator(".probe-pair .diff-del")).toHaveCount(2);
+    await expect(page.locator(".probe-pair .diff-add")).toHaveCount(2);
+  });
+
+  test("probe page lists the catalog and filters it", async ({ page }) => {
+    await page.goto(`${STATIC_BASE}/probe.html`);
+    // Rendered from server/probe/probe-catalog.ts — same reasoning as the
+    // checks test above: assert a floor, not the current count, so adding a
+    // probe does not mean editing this file.
+    const rows = page.locator(".probe-table tbody tr");
+    const total = await rows.count();
+    expect(total).toBeGreaterThan(80);
+    await expect(page.locator("#probeCount")).toContainText(`${total} of ${total}`);
+
+    // The landing spotlight and the page both count PROBES.length, so they
+    // must agree — that is the whole reason neither hardcodes a number.
+    await page.goto(`${STATIC_BASE}/`);
+    await expect(page.locator(".hero-signals")).toContainText(String(total));
+
+    await page.goto(`${STATIC_BASE}/probe.html`);
+    await page.locator("#probeSearch").fill("string.padStart");
+    await expect(rows).toHaveCount(1);
+    await expect(page.locator("#probe-string\\.padStart")).toBeVisible();
+
+    // Filtering by group narrows to that bucket and nothing else.
+    await page.locator("#probeSearch").fill("");
+    await page.locator("#probeGroup").selectOption("memory");
+    await expect(page.locator(".checks-tier")).toHaveCount(1);
+    await expect(page.locator("#group-memory")).toBeVisible();
+
+    await page.locator("#probeGroup").selectOption("all");
+    await page.locator("#probeSearch").fill("no-such-probe-anywhere");
+    await expect(page.locator("#probeEmpty")).toBeVisible();
+  });
 });

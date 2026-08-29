@@ -12,6 +12,8 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
+// Shared with scripts/test-static-bundle.mjs, which asserts the same number.
+import { SITE_JS_BUDGET } from "./site-budgets.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -160,7 +162,9 @@ if (existsSync(siteDir)) {
   }
 
   const siteBytes = statSync(join(siteDir, "site.js")).size;
-  if (siteBytes > 60_000) fail(`site/site.js is ${siteBytes} B, over its 60000 B budget`);
+  if (siteBytes > SITE_JS_BUDGET) {
+    fail(`site/site.js is ${siteBytes} B, over its ${SITE_JS_BUDGET} B budget`);
+  }
 
   console.log(
     `OK: site/ present and within budget (demo/app.js ${appBytes} B, worker ${workerBytes} B raw / ${workerGz} B gz, site.js ${siteBytes} B)`,

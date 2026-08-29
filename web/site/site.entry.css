@@ -7,4 +7,7 @@
  */
 @import "../shell/tokens.css";
 @import "./site.css";
+/* After site.css, not before: tour.css ends with the media overrides for the
+   rules it owns, and those have to come after their own base declarations. */
+@import "./tour.css";
 @import "./docs.css";

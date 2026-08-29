@@ -377,6 +377,81 @@
   font-size: 11.5px;
 }
 
+/* ------------------------------------------------------------- probe page
+ *
+ * web/site/probe.tsx. The explainer half borrows the landing spotlight's
+ * .probe-flow/.probe-node (site.css) and the feature card (.feature), and the
+ * catalog half borrows the checks page's control strip and .checks-tier — so
+ * what follows is only the joins those two halves do not already cover.
+ */
+
+/* The flow is a 5-column grid built for the spotlight's narrow right column;
+   given the full page width it would stretch to 62ch of arrows. */
+.probe-steps .probe-flow { max-width: 720px; }
+
+/* Three cards, not the landing's four. */
+.probe-gains {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.probe-case {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 24px;
+  align-items: center;
+}
+
+.probe-case h2 { margin: 0 0 8px; font-size: 18px; }
+.probe-case p { margin: 0; max-width: 52ch; color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+/* Always visible, unlike the checks page's pair — it is the argument for the
+   feature, not an annotation on a row, so it must not need a hover. */
+.probe-pair {
+  display: grid;
+  border: 1px solid color-mix(in srgb, var(--faint) 18%, transparent);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.probe-faq {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px 28px;
+}
+
+.probe-faq h2 { margin: 0 0 6px; font-size: 14px; }
+.probe-faq p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.6; }
+
+.probe-catalog { display: grid; gap: 6px; }
+.probe-catalog > h2 { margin: 0; font-size: 18px; }
+
+/* Fixed like .checks-table, and for the same reason: one table per group, so
+   only fixed columns line up down the page. */
+.probe-table { table-layout: fixed; }
+.probe-table tbody tr { background: var(--surface); }
+.probe-table tbody tr:hover { background: var(--surface-2); }
+.probe-table th, .probe-table td { padding-left: 10px; }
+/* 240px is `nesting.anon.depth3` and friends at 11.5px mono plus padding. */
+.probe-table th:first-child, .probe-table td:first-child { width: 240px; }
+.probe-table th:last-child, .probe-table td:last-child { width: 34%; }
+
+.probe-table td:first-child { white-space: nowrap; }
+
+/* Expressions wrap: the deepest nesting probe is a single ~200-char line, and
+   a horizontal scrollbar inside a table cell is worse than a wrapped line. */
+.probe-code code {
+  font-size: 11.5px;
+  overflow-wrap: anywhere;
+}
+
+.probe-note-cell { color: var(--faint); font-size: 11.5px; }
+
+@media (max-width: 900px) {
+  .probe-gains, .probe-case, .probe-faq { grid-template-columns: 1fr; }
+}
+
 .checks-foot {
   max-width: 74ch;
   margin: 0;

@@ -16,6 +16,8 @@ import { existsSync, readFileSync, statSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
+// Shared with scripts/test-web-assets.mjs, which asserts the same two numbers.
+import { SITE_CSS_BUDGET, SITE_JS_BUDGET } from "./site-budgets.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SITE = join(ROOT, "site");
@@ -35,6 +37,7 @@ const REQUIRED_ROOT = [
   "download.html",
   "docs.html",
   "checks.html",
+  "probe.html",
   "site.js",
   "site.css",
   ".nojekyll",
@@ -94,17 +97,15 @@ if (workerGz > 1_350_000) {
 
 const siteJsPath = join(SITE, "site.js");
 const siteJsBytes = statSync(siteJsPath).size;
-if (siteJsBytes > 60_000) fail(`site/site.js is ${siteJsBytes} B, over its 60000 B budget`);
+if (siteJsBytes > SITE_JS_BUDGET) {
+  fail(`site/site.js is ${siteJsBytes} B, over its ${SITE_JS_BUDGET} B budget`);
+}
 
 const siteCssPath = join(SITE, "site.css");
 const siteCssBytes = statSync(siteCssPath).size;
-// Rebaselined twice: from 12000 B when the docs and checks pages landed
-// (site.entry.css picked up web/site/docs.css and web/ui/option-tip.css, the
-// checks page reusing the app's rule tip verbatim), then from 15000 B for the
-// landing tour — five screenshot rows with their own stage, index badges and
-// gradients, taking ~13.6 KB to ~16.2 KB. ~10% above that, per the convention
-// in scripts/test-web-assets.mjs.
-if (siteCssBytes > 17_800) fail(`site/site.css is ${siteCssBytes} B, over its 17800 B budget`);
+if (siteCssBytes > SITE_CSS_BUDGET) {
+  fail(`site/site.css is ${siteCssBytes} B, over its ${SITE_CSS_BUDGET} B budget`);
+}
 
 const appSource = readFileSync(join(DEMO, "app.js"), "utf8");
 const siteJsSource = readFileSync(siteJsPath, "utf8");
@@ -135,7 +136,8 @@ if (siteJsSource.includes("cm-content")) {
 
 console.log(
   `  budgets: app.js ${appBytes} B (≤700000), worker ${workerBytes} B raw / ${workerGz} B gz (≤5000000 / ≤1350000), ` +
-    `site.js ${siteJsBytes} B (≤60000), site.css ${siteCssBytes} B (≤17800), worker/compiler/editor not leaked into site.js`,
+    `site.js ${siteJsBytes} B (≤${SITE_JS_BUDGET}), site.css ${siteCssBytes} B (≤${SITE_CSS_BUDGET}), ` +
+    `worker/compiler/editor not leaked into site.js`,
 );
 
 // ------------------------------------------------------------------ leakage
@@ -163,6 +165,15 @@ const KNOWN_GUARDED_PROCESS_PROPS = new Set([
   "recordreplay",
 ]);
 
+/**
+ * `process.*` that is *device* source text, not a Node access: the probe
+ * catalog's expressions are strings sent to Espruino, which has its own
+ * `process` object, and site.js bundles that catalog for web/site/probe.tsx.
+ * Kept separate from the set above so the two reasons stay distinguishable —
+ * these are not "guarded by a typeof check", they are data.
+ */
+const PROBE_DATA_PROCESS_PROPS = new Set(["memory"]);
+
 function checkLeakage(name, bundle) {
   if (/\b(?:import\(|require\(|from\s*)["']node:/.test(bundle)) {
     fail(`site/${name} contains an unresolved node: import/require specifier`);
@@ -181,7 +192,9 @@ function checkLeakage(name, bundle) {
   }
 
   const processProps = new Set([...bundle.matchAll(/process\.([A-Za-z_$][A-Za-z0-9_$]*)/g)].map((m) => m[1]));
-  const unknown = [...processProps].filter((p) => !KNOWN_GUARDED_PROCESS_PROPS.has(p));
+  const unknown = [...processProps].filter(
+    (p) => !KNOWN_GUARDED_PROCESS_PROPS.has(p) && !PROBE_DATA_PROCESS_PROPS.has(p),
+  );
   if (unknown.length) {
     fail(`site/${name} references process.{${unknown.join(", ")}} outside the known-guarded set`);
   }
@@ -204,6 +217,7 @@ for (const [label, path] of [
   ["download.html", join(SITE, "download.html")],
   ["docs.html", join(SITE, "docs.html")],
   ["checks.html", join(SITE, "checks.html")],
+  ["probe.html", join(SITE, "probe.html")],
   ["demo/index.html", join(DEMO, "index.html")],
 ]) {
   const html = readFileSync(path, "utf8");
@@ -218,7 +232,9 @@ for (const name of ["app.js", "styles.css", "sw.js", "manifest.webmanifest"]) {
   if (!demoHtml.includes(`"./${name}"`)) fail(`site/demo/index.html has no relative reference to ./${name}`);
 }
 
-console.log("  html: relative asset paths only across index.html, download.html, docs.html, checks.html and demo/index.html");
+console.log(
+  "  html: relative asset paths only across index.html, download.html, docs.html, checks.html, probe.html and demo/index.html",
+);
 
 // Cross-page navigation contract (M26 plan §4): the landing must link into
 // the demo and the download page; the demo must link back out to the landing.
@@ -235,6 +251,8 @@ for (const [href, what] of [
   ['"./download.html"', "the download page"],
   ['"./docs.html"', "the docs page"],
   ['"./checks.html"', "the checks reference"],
+  // Reached from the landing tour's probe spotlight, not from the header nav.
+  ['"./probe.html"', "the probe reference"],
 ]) {
   if (!siteJs.includes(href)) fail(`site/site.js has no ${href} link to ${what}`);
 }
@@ -247,6 +265,6 @@ if (!appSource.includes('"../"') && !appSource.includes("'../'")) {
   fail('site/demo/app.js has no "../" href — the back-link target is wrong or non-relative');
 }
 
-console.log("  cross-page links: landing -> demo/download/docs/checks, demo -> landing");
+console.log("  cross-page links: landing -> demo/download/docs/checks/probe, demo -> landing");
 
 console.log("OK: site/ present, within budget, leak-free, and Pages-subpath-safe");

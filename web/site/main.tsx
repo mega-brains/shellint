@@ -11,6 +11,7 @@ import { Landing } from "./landing";
 import { Download } from "./download";
 import { Docs } from "./docs";
 import { Checks } from "./checks";
+import { ProbePage } from "./probe";
 
 const root = document.getElementById("site");
 if (!root) throw new Error("#site missing");
@@ -20,6 +21,7 @@ const PAGES: Record<string, ComponentType> = {
   download: Download,
   docs: Docs,
   checks: Checks,
+  probe: ProbePage,
 };
 
 const Page = PAGES[document.body.dataset.page ?? ""] ?? Landing;
