@@ -41,8 +41,19 @@ const SKIP_DIRS = new Set([
   // Minify benchmark inputs, not app source: they need bulk to be
   // representative, and nothing imports them. See bench/README.md.
   "bench",
+]);
+/**
+ * Skipped only at the repo root, unlike SKIP_DIRS above, which matches a bare
+ * directory name at any depth.
+ *
+ * The distinction is load-bearing: `site` in the set above silently exempted
+ * `web/site/` — seven authored source files — along with the intended
+ * `site/` build output, so nothing in the presentation site had ever been
+ * measured. Anchor anything here whose name is plausible deeper in the tree.
+ */
+const SKIP_ROOT_DIRS = new Set([
   // scripts/build-static.mjs's build output (M17.7) — same reasoning as dist/
-  // and web/dist/ below: generated, not authored.
+  // and web/dist/ above: generated, not authored.
   "site",
   // Design handoffs: annotated mockup documents plus the runtime they need
   // (`support.js`), delivered as-is by the designer. Reference material, not
@@ -63,6 +74,7 @@ function skipped(rel) {
 function walk(dir, out = []) {
   for (const name of readdirSync(dir)) {
     if (SKIP_DIRS.has(name)) continue;
+    if (dir === ROOT && SKIP_ROOT_DIRS.has(name)) continue;
     const path = join(dir, name);
     let st;
     try {

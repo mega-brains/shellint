@@ -82,7 +82,7 @@ editor, including a unified `debug ↔ prod` diff.
 Every run reports pass / warn / fail / **skipped** per rule with a one-line
 rationale; a script that does not parse or type-check says so instead of quietly
 passing over a recovered AST. Tiers 1–3 are offline; tier 4 needs a device
-profile; the capability probe adds `probe-absent-api` from 104 `Script.Eval`
+profile; the capability probe adds `probe-absent-api` from 109 `Script.Eval`
 expressions run against real hardware. Two tier-3 findings carry autofixes,
 previewed as a diff.
 
@@ -106,7 +106,7 @@ mise run start            # server (alias: dev)
 mise run build            # device artifacts + web bundle
 mise run test             # unit + smoke; accepts a name filter
 mise run deploy -- debug min    # or: prod raw
-mise run probe            # 104 capability probes → types/generated-probe.json
+mise run probe            # 109 capability probes → types/generated-probe.json
 mise run profile          # cache device capabilities for the tier-4 checks
 mise run beforeCommit     # the full gate: lint, lines, typecheck, build, test, e2e ×2
 mise run build:static     # the offline site/ build

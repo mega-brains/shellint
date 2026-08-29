@@ -17,6 +17,10 @@ import { Button } from "../ui/button";
 import { Group } from "../ui/measure";
 import { useTheme, type Theme } from "../shell/theme";
 import { repoUrl } from "./release";
+// Zero-import data module (see web/site/probe.tsx) — the probe count is read
+// from the catalog rather than typed here, so the landing, the spotlight and
+// probe.html cannot disagree about how many probes there are.
+import { PROBES } from "../../server/probe/probe-catalog.ts";
 
 /**
  * The hero screenshot, in the theme the visitor is actually looking at — a
@@ -190,7 +194,7 @@ const TOUR: { key: string; figs: { src: string; alt: string }[]; title: string; 
 const SIGNALS = [
   ["66", "checks"],
   ["6", "artifacts"],
-  ["104", "probes"],
+  [String(PROBES.length), "probes"],
 ];
 
 /**
@@ -256,10 +260,14 @@ export function Landing() {
               <p class="probe-eyebrow">● Device truth</p>
               <h3 id="probeTitle">Probe firmware. Remove guesswork.</h3>
               <p>
-                Shellint checks 104 runtime capabilities. Each probe runs
-                on-device. Results stay device and firmware specific. Generated
-                typings expose supported APIs. Lint flags confirmed missing APIs.
+                Shellint checks {PROBES.length} runtime capabilities. Each probe
+                runs on-device. Results stay device and firmware specific.
+                Generated typings expose supported APIs. Lint flags confirmed
+                missing APIs.
               </p>
+              <a class="probe-cta" id="ctaProbe" href="./probe.html">
+                How the probe works <span aria-hidden="true">→</span>
+              </a>
             </div>
             <div class="probe-flow" aria-label="Probe workflow">
               <div class="probe-node">
@@ -271,7 +279,7 @@ export function Landing() {
               <div class="probe-node probe-node-active">
                 <span>02</span>
                 <strong>Script.Eval</strong>
-                <small>104 live checks</small>
+                <small>{PROBES.length} live checks</small>
               </div>
               <span class="probe-arrow" aria-hidden="true">→</span>
               <div class="probe-node">
