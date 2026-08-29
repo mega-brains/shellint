@@ -1,48 +1,17 @@
 /*
- * Docs page (`site/docs.html`). Renders `docs-content.ts` — this file owns
- * layout and the tiny inline-markup renderer, and carries no prose of its own.
+ * Docs page (`site/docs.html`). Renders `docs-content.ts`: layout lives here,
+ * prose does not, and the inline renderer is shared with faq.tsx.
  *
- * The renderer handles exactly three inline forms (`code`, [label](href),
- * **bold**) because those are the three the content uses; anything richer
- * would mean shipping a Markdown parser to a site that deliberately has no
- * runtime dependencies beyond Preact.
- *
- * Sections are one long scroll with a sticky table of contents rather than one
- * page per topic: GitHub Pages has no SPA rewrite, so every extra topic would
- * otherwise cost another HTML shell, another `data-page` branch and another
- * entry in build-static.mjs's copy loop.
+ * One long scroll with a sticky table of contents, not a page per topic:
+ * GitHub Pages has no SPA rewrite, so each extra topic would cost another HTML
+ * shell, `data-page` branch and build-static.mjs copy entry. The FAQ is the
+ * one topic that earned all three — it is what a visitor arrives looking for.
  */
-import { Fragment, type ComponentChildren } from "preact";
+import { Fragment } from "preact";
 import { useTheme } from "../shell/theme";
 import { SiteHeader, SiteFooter } from "./landing";
+import { renderInline } from "./inline";
 import { DOC_SECTIONS, type Block } from "./docs-content";
-
-/** `code` | [label](href) | **bold** — see the file header for why only these. */
-const INLINE = /`([^`]+)`|\[([^\]]+)\]\(([^)]+)\)|\*\*([^*]+)\*\*/g;
-
-function renderInline(text: string): ComponentChildren {
-  const out: ComponentChildren[] = [];
-  let last = 0;
-  for (const m of text.matchAll(INLINE)) {
-    const at = m.index ?? 0;
-    if (at > last) out.push(text.slice(last, at));
-    if (m[1] !== undefined) {
-      out.push(<code>{m[1]}</code>);
-    } else if (m[2] !== undefined && m[3] !== undefined) {
-      const external = m[3].startsWith("http");
-      out.push(
-        <a href={m[3]} {...(external ? { target: "_blank", rel: "noreferrer" } : {})}>
-          {m[2]}
-        </a>,
-      );
-    } else {
-      out.push(<strong>{m[4]}</strong>);
-    }
-    last = at + m[0].length;
-  }
-  if (last < text.length) out.push(text.slice(last));
-  return out;
-}
 
 function DocBlock({ block }: { block: Block }) {
   switch (block.kind) {
@@ -100,15 +69,15 @@ export function Docs() {
           <p class="hero-kicker">Documentation</p>
           <h1>Everything shellint does, and what it refuses to do.</h1>
           <p class="hero-sub">
-            Install, the workspace, the build, the checks and the device — plus
-            the security posture you should read before binding a port.
+            Install, workspace, build, checks and device — plus the security
+            posture to read before binding a port.
           </p>
         </header>
 
         <div class="docs-body">
-          {/* Sticky, so a reader deep in the checks section can still see the
-              shape of the page. `aria-label` because there are already two
-              other navs on the page (header, footer). */}
+          {/* Sticky, so a reader deep in the checks section still sees the
+              page shape. `aria-label` because the page already has two other
+              navs (header, footer). */}
           <nav class="docs-toc" aria-label="On this page">
             <p class="docs-toc-title">On this page</p>
             <ol>

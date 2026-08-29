@@ -1,5 +1,5 @@
 /*
- * One JS bundle serves both static pages (landing + download) — cheaper than
+ * One JS bundle serves every static page — cheaper than
  * a router, and each HTML shell stays statically addressable, which matters
  * because GitHub Pages has no SPA rewrite to fall back on. The shell picks
  * its page by setting `data-page` on <body>; this entry reads it once and
@@ -12,6 +12,8 @@ import { Download } from "./download";
 import { Docs } from "./docs";
 import { Checks } from "./checks";
 import { ProbePage } from "./probe";
+import { Faq } from "./faq";
+import { Stack } from "./stack";
 
 const root = document.getElementById("site");
 if (!root) throw new Error("#site missing");
@@ -22,6 +24,8 @@ const PAGES: Record<string, ComponentType> = {
   docs: Docs,
   checks: Checks,
   probe: ProbePage,
+  faq: Faq,
+  stack: Stack,
 };
 
 const Page = PAGES[document.body.dataset.page ?? ""] ?? Landing;

@@ -1,0 +1,53 @@
+/*
+ * Rules for the FAQ and "Built with" pages.
+ *
+ * Both reuse docs.css's page frame (`.docs-main`, `.docs-body`, `.docs-toc`,
+ * `.docs-section`, `.docs-table`) and only add what is genuinely new: the
+ * question/answer pair, and the four-column dependency table. They live here
+ * rather than at the end of docs.css because that file is already close to the
+ * 500-line cap `mise run check:lines` enforces.
+ */
+
+/* -------------------------------------------------------------- faq page */
+
+/* Questions are the scan target, so they get more air above than the 12px
+   grid gap between paragraphs gives them. */
+.faq-item {
+  display: grid;
+  gap: 9px;
+  scroll-margin-top: 20px;
+}
+
+.faq-item + .faq-item { margin-top: 14px; }
+
+.faq-q {
+  position: relative;
+  margin: 0;
+  color: var(--ink);
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: -0.005em;
+}
+
+.faq-q:hover .docs-anchor { color: var(--accent); }
+
+/* ------------------------------------------------------------ stack page */
+
+.stack-table td:first-child { white-space: nowrap; }
+
+.stack-version,
+.stack-licence {
+  color: var(--faint);
+  font-family: var(--mono);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+@media (max-width: 860px) {
+  /* The frame's own breakpoint drops .docs-anchor; the licence column is the
+     first thing worth losing after that, since every entry repeats one of
+     three values and the link carries the same information. */
+  .stack-licence { display: none; }
+  .stack-table th:nth-child(3) { display: none; }
+  .stack-table td:first-child { white-space: normal; }
+}

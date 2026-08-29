@@ -1,39 +1,31 @@
 /*
- * Landing page (`site/index.html`, M26 plan §6.1). This is the front door for
- * a visitor who has never seen shellint: size and lint story
- * matters, and two ways in — the in-browser demo or the downloadable
- * executable. It shares tokens.css and the app's Button/theme so the site
- * reads as the same product as the app it links to, not a marketing skin
- * bolted on top.
+ * Landing page (`site/index.html`, M26 plan §6.1) — front door for a visitor
+ * who has never seen shellint: the size and lint story, plus two ways in (the
+ * in-browser demo or the executable). Shares tokens.css and the app's
+ * Button/theme so the site reads as the same product, not a marketing skin.
  *
- * `SiteHeader`/`SiteFooter` are exported for `download.tsx` to reuse — one
- * definition each, kept here rather than in a third file because the build
- * contract (M26 plan §5) names exactly the files under web/site/ and neither
- * page owns the other, so co-locating on the page that renders first is the
- * least surprising place.
+ * `SiteHeader`/`SiteFooter` are exported for `download.tsx`. They live here
+ * rather than in a third file because the build contract (M26 plan §5) names
+ * exactly the files under web/site/, and neither page owns the other.
  */
 import { Fragment } from "preact";
 import { Button } from "../ui/button";
 import { Group } from "../ui/measure";
 import { useTheme, type Theme } from "../shell/theme";
 import { repoUrl } from "./release";
-// Zero-import data module (see web/site/probe.tsx) — the probe count is read
-// from the catalog rather than typed here, so the landing, the spotlight and
-// probe.html cannot disagree about how many probes there are.
+// Zero-import data module (see web/site/probe.tsx). The count is read from the
+// catalog, so the landing, the spotlight and probe.html cannot disagree.
 import { PROBES } from "../../server/probe/probe-catalog.ts";
 
 /**
- * The hero screenshot, in the theme the visitor is actually looking at — a
- * light shot of the app on a dark page (or the reverse) reads as a screenshot
- * of some *other* program.
+ * The hero screenshot, in the theme the visitor is looking at — a light shot
+ * on a dark page reads as some *other* program.
  *
- * Driven off `useTheme()` rather than a `<picture>` with a
- * `prefers-color-scheme` `<source>`: `<picture>` only ever sees the OS
- * preference, so it would ignore the header's theme toggle. Swapping `src`
- * also means the browser fetches one image, not both — two ~250 KB PNGs, one
- * of them `display: none`, is still two downloads.
+ * Driven off `useTheme()`, not a `<picture>` with `prefers-color-scheme`:
+ * `<picture>` only sees the OS preference, so it would ignore the header
+ * toggle. Swapping `src` also fetches one image, not two ~250 KB PNGs.
  *
- * Both files are 1620×908; the box crops the bottom (see `.hero-shot` in
+ * Both files are 1620×908; the box crops the bottom (`.hero-shot` in
  * site.css), which is why the dashboard rail sits high in the frame.
  */
 function HeroShot({ theme }: { theme: Theme }) {
@@ -69,6 +61,7 @@ export function SiteHeader({ theme, toggle }: { theme: Theme; toggle: () => void
         <a class="chip" href="./demo/">Demo <span aria-hidden="true">→</span></a>
         <a href="./docs.html">Docs</a>
         <a href="./checks.html">Checks</a>
+        <a href="./faq.html">FAQ</a>
         <a href="./download.html">Download</a>
         <a href={repoUrl()} target="_blank" rel="noreferrer">
           GitHub
@@ -90,11 +83,11 @@ export function SiteHeader({ theme, toggle }: { theme: Theme; toggle: () => void
 export function SiteFooter() {
   return (
     <footer class="site-footer">
-      {/* No licence is claimed here on purpose: the repo carries no LICENSE
-          file and no `license` field in package.json, so stating one would be
-          a claim the project has not actually made. Add the line back once a
-          licence lands. */}
+      {/* No licence claimed on purpose: the repo carries no LICENSE file and
+          no `license` field in package.json, so stating one would be a claim
+          the project has not made. Add the line back once a licence lands. */}
       <span>A local playground for Shelly Gen2 scripts.</span>
+      <a href="./stack.html">Built with</a>
       <a href={repoUrl()} target="_blank" rel="noreferrer">
         Source on GitHub
       </a>
@@ -122,23 +115,21 @@ const FEATURES: { title: string; body: string }[] = [
 ];
 
 /**
- * The guided tour under the feature cards: one region of the real UI per row,
- * with the copy that says what it is for.
+ * The guided tour under the feature cards: one region of the real UI per row.
  *
- * `figs` names crops under `site/figures/`, cut out of the same two hero
- * screenshots by `scripts/crop-docs-figures.mjs` — so a tour image can never
- * drift from the hero above it, and refreshing both is one capture plus one
- * crop run. `-dark` suffix per theme, for the reason `HeroShot` explains.
+ * `figs` names crops under `site/figures/`, cut from the same two hero shots
+ * by `scripts/crop-docs-figures.mjs`, so a tour image cannot drift from the
+ * hero above it; refreshing both is one capture plus one crop run. `-dark`
+ * suffix per theme, for the reason `HeroShot` explains.
  *
- * A row may carry more than one crop; they sit side by side at natural size,
- * which is how the portrait inspector column is shown without a row that is
- * three lines of copy next to 738 px of image.
+ * A row may carry more than one crop; they sit side by side at natural size —
+ * how the portrait inspector column fits next to three lines of copy.
  */
 const TOUR: { key: string; figs: { src: string; alt: string }[]; title: string; body: string }[] = [
   {
     key: "toolbar",
     title: "Your device, in the title bar",
-    body: "Pick the device and the script slot, watch the run state, and build, deploy or probe from the same row. Multiple devices and slots switch here; digest auth is supported.",
+    body: "Pick device and slot, watch the run state, and build, deploy or probe from one row. Digest auth is supported.",
     figs: [
       {
         src: "toolbar",
@@ -149,13 +140,13 @@ const TOUR: { key: string; figs: { src: string; alt: string }[]; title: string; 
   {
     key: "rail",
     title: "Three gates, always visible",
-    body: "Built, checked and probed — the rail says which of the three is stale before you deploy something you have not re-checked. 66/66 means every rule ran, not that every rule passed silently.",
+    body: "Built, checked and probed. The rail says which one is stale before you deploy. 66/66 means every rule ran — not that every rule passed silently.",
     figs: [{ src: "rail", alt: "Readiness rail showing not built, checked 66/66 and probed" }],
   },
   {
     key: "artifacts",
     title: "Read what actually ships",
-    body: "Every built artifact previews read-only in the editor — the DCE output, the minified output, and a unified debug ↔ prod diff that shows exactly what the environment gating removed.",
+    body: "Every artifact previews read-only in the editor: DCE output, minified output, and a debug ↔ prod diff showing what the environment gating removed.",
     figs: [
       {
         src: "artifacts",
@@ -166,7 +157,7 @@ const TOUR: { key: string; figs: { src: string; alt: string }[]; title: string; 
   {
     key: "inspector",
     title: "Bytes and RAM before the flash",
-    body: "Artifact sizes against the device caps, script counters that highlight their own lines in the editor, firmware limits on registrations and strings, the minimum firmware your API use needs, and a static RAM estimate drawn against the device's measured peak.",
+    body: "Artifact sizes against device caps, counters that highlight their own lines, firmware limits on registrations and strings, the minimum firmware your APIs need, and a RAM estimate against the measured peak.",
     figs: [
       {
         src: "inspector-sizes",
@@ -181,7 +172,7 @@ const TOUR: { key: string; figs: { src: string; alt: string }[]; title: string; 
   {
     key: "dock",
     title: "The device, while you work",
-    body: "Script memory and CPU, RAM, filesystem, temperature and RSSI, an eco toggle, and a streamed debug log. Numeric series chart themselves from print(\"#m <series> <value>\").",
+    body: "Script memory and CPU, RAM, filesystem, temperature and RSSI, an eco toggle, and a streamed debug log. print(\"#m <series> <value>\") charts itself.",
     figs: [
       {
         src: "dock",
@@ -198,8 +189,8 @@ const SIGNALS = [
 ];
 
 /**
- * #site itself is the mount point declared in index.html; this component
- * fills it (a fragment, not a wrapping div) so the root's id stays unique.
+ * #site is the mount point in index.html; this fills it with a fragment, not a
+ * wrapping div, so the root's id stays unique.
  */
 export function Landing() {
   const [theme, toggle] = useTheme();
@@ -213,8 +204,8 @@ export function Landing() {
             <p class="hero-kicker">Shelly Gen2+ · TypeScript · Espruino</p>
             <h1>Write smarter scripts. Keep them small.</h1>
             <p class="hero-sub">
-              Type safety, device-aware linting, size budgets, and deployment.
-              One local workspace.
+              Types, device-aware lint, size budgets and deploy. One local
+              workspace.
             </p>
             <div class="hero-cta">
               <a class="site-btn site-btn-primary" id="ctaDemo" href="./demo/">
@@ -251,8 +242,8 @@ export function Landing() {
             <p class="tour-kicker">Inside shellint</p>
             <h2 id="tourTitle">One workspace. Every signal.</h2>
             <p>
-              Follow script from source to device. Each surface answers one
-              practical question before code ships.
+              Source to device. Each surface answers one question before the
+              code ships.
             </p>
           </header>
           <article class="probe-spotlight" aria-labelledby="probeTitle">
@@ -260,10 +251,9 @@ export function Landing() {
               <p class="probe-eyebrow">● Device truth</p>
               <h3 id="probeTitle">Probe firmware. Remove guesswork.</h3>
               <p>
-                Shellint checks {PROBES.length} runtime capabilities. Each probe
-                runs on-device. Results stay device and firmware specific.
-                Generated typings expose supported APIs. Lint flags confirmed
-                missing APIs.
+                {PROBES.length} capability checks, run on the device itself.
+                Results are device- and firmware-specific: typings expose what
+                exists, lint flags what does not.
               </p>
               <a class="probe-cta" id="ctaProbe" href="./probe.html">
                 How the probe works <span aria-hidden="true">→</span>
@@ -288,7 +278,7 @@ export function Landing() {
                 <small>types + lint</small>
               </div>
               <p class="probe-note">
-                Missing APIs become lint findings. Problems surface before deployment.
+                Missing APIs become lint findings, before you deploy.
               </p>
             </div>
           </article>
@@ -319,8 +309,8 @@ export function Landing() {
         <section class="limits">
           <Group title="What the demo cannot do" id="limits">
             <p>
-              Browser demo works offline. Device-only checks, deploys, and logs
-              need <a href="./download.html">local version</a>.
+              The browser demo works offline. Device checks, deploys and logs
+              need the <a href="./download.html">local build</a>.
             </p>
           </Group>
         </section>
