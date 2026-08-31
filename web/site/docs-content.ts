@@ -85,26 +85,44 @@ export const DOC_SECTIONS: DocSection[] = [
   },
   {
     id: "workspace",
-    title: "The workspace",
+    title: "Your workspace",
     blocks: [
       {
         kind: "p",
-        text: "Everything shellint reads and writes lives in the directory it was started from — the release binary included.",
+        text: "Run `./shellint` inside any folder. That folder becomes your workspace: it holds your script, settings and build output. The release binary can live anywhere; shellint does not write beside it.",
       },
       {
-        kind: "table",
-        head: ["Path", "What it is"],
-        rows: [
-          ["`scripts/main.ts`", "your script — the editor buffer, seeded from `templates/main.example.ts`"],
-          ["`types/*.d.ts`", "the entire stdlib for device code; the compile is `noLib` with `types: []`"],
-          ["`dist/`", "build output — `{debug,prod}.{raw.js,js,adv.js}`"],
-          ["`shellint.json`", "host, port, compiler and minify settings"],
-          ["`.shellint/devices.json`", "device list, active device/slot, and passwords — gitignored, `0600`"],
+        kind: "p",
+        text: "**First run in an empty workspace creates:**",
+      },
+      {
+        kind: "list",
+        items: [
+          "`templates/main.example.ts` — starter script template, copied from the release binary.",
+          "`types/` — three Shelly and Espruino declaration files used while compiling your script.",
+          "`scripts/main.ts` — your editable script, copied from the starter template.",
         ],
       },
       {
         kind: "p",
-        text: "On first run in an empty directory, the release binary writes out the files it must read back — the template and the three `types/*.d.ts` — and never overwrites an existing one.",
+        text: "Existing files always win. shellint only creates missing files, so an upgrade never replaces your script or declaration edits.",
+      },
+      {
+        kind: "p",
+        text: "**Other workspace paths appear when you use their feature:**",
+      },
+      {
+        kind: "table",
+        head: ["Path", "Created when", "What it stores"],
+        rows: [
+          ["`dist/`", "after your first build", "debug and prod JavaScript artifacts"],
+          ["`.shellint/`", "when you save, build or add a device", "history, device list, profiles, probes and passwords"],
+          ["`shellint.json`", "when you change a minify setting", "saved host, port, compiler and minify settings"],
+        ],
+      },
+      {
+        kind: "p",
+        text: "Keep `.shellint/` private. Its `devices.json` file can contain device passwords and is gitignored with `0600` permissions.",
       },
     ],
   },

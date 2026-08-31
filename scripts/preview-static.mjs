@@ -7,11 +7,13 @@
  * Usage: node scripts/preview-static.mjs [--port N]   (default 8788, or $PORT)
  */
 import { createServer } from "node:http";
-import { existsSync, readFileSync, statSync } from "node:fs";
+import { existsSync, readFileSync, statSync, watch } from "node:fs";
 import { dirname, extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
+import { spawn } from "node:child_process";
 
-const root = join(dirname(fileURLToPath(import.meta.url)), "..", "site");
+const projectRoot = join(dirname(fileURLToPath(import.meta.url)), "..");
+const root = join(projectRoot, "site");
 
 if (!existsSync(root)) {
   console.error(`FAIL: ${root} missing — run \`npm run build:static\` first`);
@@ -65,3 +67,39 @@ const server = createServer((req, res) => {
 server.listen(port, () => {
   console.log(`preview:static — http://127.0.0.1:${port}/ (serving ${root})`);
 });
+
+const watchedPaths = ["web", "shared", "server", "scripts", "config", ".github/assets"]
+  .map((path) => join(projectRoot, path))
+  .filter(existsSync);
+let timer;
+let rebuilding = false;
+let rebuildQueued = false;
+
+function rebuild() {
+  if (rebuilding) {
+    rebuildQueued = true;
+    return;
+  }
+  rebuilding = true;
+  console.log("preview:static — rebuilding");
+  const child = spawn("pnpm", ["run", "build:static"], {
+    cwd: projectRoot,
+    stdio: "inherit",
+  });
+  child.on("exit", (code) => {
+    rebuilding = false;
+    console.log(code === 0 ? "preview:static — rebuilt" : "preview:static — rebuild failed");
+    if (rebuildQueued) {
+      rebuildQueued = false;
+      rebuild();
+    }
+  });
+}
+
+function scheduleRebuild() {
+  clearTimeout(timer);
+  timer = setTimeout(rebuild, 100);
+}
+
+for (const path of watchedPaths) watch(path, { recursive: true }, scheduleRebuild);
+console.log("preview:static — watching source changes");

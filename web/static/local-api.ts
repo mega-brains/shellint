@@ -419,20 +419,23 @@ const ROUTES: Record<string, (ctx: RouteCtx) => unknown> = {
  * here rather than a `track()` call inside each handler: this router is already
  * the single choke point every panel's request passes through.
  *
- * `/api/config` and `/api/script` are method-dependent — a GET of either is the
- * page loading, not an action — so they are resolved in featureFor() instead.
+ * `/api/config`, `/api/script` and `/api/check` are conditional — a GET of the
+ * first two is the page loading, and the app runs its own checks — so they are
+ * resolved in featureFor() instead.
  */
 const FEATURE_BY_ROUTE: Record<string, Feature> = {
   "/api/build": "build",
-  "/api/check": "check",
   "/api/artifact": "artifact-preview",
   "/api/script/checkpoint": "checkpoint",
   "/api/script/restore": "restore",
 };
 
-function featureFor(pathname: string, method: string): Feature | undefined {
+/** `body.quiet` is app.tsx's automatic check (after load, save, restore) — same
+ * route as the Check button, so without it the event counts loads, not presses. */
+function featureFor(pathname: string, method: string, body: { quiet?: boolean }) {
   if (pathname === "/api/config") return method === "PATCH" ? "options-change" : undefined;
   if (pathname === "/api/script") return method === "PUT" ? "script-edit" : undefined;
+  if (pathname === "/api/check") return body.quiet ? undefined : "check";
   return FEATURE_BY_ROUTE[pathname];
 }
 
@@ -444,12 +447,14 @@ async function route(path: string, init?: RequestInit): Promise<unknown> {
 
   if (DEVICE_PREFIXES.some((p) => pathname.startsWith(p))) {
     // Nothing here can succeed without a LAN device, but wanting one is the
-    // single most useful thing to know about the demo.
+    // single most useful thing to know about the demo. Deliberate by
+    // construction: device-section.tsx renders no device UI and starts no
+    // polling once `/api/config` reports the static build.
     track("device-attempt");
     throw new StaticModeError(pathname);
   }
 
-  const feature = featureFor(pathname, method);
+  const feature = featureFor(pathname, method, body);
   if (feature) track(feature);
 
   // Not a table entry: the id is an ISO timestamp, so it is not a fixed string.
@@ -477,15 +482,16 @@ export async function api<T>(
 /** Static equivalent of web/lib/api.ts's streamed Check transport. */
 export async function apiStream<T>(
   path: string,
-  _init: RequestInit | undefined,
+  init: RequestInit | undefined,
   onProgress: (progress: CheckProgress) => void,
 ): Promise<T> {
   if (path !== "/api/check/stream") {
     throw new Error(`no static stream handler for ${path}`);
   }
-  // The transport Check actually uses; the `/api/check` table entry above is
-  // the non-streaming fallback, so both have to report the one feature.
-  track("check");
+  // The transport Check uses when the progress option is on; featureFor()'s
+  // `/api/check` branch is the other half, so both honour the same `quiet`.
+  const body = init?.body ? (JSON.parse(String(init.body)) as { quiet?: boolean }) : {};
+  if (!body.quiet) track("check");
   const report = await pipelineRequest<CheckReport>(
     { type: "check", source: loadSource(), artifacts },
     onProgress,

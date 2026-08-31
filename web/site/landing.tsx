@@ -63,8 +63,8 @@ export function SiteHeader({ theme, toggle }: { theme: Theme; toggle: () => void
         <a href="./checks.html">Checks</a>
         <a href="./faq.html">FAQ</a>
         <a href="./download.html">Download</a>
-        <a href={repoUrl()} target="_blank" rel="noreferrer">
-          GitHub
+        <a href={repoUrl()} target="_blank" rel="noreferrer" aria-label="GitHub (opens in new tab)">
+          GitHub <span class="external-link-icon" aria-hidden="true">↗</span>
         </a>
       </nav>
       <Button
@@ -240,7 +240,7 @@ export function Landing() {
         <section class="tour" aria-labelledby="tourTitle">
           <header class="tour-heading">
             <p class="tour-kicker">Inside shellint</p>
-            <h2 id="tourTitle">One workspace. Every signal.</h2>
+            <h2 id="tourTitle">One workspace.</h2>
             <p>
               Source to device. Each surface answers one question before the
               code ships.

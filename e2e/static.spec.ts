@@ -373,4 +373,41 @@ test.describe("presentation site (M26)", () => {
     await page.locator("#probeSearch").fill("no-such-probe-anywhere");
     await expect(page.locator("#probeEmpty")).toBeVisible();
   });
+
+  /**
+   * web/static/analytics.ts only ever runs against the collector's `s.js`, which
+   * the demo build injects only when COLLECTOR_ORIGIN is set — never here. So
+   * this stubs the one API it uses (`globalThis.__da.trackEvent`) and reads the
+   * calls back, which also pins the two ways the counts have silently lied:
+   * an event has to be a press (loading the page is not one), and pressing
+   * twice has to count twice.
+   */
+  test("feature events count presses, not page loads", async ({ page }) => {
+    await page.addInitScript(() => {
+      const calls: string[][] = [];
+      (globalThis as unknown as Record<string, unknown>).__daCalls = calls;
+      (globalThis as unknown as Record<string, unknown>).__da = {
+        trackEvent: (ev: string, target?: string) => calls.push([ev, target ?? ""]),
+      };
+    });
+    const targets = () =>
+      page.evaluate(
+        () => ((globalThis as unknown as { __daCalls: string[][] }).__daCalls).map((c) => c[1]),
+      );
+
+    await openStatic(page);
+    // The mount-time load runs its own quiet check and, until the static flag
+    // lands, would have polled the device routes — neither is a visitor action.
+    expect(await targets()).toEqual([]);
+
+    for (const _ of [0, 1]) {
+      await page.locator("#btnBuildMenu").click();
+      await page.locator('#buildMenu button[data-action="check"]').click();
+      await expect(page.locator("#checkNote")).toContainText("device profile", {
+        timeout: 45_000,
+      });
+    }
+    // Two presses, plus the once-per-tab-session copy of the first.
+    expect(await targets()).toEqual(["check", "check@1st", "check"]);
+  });
 });

@@ -52,7 +52,7 @@ export function App() {
   );
   const [deviceIp, setDeviceIp] = useState("");
   const [configFail, setConfigFail] = useState<string | undefined>();
-  const [isStatic, setIsStatic] = useState(false);
+  const [isStatic, setIsStatic] = useState<boolean | null>(null);
   const [sizeDebug, setSizeDebug] = useState<Sizes>({});
   const [sizeProd, setSizeProd] = useState<Sizes>({});
   const [dash, setDash] = useState<DashboardPatch>({ history: [] });
@@ -133,14 +133,14 @@ export function App() {
               "/api/check/stream",
               {
                 method: "POST",
-                body: JSON.stringify({ connected: deviceSection.deviceOnline }),
+                body: JSON.stringify({ connected: deviceSection.deviceOnline, quiet }),
               },
               setCheckProgress,
             )
           : (
               await api<{ report: CheckReport }>("/api/check", {
                 method: "POST",
-                body: JSON.stringify({ connected: deviceSection.deviceOnline }),
+                body: JSON.stringify({ connected: deviceSection.deviceOnline, quiet }),
               })
             ).report;
         setReport(next);
@@ -344,7 +344,7 @@ export function App() {
     estimateBytes: dash.estimate?.bytes ?? null,
     report,
     dialectFindings,
-    isStatic,
+    isStatic: isStatic === true,
     hasDevice: deviceSection.hasDevice,
     probeRequired: deviceSection.probeRequired,
     probeSkipped: deviceSection.probeSkipped,
@@ -360,7 +360,7 @@ export function App() {
         configFail={configFail}
         identity={deviceSection.identity}
         onToggleRun={deviceSection.onToggleRun}
-        staticMode={isStatic}
+        staticMode={isStatic === true}
         deviceSelector={deviceSection.selector}
       >
         <Toolbar
@@ -374,13 +374,13 @@ export function App() {
           deployChoice={deployChoice}
           autoBuildCheck={autoBuildCheck}
           nextStep={
-            readiness.deployReady && !isStatic
+            readiness.deployReady && isStatic !== true
               ? "deploy"
               : readiness.gates[0].state === "ok" && readiness.gates[1].state === "ok"
                 ? "none"
                 : "build"
           }
-          staticMode={isStatic}
+          staticMode={isStatic === true}
           staticControls={
             isStatic ? (
               <StaticFileControls

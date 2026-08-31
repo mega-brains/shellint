@@ -87,6 +87,13 @@ code, pre {
 
 .site-nav a:hover { color: var(--ink); }
 
+.external-link-icon {
+  display: inline-block;
+  font-size: 0.75em;
+  margin-left: 2px;
+  vertical-align: 0.15em;
+}
+
 /* ------------------------------------------------------- chip / button */
 /* Subset of web/shell/styles.css needed by ui/button.tsx's chip-icon variant
    (the theme toggle) — not the whole app control system. */

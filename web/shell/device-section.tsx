@@ -20,10 +20,14 @@ import type { ProbeResult } from "../probe/probe-logic";
 import type { Mode, Minify } from "./toolbar";
 
 export type DeviceSectionProps = {
-  /** From `GET /api/config`'s `static` flag — while unknown (pre-fetch) this
-   * stays `false`, same as every other config-dependent default in app.tsx,
-   * so the very first paint looks identical to today's server-mode UI. */
-  isStatic: boolean;
+  /** From `GET /api/config`'s `static` flag, `null` until that fetch lands.
+   * Rendering treats `null` like `false`, so the very first paint still looks
+   * identical to today's server-mode UI — but the polling hooks below start
+   * only on an explicit `false`. Under the static build the flag arrives after
+   * mount, so an `enabled: !isStatic` here would fire one `/api/devices` and
+   * one `/api/device/status` on every page load: dead requests that the
+   * static router counts as a `device-attempt` nobody made. */
+  isStatic: boolean | null;
   viewRef: RefObject<EditorView | null>;
   setStatus: (msg: string, isError?: boolean) => void;
   withBusy: (fn: () => Promise<void>) => Promise<void>;
@@ -89,7 +93,7 @@ export function useDeviceSection(props: DeviceSectionProps): DeviceSectionResult
   const deviceRef = useRef<{ refresh: () => Promise<void> } | null>(null);
 
   const deviceStatus = useDeviceStatus({
-    enabled: !isStatic,
+    enabled: isStatic === false,
     api,
     onStatus: setStatus,
     onIdentity: (id) => {
@@ -103,7 +107,7 @@ export function useDeviceSection(props: DeviceSectionProps): DeviceSectionResult
     },
   });
 
-  const devicesState = useDevices(!isStatic);
+  const devicesState = useDevices(isStatic === false);
   const activeDeviceId = devicesState.active?.device ?? null;
   const activeDevice = devicesState.devices.find((d) => d.id === activeDeviceId);
   const slotImport = useSlotImport(viewRef, setStatus);

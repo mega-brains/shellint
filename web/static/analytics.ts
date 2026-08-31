@@ -17,7 +17,8 @@
  * more, by the same mechanism.
  *
  * What is sent: the literal `"feature"` as the event name and one name from
- * FEATURES below as its target — landing in the collector's `event` /
+ * FEATURES below as its target (plus a `@1st` variant of that target on the
+ * first press per tab session) — landing in the collector's `event` /
  * `event_target` dims, next to the `outbound` and `download` events s.js
  * tracks by itself. No source, no script contents, no artifacts, no
  * identifiers; the editor buffer never leaves the browser, which is the whole
@@ -25,7 +26,11 @@
  *
  * `/api/stats` and `/api/history` are absent on purpose: the dashboard fetches
  * both on mount, so they measure the page loading, not a visitor doing
- * anything. Every name below needs a deliberate action to reach.
+ * anything. Every name below needs a deliberate action to reach — which matters
+ * more now that a name is counted per press: the two routes the app drives by
+ * itself are excluded at the router (local-api.ts's featureFor and apiStream
+ * skip a `quiet` check; device-section.tsx no longer polls before the static
+ * flag lands), or they would report a visitor's page loads as their clicks.
  */
 
 /**
@@ -48,13 +53,30 @@ export type Feature =
 /** The one event name; the Feature is its target, so `event` stays low-cardinality. */
 const EVENT = "feature";
 
+/**
+ * Suffix for the once-per-tab-session copy of a feature event. The collector
+ * counts `event` and `event_target` as independent marginals (no cross-filter,
+ * and event payloads carry no session id), so "raw" and "first touch" cannot be
+ * one target value read two ways — they have to be two values. The bare name is
+ * the raw count, since that is the one a reader assumes: `check` is presses,
+ * `check@1st` is sessions that pressed at least once.
+ */
+const FIRST_SUFFIX = "@1st";
+
 type Collector = { trackEvent?: (ev: string, target?: string) => void };
 
-/** Fired names, so each feature reports once per tab session. */
+/** Names already counted under FIRST_SUFFIX, so that copy stays once per tab session. */
 const fired = new Set<string>();
 
 /** Fired before `s.js` finished loading — flushed on the next successful track. */
 const pending: Feature[] = [];
+
+/**
+ * `pending` holds raw presses, so repeats are real and it is no longer bounded
+ * by the Feature union. A beacon that never arrives (blocked, offline) would
+ * otherwise grow it for the life of the page.
+ */
+const MAX_PENDING = 24;
 
 const STORE_KEY = "shellint.static.tracked";
 
@@ -99,30 +121,35 @@ function collector(): Required<Collector>["trackEvent"] | null {
 }
 
 /**
- * Record that a feature was tried. Never throws and never awaits: a dead
- * collector, a blocked script or an offline PWA session must not be observable
- * from the UI, so failures are dropped on the floor.
+ * Record that a feature was tried — once per deliberate action, so a visitor
+ * who presses Check five times reports five times. Never throws and never
+ * awaits: a dead collector, a blocked script or an offline PWA session must not
+ * be observable from the UI, so failures are dropped on the floor.
+ *
+ * Every call sends the bare name; the first call for a name in a tab session
+ * sends a second event under `<name>@1st`. Two requests on that first press is
+ * the price of both numbers — see FIRST_SUFFIX for why one cannot serve.
  *
  * The beacon tag is `defer`, so the very first actions of a session can beat it
- * onto the page; those queue in `pending` (bounded by the Feature union) and go
- * out with the next event rather than being lost.
+ * onto the page; those queue in `pending` (capped at MAX_PENDING) and go out
+ * with the next event rather than being lost.
  */
 export function track(name: Feature): void {
   try {
     if (optedOut()) return;
     loadFired();
-    if (fired.has(name)) return;
     const send = collector();
     if (!send) {
-      if (!pending.includes(name)) pending.push(name);
+      if (pending.length < MAX_PENDING) pending.push(name);
       return;
     }
     pending.push(name);
     let changed = false;
     for (const queued of pending.splice(0)) {
+      send(EVENT, queued);
       if (fired.has(queued)) continue;
       fired.add(queued);
-      send(EVENT, queued);
+      send(EVENT, queued + FIRST_SUFFIX);
       changed = true;
     }
     if (changed) persistFired();
