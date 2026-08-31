@@ -1,6 +1,6 @@
 [tools]
 node = "24"
-pnpm = "11"
+pnpm = "12"
 
 [env]
 # Overrides, not the source of truth: txiki-test-util.mjs pins the version and
