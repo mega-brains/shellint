@@ -33,6 +33,7 @@ if (FIXTURE_SCRIPT === join(ROOT, "scripts", "main.ts")) {
 }
 
 const argv = process.argv.slice(2);
+process.env.SHELLINT_NO_DEVICE = "1";
 const isolated = argv.includes("--isolated");
 const filters = argv.filter((a) => !a.startsWith("--"));
 
@@ -61,8 +62,10 @@ const TESTS = [
   "test-script-history",
   "test-probe-store",
   "test-probe-eco",
+  "test-probe-recovery",
   "test-devices",
   "test-device-scripts",
+  "test-rpc-pool",
   "test-deploy-gate",
   "test-lint-memory",
   "test-semantic-fixes",

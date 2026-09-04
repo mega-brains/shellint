@@ -1,6 +1,8 @@
 import { runtime } from "#shellint/runtime";
 import { DEVICE_PROFILE_PATH, PROBE_PATH, STATE_DIR, devicePaths } from "../core/paths.ts";
-import { AuthFailedError, ShellyRpc } from "./rpc.ts";
+import { AuthFailedError } from "./rpc.ts";
+import { pooledRpc } from "./rpc-pool.ts";
+import { probeShellyHttp, UnsupportedDeviceError, type ShellyHttpFetch } from "./device-generation.ts";
 import { writeGeneratedTypings } from "../probe/probe-typings.ts";
 import { newestCapture, probeState, resolveCapture, type ProbeSkip } from "../probe/probe-store.ts";
 import { resolveConfigPath } from "../core/config.ts";
@@ -8,7 +10,6 @@ import { migrateStateDir } from "../core/migrate-state-dir.ts";
 
 const { fs } = runtime;
 const { dirname, join } = runtime.path;
-
 export type DeviceAuth = { username: string; password: string };
 export type DeviceInfo = { model?: string; gen?: number; ver?: string; app?: string };
 export type SlotBinding = { script: string; name?: string };
@@ -23,6 +24,7 @@ export type DeviceRecord = {
   /** One slot, not a list — a skip for an older firmware is dead the moment
    * `ver` moves (M16 §3.3). */
   probeSkipped?: ProbeSkip;
+  unsupported?: { gen: number | null; model: string | null; at: string };
 };
 export type ActiveSelection = { device: string; slot: number; script: string };
 export type DevicesFile = {
@@ -31,23 +33,19 @@ export type DevicesFile = {
   devices: DeviceRecord[];
 };
 export type ActiveTarget = { device: DeviceRecord; slot: number; script: string };
-
 const DEVICES_FILE = join(STATE_DIR, "devices.json");
-
 export class NoDeviceError extends Error {
   constructor() {
     super("no device selected — add one first");
     this.name = "NoDeviceError";
   }
 }
-
 export class DuplicateDeviceError extends Error {
   constructor(id: string) {
     super(`device "${id}" already exists`);
     this.name = "DuplicateDeviceError";
   }
 }
-
 function slug(s: string): string {
   return (
     s
@@ -56,11 +54,9 @@ function slug(s: string): string {
       .replace(/^-+|-+$/g, "") || "device"
   );
 }
-
 function emptyFile(): DevicesFile {
   return { version: 1, active: null, devices: [] };
 }
-
 async function readRaw(): Promise<DevicesFile | null> {
   if (!(await fs.exists(DEVICES_FILE))) return null;
   try {
@@ -199,26 +195,14 @@ export type DeviceRpc = {
 
 export type DeviceRpcFactory = (ip: string, auth?: DeviceAuth) => DeviceRpc;
 
-const defaultRpcFactory: DeviceRpcFactory = (ip, auth) => new ShellyRpc({ ip, auth });
+const defaultRpcFactory: DeviceRpcFactory = (ip, auth) => pooledRpc({ ip, auth });
 
 /** Narrows a raw `Shelly.GetDeviceInfo` answer down to the fields we cache. */
 export function toDeviceInfo(raw: Record<string, unknown>): DeviceInfo {
-  return {
-    model: typeof raw.model === "string" ? raw.model : undefined,
-    gen: typeof raw.gen === "number" ? raw.gen : undefined,
-    ver: typeof raw.ver === "string" ? raw.ver : undefined,
-    app: typeof raw.app === "string" ? raw.app : undefined,
-  };
+  return { model: typeof raw.model === "string" ? raw.model : undefined, gen: typeof raw.gen === "number" ? raw.gen : undefined, ver: typeof raw.ver === "string" ? raw.ver : undefined, app: typeof raw.app === "string" ? raw.app : undefined };
 }
 
-/**
- * Persists a fresh `GetDeviceInfo` answer, called from every RPC path that
- * already fetches one (`addDevice`, the device-test route, `fetchDeviceProfile`,
- * `fetchDeviceStatus`, `runProbe`) — `info.ver` is the probe gate's key half
- * (M16 §3.3), and used to only ever be written once, at `addDevice`. No-ops
- * when nothing changed, so a five-second status poll does not rewrite a
- * `0600` JSON file every cycle.
- */
+/** Persists changed `GetDeviceInfo` fields without rewriting unchanged status polls. */
 export async function touchDeviceInfo(id: string, info: DeviceInfo): Promise<void> {
   const file = await loadDevices();
   const idx = file.devices.findIndex((d) => d.id === id);
@@ -237,31 +221,30 @@ export async function touchDeviceInfo(id: string, info: DeviceInfo): Promise<voi
 
 async function probeDeviceInfo(rpc: DeviceRpc): Promise<DeviceInfo & { id?: string }> {
   await rpc.connect();
-  const info = ((await rpc.call("Shelly.GetDeviceInfo", {})) ?? {}) as Record<
-    string,
-    unknown
-  >;
+  const info = ((await rpc.call("Shelly.GetDeviceInfo", {})) ?? {}) as Record<string, unknown>;
   return {
     id: typeof info.id === "string" ? info.id : undefined,
     ...toDeviceInfo(info),
   };
 }
 
+async function fallbackDeviceInfo(ip: string, httpFetch?: ShellyHttpFetch) {
+  const verdict = await probeShellyHttp(ip, httpFetch);
+  if (verdict.kind === "gen1") throw new UnsupportedDeviceError(verdict.model, null);
+  return verdict.kind === "gen2plus" ? verdict.info : null;
+}
+
+function assertSupported(info: DeviceInfo): void {
+  if (info.gen != null && info.gen < 2) throw new UnsupportedDeviceError(info.model ?? null, info.gen);
+}
+
 export type AddDeviceInput = { ip: string; label?: string; password?: string };
 
-/**
- * Probes `Shelly.GetDeviceInfo` for a stable id + info. Offline (device
- * unreachable right now) falls back to `slug(label || ip)` — the id is
- * rewritten once on the first successful connect, since keying by IP goes
- * stale exactly when DHCP reassigns it. Either way it is slugged: the id is a
- * path component in `.shellint/devices/<id>/`, so a device answering `../`
- * must not be able to name a directory outside it. A wrong password (digest
- * challenge that fails) is rejected outright rather than stored to fail again
- * later. `rpcFactory` is a test seam — production always uses the real `ShellyRpc`.
- */
+/** Adds offline devices too; id stays safe for `.shellint/devices/<id>/` paths. */
 export async function addDevice(
   input: AddDeviceInput,
   rpcFactory: DeviceRpcFactory = defaultRpcFactory,
+  httpFetch?: ShellyHttpFetch,
 ): Promise<DeviceRecord> {
   const file = await loadDevices();
   if (file.devices.some((d) => d.ip === input.ip)) {
@@ -275,12 +258,19 @@ export async function addDevice(
   const rpc = rpcFactory(input.ip, auth);
   try {
     const probed = await probeDeviceInfo(rpc);
+    assertSupported(probed);
     if (probed.id) id = slug(probed.id);
     info = { model: probed.model, gen: probed.gen, ver: probed.ver, app: probed.app };
     lastSeen = new Date().toISOString();
   } catch (e) {
     if (e instanceof AuthFailedError) throw e;
-    // Offline now — keep fallback id.
+    if (e instanceof UnsupportedDeviceError) throw e;
+    const fallback = await fallbackDeviceInfo(input.ip, httpFetch);
+    if (fallback) {
+      id = fallback.id ? slug(fallback.id) : id;
+      info = fallback;
+      lastSeen = new Date().toISOString();
+    }
   } finally {
     rpc.close();
   }
@@ -473,6 +463,16 @@ export async function clearProbeSkip(id: string, ver: string | null): Promise<vo
   await persist({ ...file, devices });
 }
 
+export async function markUnsupportedDevice(id: string, model: string | null, gen: number | null): Promise<DeviceRecord | null> {
+  const file = await loadDevices();
+  const idx = file.devices.findIndex((d) => d.id === id);
+  if (idx === -1) return null;
+  const devices = [...file.devices];
+  const record = { ...devices[idx]!, unsupported: { model, gen, at: new Date().toISOString() } };
+  devices[idx] = record;
+  await persist({ ...file, devices });
+  return record;
+}
 /** Public view of a device — never serialize `auth.password` to a client. */
 export async function sanitizeDevice(d: DeviceRecord) {
   const state = await probeState(d.id);
@@ -483,6 +483,7 @@ export async function sanitizeDevice(d: DeviceRecord) {
     hasPassword: !!d.auth?.password,
     info: d.info,
     lastSeen: d.lastSeen,
+    unsupported: d.unsupported,
     slots: d.slots,
     probe: {
       required: state.required,
@@ -494,6 +495,5 @@ export async function sanitizeDevice(d: DeviceRecord) {
 }
 
 export function _resetCache(): void {
-  cache = null;
-  loading = null;
+  cache = null; loading = null;
 }

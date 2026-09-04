@@ -17,7 +17,7 @@
  * Rebaselined three times: 60000 B held through the landing, download, docs and
  * checks pages; the probe page (web/site/probe.tsx) then bundled
  * server/probe/probe-catalog.ts the way checks.tsx bundles the check catalog,
- * and 109 probes' ids, expressions and notes plus the page's own prose took
+ * and 116 probes' ids, expressions and notes plus the page's own prose took
  * ~59.4 KB to ~73.1 KB; then from 80000 B for the FAQ and "built with" pages
  * (web/site/{faq,stack}.tsx and their content modules), ~73.1 KB to ~81.5 KB.
  * Both are prose, so the growth is the copy itself — the two components share

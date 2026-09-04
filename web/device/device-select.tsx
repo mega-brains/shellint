@@ -39,6 +39,7 @@ export function DeviceSelect(props: DeviceSelectProps) {
         {props.devices.length === 0 ? <option value="">no devices</option> : null}
         {props.devices.map((d) => (
           <option key={d.id} value={d.id}>
+            {d.unsupported ? "gen 1 · unsupported · " : ""}
             {d.probe.required ? "! " : ""}
             {d.label} ({d.ip})
           </option>

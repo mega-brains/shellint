@@ -8,17 +8,25 @@ import {
 } from "../device/devices.ts";
 import { createSlot, deleteSlot } from "../device/device-scripts.ts";
 import { applyEcoMode, readEcoConfig } from "../device/device-status.ts";
-import { AuthNotSupportedError, ShellyRpc } from "../device/rpc.ts";
+import { AuthNotSupportedError, RpcError } from "../device/rpc.ts";
+import { acquireRpc, type RpcLease } from "../device/rpc-pool.ts";
+import type { DeviceAuth } from "../device/devices.ts";
 // Script.Eval expressions, and they must stay side-effect-free: they may be
 // evaluated inside a script the user owns.
 import { PROBES } from "./probe-catalog.ts";
 import { writeCapture } from "./probe-store.ts";
+import {
+  finishProbeRun,
+  getProbeProgress as progress,
+  startProbeRun,
+  updateProbeRun,
+  type ProbeRun,
+} from "./probe-run.ts";
+import { evaluateProbe, repairUserHost } from "./probe-recovery.ts";
 
-/** Live progress of the in-flight (or most recent) probe run, polled by the UI. */
-let progressState = { done: 0, total: 0 };
-
-export function getProbeProgress(): { done: number; total: number } {
-  return { ...progressState };
+export { getProbeRun } from "./probe-run.ts";
+export function getProbeProgress() {
+  return progress();
 }
 
 /** Temporary slot created by the probe. Only ever a freshly created id. */
@@ -35,6 +43,12 @@ export type ProbeEntry = {
   ok: boolean;
   result?: unknown;
   error?: string;
+  /**
+   * RPC never reached live script context, so absence is unknown rather than
+   * observed. `host-dead`: the script stopped. `transport`: the connection
+   * died or the request budget ran out before the device answered.
+   */
+  unevaluated?: "host-dead" | "transport";
 };
 
 export type ProbeReport = {
@@ -60,6 +74,8 @@ export type ProbeReport = {
   scratchRemoved: boolean;
   notes: string[];
   results: ProbeEntry[];
+  /** Entries never evaluated after host failure. */
+  unevaluated?: number;
 };
 
 type Slot = { id: number; name: string | null; running: boolean | null };
@@ -69,12 +85,17 @@ export type ProbeRpc = {
   call(method: string, params?: Record<string, unknown>): Promise<unknown>;
 };
 
+export type ProbeClient = ProbeRpc & { connect(): Promise<void>; close(): void };
+export type ProbeRpcFactory = (ip: string, auth?: DeviceAuth) => ProbeClient;
+
 export type Host = {
   scriptId: number;
   strategy: ProbeStrategy;
   scratchScriptId: number | null;
   existingScriptIds: number[];
   notes: string[];
+  name: string | null;
+  repairProbeId: string | null;
 };
 
 function msg(e: unknown): string {
@@ -117,8 +138,8 @@ async function isRunning(rpc: ProbeRpc, id: number): Promise<boolean> {
  */
 async function createScratchHost(
   rpc: ProbeRpc,
-  existingIds: Set<number>,
 ): Promise<number> {
+  const existingIds = new Set((await listSlots(rpc)).map((s) => s.id));
   const id = await createSlot(rpc, SCRATCH_NAME);
   if (existingIds.has(id)) {
     throw new Error(
@@ -161,6 +182,8 @@ export async function acquireHost(
       scratchScriptId: null,
       existingScriptIds,
       notes,
+      name: slots.find((s) => s.id === configuredId)?.name ?? null,
+      repairProbeId: null,
     };
   }
 
@@ -172,7 +195,7 @@ export async function acquireHost(
   }
 
   try {
-    const id = await createScratchHost(rpc, existingIds);
+    const id = await createScratchHost(rpc);
     notes.push(
       `script ${configuredId} not running — probed in temporary slot ${id} ("${SCRATCH_NAME}"), removed afterwards`,
     );
@@ -182,6 +205,8 @@ export async function acquireHost(
       scratchScriptId: id,
       existingScriptIds,
       notes,
+      name: SCRATCH_NAME,
+      repairProbeId: null,
     };
   } catch (e) {
     if (e instanceof AuthNotSupportedError) throw e;
@@ -189,7 +214,7 @@ export async function acquireHost(
   }
 
   for (const s of slots) {
-    if (s.id === configuredId || s.running === false) continue;
+    if (s.id === configuredId || s.name === SCRATCH_NAME || s.running === false) continue;
     if (await isRunning(rpc, s.id)) {
       notes.push(
         `probed read-only inside running script ${s.id}${s.name ? ` ("${s.name}")` : ""} — its code was not modified`,
@@ -200,6 +225,8 @@ export async function acquireHost(
         scratchScriptId: null,
         existingScriptIds,
         notes,
+        name: s.name,
+        repairProbeId: null,
       };
     }
   }
@@ -213,7 +240,11 @@ export async function acquireHost(
 /** What to do about eco mode for this run, as chosen in the UI's confirmation
  * dialog. Omitted leaves eco exactly as it is. */
 export type EcoOverride = "probe-only" | "permanent";
-export type RunProbeOptions = { ecoOff?: EcoOverride };
+export type RunProbeOptions = {
+  ecoOff?: EcoOverride;
+  /** Test-only. Production creates ShellyRpc directly. */
+  rpcFactory?: ProbeRpcFactory;
+};
 
 /**
  * Eco mode buys power at the cost of "reduced execution speed and increased
@@ -247,6 +278,16 @@ export async function disableEcoForProbe(
   return mode === "probe-only";
 }
 
+/** Restore only our own temporary change. A user toggle wins. */
+export async function restoreEcoForProbe(rpc: ProbeRpc, notes: string[]): Promise<void> {
+  if ((await readEcoConfig(rpc)) !== false) {
+    notes.push("eco mode restore skipped — its setting changed during the probe");
+    return;
+  }
+  await applyEcoMode(rpc, true);
+  notes.push("eco mode restored");
+}
+
 /**
  * Run Script.Eval capability checks and write types/generated-probe.json.
  * Never writes to or deletes a script slot that already existed on the device:
@@ -254,19 +295,67 @@ export async function disableEcoForProbe(
  * temporary slot it creates and removes, otherwise read-only in another running script.
  */
 export async function runProbe(opts: RunProbeOptions = {}): Promise<ProbeReport> {
+  const run = startProbeRun();
+  try {
+    return await runProbeInner(opts, run);
+  } catch (e) {
+    finishProbeRun(run, e);
+    throw e;
+  } finally {
+    finishProbeRun(run);
+  }
+}
+
+async function runProbeInner(opts: RunProbeOptions, run: ProbeRun): Promise<ProbeReport> {
   const cfg = await loadConfig();
   assertShellintCompiler(cfg);
   const target = await requireActive();
 
-  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
+  updateProbeRun(run, { deviceId: target.device.id, total: PROBES.length, phase: "connecting" });
+  let lease: RpcLease | null = null;
+  const rpc = opts.rpcFactory
+    ? opts.rpcFactory(target.device.ip, target.device.auth)
+    : // Unbounded: PROBES.length sequential evals outlast a UI request budget.
+      (lease = await acquireRpc(
+        { ip: target.device.ip, auth: target.device.auth },
+        { bounded: false },
+      )).rpc;
   const results: ProbeEntry[] = [];
   const ecoNotes: string[] = [];
   let scratchRemoved = false;
   let restoreEco = false;
-  progressState = { done: 0, total: PROBES.length };
+  let host: Host | null = null;
+  let cleaned = false;
+
+  const cleanup = async () => {
+    if (cleaned) return;
+    cleaned = true;
+    updateProbeRun(run, { phase: "cleanup" });
+    if (host?.scratchScriptId != null) {
+      try {
+        await removeScratch(rpc, host.scratchScriptId);
+        scratchRemoved = true;
+      } catch (e) {
+        host.notes.push(
+          `WARNING: temporary slot ${host.scratchScriptId} could not be removed (${msg(e)}) — delete it on the device`,
+        );
+      }
+    }
+    if (host) await repairUserHost(rpc, host);
+    if (restoreEco) {
+      try {
+        await restoreEcoForProbe(rpc, ecoNotes);
+      } catch (e) {
+        ecoNotes.push(
+          `WARNING: eco mode could not be restored (${msg(e)}) — turn it back on in the device panel`,
+        );
+      }
+    }
+  };
 
   try {
-    await rpc.connect();
+    if (opts.rpcFactory) await rpc.connect();
+    updateProbeRun(run, { phase: "device-info" });
     const info = ((await rpc.call("Shelly.GetDeviceInfo", {})) ?? {}) as Record<
       string,
       unknown
@@ -283,52 +372,47 @@ export async function runProbe(opts: RunProbeOptions = {}): Promise<ProbeReport>
     await touchDeviceInfo(deviceId, toDeviceInfo(info));
     // Before `acquireHost`: slot creation and the keep-alive stub are round
     // trips that pay the eco penalty too.
+    updateProbeRun(run, { phase: "eco" });
     restoreEco = await disableEcoForProbe(rpc, opts.ecoOff, ecoNotes);
-    const host = await acquireHost(rpc, target.slot);
+    updateProbeRun(run, { phase: "acquiring-host" });
+    host = await acquireHost(rpc, target.slot);
 
-    try {
-      for (const p of PROBES) {
-        try {
-          const result = await rpc.call("Script.Eval", {
-            id: host.scriptId,
-            code: p.code,
+    updateProbeRun(run, { phase: "probing" });
+    const restarts = { count: 0 };
+    for (let index = 0; index < PROBES.length; index += 1) {
+      const probe = PROBES[index]!;
+      const evaluation = await evaluateProbe(
+        rpc,
+        host,
+        probe,
+        restarts,
+        run,
+        () => createScratchHost(rpc),
+      );
+      results.push(evaluation.entry);
+      updateProbeRun(run, { done: results.length });
+      if (evaluation.exhausted) {
+        const cause = evaluation.entry.unevaluated ?? "host-dead";
+        const why =
+          cause === "transport"
+            ? "device connection lost before evaluation"
+            : "probe host stopped before evaluation";
+        for (const remaining of PROBES.slice(index + 1)) {
+          results.push({
+            id: remaining.id,
+            code: remaining.code,
+            ok: false,
+            error: why,
+            unevaluated: cause,
           });
-          const value =
-            result && typeof result === "object" && "result" in (result as object)
-              ? (result as { result: unknown }).result
-              : result;
-          results.push({ id: p.id, code: p.code, ok: true, result: value });
-        } catch (e) {
-          if (e instanceof AuthNotSupportedError) throw e;
-          results.push({ id: p.id, code: p.code, ok: false, error: msg(e) });
         }
-        progressState.done += 1;
-      }
-    } finally {
-      if (host.scratchScriptId != null) {
-        try {
-          await removeScratch(rpc, host.scratchScriptId);
-          scratchRemoved = true;
-        } catch (e) {
-          host.notes.push(
-            `WARNING: temporary slot ${host.scratchScriptId} could not be removed (${msg(e)}) — delete it on the device`,
-          );
-        }
-      }
-      if (restoreEco) {
-        try {
-          await applyEcoMode(rpc, true);
-          restoreEco = false;
-          ecoNotes.push("eco mode restored");
-        } catch (e) {
-          ecoNotes.push(
-            `WARNING: eco mode could not be restored (${msg(e)}) — turn it back on in the device panel`,
-          );
-          restoreEco = false;
-        }
+        updateProbeRun(run, { done: PROBES.length });
+        break;
       }
     }
 
+    await cleanup();
+    const unevaluated = results.filter((entry) => entry.unevaluated).length;
     const report: ProbeReport = {
       probed: true,
       at: new Date().toISOString(),
@@ -345,18 +429,23 @@ export async function runProbe(opts: RunProbeOptions = {}): Promise<ProbeReport>
       scratchRemoved,
       notes: [...ecoNotes, ...host.notes],
       results,
+      ...(unevaluated ? { unevaluated } : {}),
     };
 
-    await writeCapture(target.device.id, report);
+    const capture = await writeCapture(target.device.id, report);
+    if (capture.kept) {
+      report.notes.push(
+        `capture kept: stored ${ver ?? "unknown"} capture has fewer unevaluated probes — nothing was overwritten`,
+      );
+    }
     await clearProbeSkip(target.device.id, ver);
     await mirrorActiveDevice(target.device.id);
     return report;
   } finally {
-    // Only reached when the run failed before the inner `finally` could
-    // restore it — a thrown probe must not leave eco off behind it.
-    if (restoreEco) await applyEcoMode(rpc, true).catch(() => {});
-    rpc.close();
+    await cleanup();
+    if (lease) lease.release();
+    else rpc.close();
   }
 }
 
-export { AuthNotSupportedError };
+export { AuthNotSupportedError, RpcError };

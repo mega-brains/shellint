@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "preact/hooks";
 import { api } from "../lib/api";
 
 export type DeviceInfo = { model?: string; gen?: number; ver?: string; app?: string };
+export type UnsupportedDevice = { gen: number | null; model: string | null; at: string };
 export type SlotBinding = { script: string; name?: string };
 export type ProbeBadge = {
   required: boolean;
@@ -16,6 +17,7 @@ export type Device = {
   hasPassword: boolean;
   info?: DeviceInfo;
   lastSeen?: string;
+  unsupported?: UnsupportedDevice;
   slots: Record<string, SlotBinding>;
   probe: ProbeBadge;
 };

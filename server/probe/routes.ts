@@ -16,7 +16,7 @@ import {
   probeState,
   resolveCapture,
 } from "./probe-store.ts";
-import { getProbeProgress, runProbe, type EcoOverride } from "./probe.ts";
+import { getProbeProgress, getProbeRun, runProbe, type EcoOverride } from "./probe.ts";
 import { writeGeneratedTypings } from "./probe-typings.ts";
 import { deviceError } from "../device/routes.ts";
 
@@ -42,7 +42,7 @@ async function resolveDevice(c: Context): Promise<DeviceRecord | null> {
  */
 export function registerProbeRoutes(app: Router) {
   app.get("/api/probe/progress", (c) => {
-    return c.json({ ok: true, ...getProbeProgress() });
+    return c.json({ ok: true, ...getProbeProgress(), run: getProbeRun() });
   });
 
   app.post("/api/probe", async (c) => {

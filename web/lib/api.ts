@@ -1,3 +1,12 @@
+const DEVICE_TIMEOUT_MS = 15_000;
+
+function timeoutSignal(path: string, init?: RequestInit): AbortSignal | null | undefined {
+  if (init?.signal) return init.signal;
+  return path.startsWith("/api/device/") || path === "/api/deploy"
+    ? AbortSignal.timeout(DEVICE_TIMEOUT_MS)
+    : undefined;
+}
+
 export async function api<T>(
   path: string,
   init?: RequestInit,
@@ -5,6 +14,7 @@ export async function api<T>(
   const res = await fetch(path, {
     headers: { "Content-Type": "application/json", ...init?.headers },
     ...init,
+    signal: timeoutSignal(path, init),
   });
   const data = (await res.json()) as T & { ok: boolean; error?: string };
   if (res.status === 401 || data.error === "auth not supported yet") {

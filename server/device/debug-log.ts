@@ -2,7 +2,8 @@ import { runtime } from "#shellint/runtime";
 import type { RuntimeWebSocket, RuntimeWebSocketMessage } from "../runtime/types.ts";
 import { loadConfig, assertShellintCompiler } from "../core/config.ts";
 import { requireActive } from "./devices.ts";
-import { AuthNotSupportedError, ShellyRpc, type RpcTarget } from "./rpc.ts";
+import { AuthNotSupportedError, type RpcTarget } from "./rpc.ts";
+import { acquireRpc } from "./rpc-pool.ts";
 
 export type LogLine = { seq: number; ts: number; level: number; text: string };
 export type MetricPoint = { ts: number; series: string; value: number };
@@ -101,9 +102,9 @@ function ingest(raw: string): void {
 type EnableResult = { enabled: boolean; restartRequired: boolean; error?: string };
 
 async function enableDeviceDebug(target: RpcTarget): Promise<EnableResult> {
-  const rpc = new ShellyRpc(target);
+  const lease = await acquireRpc(target);
+  const rpc = lease.rpc;
   try {
-    await rpc.connect();
     const result = (await rpc.call("Sys.SetConfig", {
       config: { debug: { websocket: { enable: true } } },
     })) as Record<string, unknown>;
@@ -115,7 +116,7 @@ async function enableDeviceDebug(target: RpcTarget): Promise<EnableResult> {
         : msg(e);
     return { enabled: false, restartRequired: false, error };
   } finally {
-    rpc.close();
+    lease.release();
   }
 }
 
@@ -182,6 +183,14 @@ function openLogSocket(deviceIp: string, gen: number): Promise<OpenResult> {
 
 async function begin(): Promise<LogStreamStart> {
   const gen = ++generation;
+  if (runtime.process.env.SHELLINT_NO_DEVICE === "1") {
+    return {
+      connected: false,
+      enabledDebug: false,
+      restartRequired: false,
+      error: "device access disabled",
+    };
+  }
   let target: RpcTarget;
   try {
     const cfg = await loadConfig();

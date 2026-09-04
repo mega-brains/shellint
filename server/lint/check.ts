@@ -15,7 +15,7 @@ import type { Finding } from "./lint-util.ts";
 import { checkBuildArtifacts } from "./dialect-check.ts";
 import { analyzeScriptFile, type ScriptStats } from "../script/script-stats.ts";
 import { CHECK_CATALOG, summarizeChecks, type CheckRow } from "./check-catalog.ts";
-import { readProbeReport } from "../probe/probe-typings.ts";
+import { probeCoverage, readProbeReport } from "../probe/probe-typings.ts";
 import { previewCheckFixes, type CheckFixPreview } from "./check-fixes.ts";
 
 const { fs } = runtime;
@@ -209,6 +209,7 @@ export async function runCheck(opts: CheckOptions = {}): Promise<CheckReport> {
   }
 
   const errors = findings.filter((f) => f.severity === "error").length;
+  const probeReport = await readProbeReport();
   return {
     ok: errors === 0,
     findings,
@@ -217,7 +218,7 @@ export async function runCheck(opts: CheckOptions = {}): Promise<CheckReport> {
       parses: true,
       profile: profile !== null,
       artifacts,
-      probe: (await readProbeReport()) !== null,
+      probe: probeCoverage(probeReport).total > 0,
       types: hasTypes,
     }),
     artifacts,

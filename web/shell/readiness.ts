@@ -6,6 +6,7 @@
  */
 import { tally, type CheckReport, type Finding } from "../check/check-types";
 import type { Sizes } from "../lib/sizes";
+import type { ProbeProgress } from "../probe/use-probe";
 
 export type GateState = "ok" | "warn" | "fail" | "stale" | "unavailable";
 export type GateId = "built" | "checked" | "probed";
@@ -32,7 +33,7 @@ export type ReadinessInput = {
   hasDevice: boolean;
   probeRequired: boolean;
   probeSkipped: boolean;
-  probeProgress: { done: number; total: number } | null;
+  probeProgress: ProbeProgress | null;
   /** `createDeployGate().ready()` — the gate stays authoritative for the
    * button; the rail only explains it (a deliberately skipped probe, for one,
    * unblocks Deploy while the pill still reads "probe skipped"). */
@@ -138,12 +139,20 @@ function checkedGate(input: ReadinessInput): Gate {
 
 function probedGate(input: ReadinessInput): Gate {
   if (input.probeProgress) {
-    const { done, total } = input.probeProgress;
+    const { done, total, phase, run } = input.probeProgress;
+    if (phase === "failed") {
+      return {
+        id: "probed",
+        state: "fail",
+        label: "probe failed",
+        title: run?.error ?? "Capability probe failed",
+      };
+    }
     return {
       id: "probed",
       state: "warn",
-      label: `probing ${done}/${total}`,
-      title: "Capability probe in progress",
+      label: phase && phase !== "probing" ? `probe ${phase}` : `probing ${done}/${total}`,
+      title: phase && phase !== "probing" ? `Capability probe: ${phase}` : "Capability probe in progress",
     };
   }
   if (input.isStatic || !input.hasDevice) {

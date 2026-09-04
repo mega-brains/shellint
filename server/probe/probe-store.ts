@@ -44,6 +44,7 @@ export type CaptureMeta = {
   path: string;
   present: number;
   absent: number;
+  unevaluated: number;
 };
 
 async function readCapture(path: string): Promise<ProbeReport | null> {
@@ -56,9 +57,13 @@ async function readCapture(path: string): Promise<ProbeReport | null> {
   }
 }
 
-function countVerdicts(report: ProbeReport): { present: number; absent: number } {
+function countVerdicts(report: ProbeReport): { present: number; absent: number; unevaluated: number } {
   const entries = probeEntries(report);
-  return { present: entries.filter(isPresent).length, absent: entries.filter(isAbsent).length };
+  return {
+    present: entries.filter(isPresent).length,
+    absent: entries.filter(isAbsent).length,
+    unevaluated: entries.filter((entry) => entry.unevaluated).length,
+  };
 }
 
 /**
@@ -111,7 +116,7 @@ export async function listCaptures(deviceId: string): Promise<CaptureMeta[]> {
     const path = join(dir, name);
     const report = await readCapture(path);
     if (!report) continue;
-    const { present, absent } = countVerdicts(report);
+    const { present, absent, unevaluated } = countVerdicts(report);
     metas.push({
       ver: typeof report.ver === "string" ? report.ver : null,
       verKey: name.slice(0, -".json".length),
@@ -119,19 +124,29 @@ export async function listCaptures(deviceId: string): Promise<CaptureMeta[]> {
       path,
       present,
       absent,
+      unevaluated,
     });
   }
   metas.sort((a, b) => (a.at < b.at ? 1 : a.at > b.at ? -1 : 0));
   return metas;
 }
 
-/** mkdir -p + atomic (temp-then-rename) write, keyed by `verKeyOf(report.ver)`. */
-export async function writeCapture(deviceId: string, report: ProbeReport): Promise<string> {
+/** mkdir -p + atomic write. Partial captures never replace fuller ones. */
+export async function writeCapture(
+  deviceId: string,
+  report: ProbeReport,
+): Promise<{ path: string; kept: boolean }> {
   const dir = devicePaths(deviceId).probesDir;
   await fs.mkdir(dir, { recursive: true });
   const path = join(dir, `${verKeyOf(report.ver)}.json`);
+  const existing = await readCapture(path);
+  const existingUnevaluated = existing ? countVerdicts(existing).unevaluated : Infinity;
+  const incomingUnevaluated = countVerdicts(report).unevaluated;
+  if (existing && existingUnevaluated < incomingUnevaluated) {
+    return { path, kept: true };
+  }
   await fs.atomicWriteText(path, JSON.stringify(report, null, 2) + "\n");
-  return path;
+  return { path, kept: false };
 }
 
 /** Exact `verKey` match — the "does this exact firmware have a capture" question. */
@@ -173,6 +188,8 @@ export type ProbeState = {
   newest: CaptureMeta | null;
   /** Only when it still applies — cleared automatically once `ver` moves. */
   skipped: ProbeSkip | null;
+  /** Matching or fallback capture has unknown capability answers. */
+  partial: boolean;
 };
 
 /**
@@ -189,14 +206,14 @@ export async function probeState(deviceId: string): Promise<ProbeState> {
   const skipped = rawSkip && rawSkip.ver === ver ? rawSkip : null;
 
   if (matched) {
-    return { required: false, reason: "none", ver, matched, newest: null, skipped };
+    return { required: false, reason: "none", ver, matched, newest: null, skipped, partial: matched.unevaluated > 0 };
   }
   if (ver == null && newest) {
-    return { required: false, reason: "none", ver: null, matched: null, newest, skipped: null };
+    return { required: false, reason: "none", ver: null, matched: null, newest, skipped: null, partial: newest.unevaluated > 0 };
   }
   const reason: ProbeState["reason"] = newest ? "firmware-changed" : "never-probed";
   if (skipped) {
-    return { required: false, reason, ver, matched: null, newest, skipped };
+    return { required: false, reason, ver, matched: null, newest, skipped, partial: !!newest?.unevaluated };
   }
-  return { required: true, reason, ver, matched: null, newest, skipped: null };
+  return { required: true, reason, ver, matched: null, newest, skipped: null, partial: !!newest?.unevaluated };
 }

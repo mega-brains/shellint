@@ -1,7 +1,7 @@
 /**
  * Field checks for the untrusted JSON bodies the device routes accept. Nothing
  * here is cosmetic: these values reach `Script.PutCode` (the slot) and
- * `ws://${ip}/rpc` (the ip), so a body naming a slot that is not a slot, or an
+ * `ws://${ip}/rpc` and `http://${ip}/shelly` (the ip), so a body naming a slot that is not a slot, or an
  * ip that re-points that URL, has to be refused before the RPC opens. Lives
  * outside routes.ts only to keep that file under the 500-line cap.
  */
@@ -20,7 +20,7 @@ export function bodyError(body: Record<string, unknown>): string | null {
   if (slot !== undefined && (typeof slot !== "number" || !Number.isInteger(slot) || slot < 0)) {
     return "slot must be a non-negative integer";
   }
-  // In `ws://${ip}/rpc` a "/" ends the authority, "?" starts a query and "@"
+  // In device URLs a "/" ends authority, "?" starts a query and "@"
   // turns everything before it into userinfo — each one re-targets the socket.
   if (typeof body.ip === "string" && /[/?@]/.test(body.ip)) {
     return 'ip must not contain "/", "?" or "@"';

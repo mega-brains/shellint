@@ -5,6 +5,9 @@
 # noble's transport dependency is platform-split, so macOS pulls xpc-connection
 # while Linux pulls bluetooth-hci-socket and usb. A list generated on one OS
 # fails --frozen-lockfile on the other.
+#
+# `false` is a decision, not an omission — strictDepBuilds is satisfied either
+# way, so a dependency we deliberately never build belongs here explicitly.
 allowBuilds:
   "@abandonware/bluetooth-hci-socket": true
   "@abandonware/noble": true
@@ -17,4 +20,8 @@ allowBuilds:
   "usocket": true
   "utf-8-validate": true
   "wrtc": true
-  "xpc-connection": true
+  # nan-based and does not compile against Node 24's V8 (`Set` arity changed),
+  # so allowing the build fails every `pnpm run` on macOS. It is noble's BLE
+  # transport, reached only via espruino -> noble-winrt -> noble; shellint shells
+  # out to `espruino --minify`, which never opens a radio. Left unbuilt on purpose.
+  "xpc-connection": false

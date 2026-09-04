@@ -5,6 +5,7 @@
  * Usage: node --import tsx scripts/test-probe-catalog.mjs
  */
 import { readFileSync } from "node:fs";
+import vm from "node:vm";
 import { PROBES } from "../server/probe/probe-catalog.ts";
 
 function fail(msg) {
@@ -151,10 +152,44 @@ const byId = new Map(PROBES.map((p) => [p.id, p]));
   if (!/import \{ PROBES \} from "\.\/probe-catalog\.ts";/.test(src)) {
     fail("server/probe/probe.ts must import PROBES from catalog");
   }
-  if (!/for \(const p of PROBES\)/.test(src)) {
+  if (!/for \(const p of PROBES\)|PROBES\[index\]/.test(src)) {
     fail("runProbe must iterate PROBES");
   }
   if (/const PROBES/.test(src)) fail("server/probe/probe.ts still declares its own PROBES");
+}
+
+// P6 — dotted globals must catch a missing root. `typeof Script.id` threw on
+// fw 1.4.99, stopping its scratch host and invalidating every later answer.
+{
+  const guarded = PROBES.filter((p) => p.code.startsWith("(function(){try{return typeof "));
+  if (guarded.length !== 28) fail(`expected 28 guarded dotted probes, got ${guarded.length}`);
+
+  for (const p of guarded) {
+    let answer;
+    try {
+      answer = vm.runInNewContext(p.code, Object.create(null));
+    } catch (e) {
+      fail(`guarded probe "${p.id}" threw: ${e}`);
+    }
+    if (typeof answer !== "string") {
+      fail(`guarded probe "${p.id}" returned ${JSON.stringify(answer)}, not a string`);
+    }
+  }
+  if (!String(vm.runInNewContext(byId.get("Script.id").code, Object.create(null))).startsWith("throws:")) {
+    fail("Script.id must report a missing root as throws:");
+  }
+}
+
+// P7 — every guarded member has a bare root check. A missing root is unknown,
+// not evidence that a same-named property is absent from every object.
+{
+  for (const probe of PROBES.filter((entry) => entry.code.startsWith("(function(){try{return typeof "))) {
+    const root = probe.id.split(".")[0];
+    const rootProbe = byId.get(root);
+    if (!rootProbe || rootProbe.code !== `typeof ${root}`) {
+      fail(`guarded probe "${probe.id}" has no bare root probe for ${root}`);
+    }
+  }
 }
 
 const groups = {};

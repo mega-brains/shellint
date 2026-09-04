@@ -1,10 +1,13 @@
 import type { ProbeState } from "./use-probe-state";
+import type { Device } from "../device/use-devices";
 
 export type ProbeBannerProps = {
   state: ProbeState;
-  deviceLabel: string;
+  device: Device;
+  busy: boolean;
   onRunProbe: () => void;
   onSkip: () => void;
+  onRemoveDevice: () => void;
 };
 
 function dateOnly(iso: string): string {
@@ -20,13 +23,27 @@ function dateOnly(iso: string): string {
 export function ProbeBanner(props: ProbeBannerProps) {
   const { state } = props;
 
+  if (props.device.unsupported) {
+    const model = props.device.unsupported.model;
+    return (
+      <div class="import-banner probe-banner probe-banner-required" role="status">
+        <span class="import-banner-text">
+          <strong>{props.device.label}</strong>{model ? ` (${model})` : ""} is a Gen1 device — no script runtime. shellint needs Gen2 or newer.
+        </span>
+        <button type="button" class="import-banner-discard" disabled={props.busy} onClick={props.onRemoveDevice}>
+          Remove device
+        </button>
+      </div>
+    );
+  }
+
   if (state.skipped && !state.required) {
     return (
       <div class="import-banner probe-banner probe-banner-skipped" role="status">
         <span class="import-banner-text">
           Probe skipped for {state.skipped.ver ?? "unknown firmware"} — findings are advisory.
         </span>
-        <button type="button" class="import-banner-discard" onClick={props.onRunProbe}>
+        <button type="button" class="import-banner-discard" disabled={props.busy} onClick={props.onRunProbe}>
           Run probe
         </button>
       </div>
@@ -35,7 +52,6 @@ export function ProbeBanner(props: ProbeBannerProps) {
 
   if (!state.required) return null;
 
-  const ver = state.ver ?? "unknown firmware";
   const fallback = state.newest
     ? ` Capability lint and Deploy use the ${state.newest.ver ?? "unknown"} capture from ${dateOnly(state.newest.at)}.`
     : " Capability lint and Deploy are blocked until it is probed (or skipped).";
@@ -43,14 +59,14 @@ export function ProbeBanner(props: ProbeBannerProps) {
   return (
     <div class="import-banner probe-banner probe-banner-required" role="status">
       <span class="import-banner-text">
-        <strong>{props.deviceLabel}</strong> runs firmware {ver} —{" "}
-        {state.reason === "firmware-changed" ? "not probed on this firmware." : "never probed."}
-        {fallback}
+        <strong>{props.device.label}</strong>{" "}
+        {state.ver ? <>runs firmware {state.ver} — {state.reason === "firmware-changed" ? "not probed on this firmware." : "never probed."}</> : <>has not reported a firmware version — shellint has never reached it over Gen2 RPC.</>}
+        {state.ver ? fallback : " Capability lint and Deploy stay blocked until it answers (or you skip)."}
       </span>
-      <button type="button" class="import-banner-discard" onClick={props.onRunProbe}>
+      <button type="button" class="import-banner-discard" disabled={props.busy} onClick={props.onRunProbe}>
         Run probe
       </button>
-      <button type="button" class="import-banner-discard" onClick={props.onSkip}>
+      <button type="button" class="import-banner-discard" disabled={props.busy} onClick={props.onSkip}>
         Skip for now
       </button>
     </div>

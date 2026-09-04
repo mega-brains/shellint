@@ -10,12 +10,13 @@ try {
   const typings = await writeGeneratedTypings();
   console.log(JSON.stringify(report, null, 2));
   console.log(
-    `types/generated.d.ts: ${typings.present.length} present, ${typings.absent.length} absent`,
+    `types/generated.d.ts: ${typings.present.length} present, ${typings.absent.length} absent, ${report.unevaluated ?? 0} unevaluated`,
   );
   const capture = await resolveCapture((await requireActive()).device.id, report.ver);
   if (capture) {
     console.log(`capture: ${capture.path} (fw ${capture.ver ?? "unknown"})`);
   }
+  if (report.unevaluated) runtime.process.exit(1);
 } catch (e) {
   console.error(e instanceof Error ? e.message : e);
   runtime.process.exit(1);

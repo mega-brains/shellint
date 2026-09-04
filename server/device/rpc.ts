@@ -1,6 +1,7 @@
 import { runtime } from "#shellint/runtime";
 import type { RuntimeWebSocket, RuntimeWebSocketMessage } from "../runtime/types.ts";
 import { buildAuthFrame, NonceCounter, type DigestChallenge } from "./auth-digest.ts";
+import { acquireDeviceSocket, releaseDeviceSocket } from "./rpc-pool.ts";
 
 export class AuthNotSupportedError extends Error {
   constructor(detail?: string) {
@@ -47,6 +48,7 @@ function messageText(data: RuntimeWebSocketMessage): string {
 
 const CONNECT_TIMEOUT_MS = 9_000;
 const RPC_TIMEOUT_MS = 10_000;
+const REQUEST_TIMEOUT_MS = 15_000;
 
 function parseChallenge(message: string): DigestChallenge | null {
   try {
@@ -81,6 +83,8 @@ export class ShellyRpc {
   private readonly ip: string;
   private readonly auth?: { username?: string; password: string };
   private nonces = new NonceCounter();
+  private acquired = false;
+  private deadlineAt = 0;
 
   constructor(target: string | RpcTarget) {
     if (typeof target === "string") {
@@ -91,13 +95,36 @@ export class ShellyRpc {
     }
   }
 
+  /**
+   * Start a logical request. Pooled users call this per lease.
+   *
+   * `bounded: false` is for a caller that legitimately holds the device far
+   * longer than one UI request — the capability probe runs 116 sequential
+   * `Script.Eval`s under a single lease. Each individual RPC keeps its own
+   * `RPC_TIMEOUT_MS`; only the whole-request ceiling is lifted.
+   */
+  beginRequest(bounded = true): void {
+    this.deadlineAt = bounded ? Date.now() + REQUEST_TIMEOUT_MS : Infinity;
+  }
+
   async connect(): Promise<void> {
     if (this.ws?.state === "open") return;
     if (this.openPromise) return this.openPromise;
 
+    if (this.deadlineAt === 0) this.beginRequest();
+    await acquireDeviceSocket();
+    this.acquired = true;
+
     this.openPromise = new Promise<void>((resolve, reject) => {
       const url = `ws://${this.ip}/rpc`;
-      const ws = runtime.websocket.connect(url);
+      let ws: RuntimeWebSocket;
+      try {
+        ws = runtime.websocket.connect(url);
+      } catch (error) {
+        this.cleanup();
+        reject(error instanceof Error ? error : new Error(String(error)));
+        return;
+      }
       this.ws = ws;
       let settled = false;
 
@@ -118,7 +145,7 @@ export class ShellyRpc {
 
       const timer = setTimeout(() => {
         fail(new Error(`connect timeout to ${url} (${CONNECT_TIMEOUT_MS}ms)`));
-      }, CONNECT_TIMEOUT_MS);
+      }, this.remainingTimeout(CONNECT_TIMEOUT_MS));
 
       ws.onOpen(() => {
         // Warm the channel with a valid src (required before notifications / further use).
@@ -151,6 +178,7 @@ export class ShellyRpc {
         this.rejectAll(new Error("WebSocket closed"));
         this.ws = null;
         this.openPromise = null;
+        this.releasePermit();
       });
     });
 
@@ -162,17 +190,31 @@ export class ShellyRpc {
     }
   }
 
-  private cleanup() {
+  private remainingTimeout(limit: number): number {
+    const remaining = this.deadlineAt - Date.now();
+    return Math.max(0, Math.min(limit, remaining));
+  }
+
+  private releasePermit(): void {
+    if (!this.acquired) return;
+    this.acquired = false;
+    releaseDeviceSocket();
+  }
+
+  private cleanup(abort = true) {
     if (this.ws) {
       try {
-        this.ws.abort();
+        if (abort) this.ws.abort();
+        else this.ws.close();
       } catch {
         /* ignore */
       }
     }
     this.ws = null;
     this.openPromise = null;
+    this.deadlineAt = 0;
     this.rejectAll(new Error("connection failed"));
+    this.releasePermit();
   }
 
   private rejectAll(err: Error) {
@@ -268,6 +310,11 @@ export class ShellyRpc {
       ctx.reject(new Error("WebSocket not connected"));
       return;
     }
+    const timeout = this.remainingTimeout(RPC_TIMEOUT_MS);
+    if (timeout <= 0) {
+      ctx.reject(new Error(`RPC request deadline exceeded: ${method}`));
+      return;
+    }
     const id = this.nextId++;
     const frame: Record<string, unknown> = {
       jsonrpc: "2.0",
@@ -281,8 +328,9 @@ export class ShellyRpc {
     const timer = setTimeout(() => {
       if (this.pending.delete(id)) {
         ctx.reject(new Error(`RPC timeout: ${method}`));
+        this.cleanup();
       }
-    }, RPC_TIMEOUT_MS);
+    }, timeout);
     this.pending.set(id, {
       resolve: ctx.resolve,
       reject: ctx.reject,
@@ -295,6 +343,6 @@ export class ShellyRpc {
   }
 
   close() {
-    this.cleanup();
+    this.cleanup(false);
   }
 }

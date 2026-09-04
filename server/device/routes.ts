@@ -8,6 +8,7 @@ import {
   getDevice,
   listDevices,
   loadDevices,
+  markUnsupportedDevice,
   NoDeviceError,
   removeDevice,
   requireActive,
@@ -18,14 +19,10 @@ import {
   touchDeviceInfo,
   updateDevice,
 } from "./devices.ts";
+import { probeShellyHttp, UnsupportedDeviceError } from "./device-generation.ts";
 import { probeState } from "../probe/probe-store.ts";
-import {
-  createSlot,
-  deleteSlot,
-  getSlotCode,
-  listSlots,
-} from "./device-scripts.ts";
-import { ShellyRpc } from "./rpc.ts";
+import { createSlot, deleteSlot, getSlotCode, listSlots } from "./device-scripts.ts";
+import { DeviceBusyError, acquireRpc, withRpcRead } from "./rpc-pool.ts";
 import {
   deploy,
   AuthNotSupportedError,
@@ -48,7 +45,7 @@ import {
 } from "./debug-log.ts";
 import { expandLogText, loadLogMap } from "../script/log-map.ts";
 import { bodyError } from "./validate-body.ts";
-
+import { activeProbeRun, ProbeBusyError } from "../probe/probe-run.ts";
 /**
  * Shared error → response mapping for every route that talks to a device:
  * `NoDeviceError` → 409, `UnknownDeviceError` → 404 (a named device that is not
@@ -57,6 +54,9 @@ import { bodyError } from "./validate-body.ts";
  * → 400, everything else → 500.
  */
 export async function deviceError(c: Context, e: unknown) {
+  if (e instanceof ProbeBusyError) {
+    return c.json({ ok: false, error: e.message, code: "probe-busy", run: e.run }, 409);
+  }
   if (e instanceof NoDeviceError) {
     return c.json({ ok: false, error: e.message }, 409);
   }
@@ -80,6 +80,9 @@ export async function deviceError(c: Context, e: unknown) {
   if (e instanceof AuthNotSupportedError) {
     return c.json({ ok: false, error: "auth not supported yet" }, 401);
   }
+  if (e instanceof DeviceBusyError) {
+    c.header("Retry-After", "2"); return c.json({ ok: false, error: e.message }, 503);
+  }
   if (e instanceof CompilerNotWiredError) {
     return c.json({ ok: false, error: e.message }, 400);
   }
@@ -88,7 +91,6 @@ export async function deviceError(c: Context, e: unknown) {
     500,
   );
 }
-
 /** Device telemetry, logs, probe, deploy. Split out of app.ts to stay under the 500-line cap. */
 export function registerDeviceRoutes(app: Router) {
   app.get("/api/devices", async (c) => {
@@ -127,6 +129,9 @@ export function registerDeviceRoutes(app: Router) {
       if (e instanceof DuplicateDeviceError) {
         return c.json({ ok: false, error: e.message }, 409);
       }
+      if (e instanceof UnsupportedDeviceError) {
+        return c.json({ ok: false, error: e.message, code: "unsupported-device", device: { gen: e.gen, model: e.model } }, 422);
+      }
       return await deviceError(c, e);
     }
   });
@@ -164,10 +169,11 @@ export function registerDeviceRoutes(app: Router) {
     } catch (e) {
       return await deviceError(c, e);
     }
-    const rpc = new ShellyRpc(target);
+    let lease;
     const t0 = performance.now();
     try {
-      await rpc.connect();
+      lease = await acquireRpc(target);
+      const rpc = lease.rpc;
       const info = ((await rpc.call("Shelly.GetDeviceInfo", {})) ?? {}) as Record<
         string,
         unknown
@@ -183,13 +189,16 @@ export function registerDeviceRoutes(app: Router) {
       if (e instanceof AuthFailedError || e instanceof AuthNotSupportedError) {
         return await deviceError(c, e);
       }
+      const verdict = await probeShellyHttp(target.ip);
+      const device = verdict.kind === "gen1" ? await markUnsupportedDevice(id, verdict.model, null) : null;
       return c.json({
         ok: true,
         online: false,
+        ...(device?.unsupported ? { unsupported: device.unsupported } : {}),
         error: e instanceof Error ? e.message : String(e),
       });
     } finally {
-      rpc.close();
+      lease?.release();
     }
   });
 
@@ -231,15 +240,16 @@ export function registerDeviceRoutes(app: Router) {
     } catch (e) {
       return await deviceError(c, e);
     }
-    const rpc = new ShellyRpc(target);
     try {
-      await rpc.connect();
-      const slots = await listSlots(rpc, device ?? undefined);
+      const slots = await withRpcRead(
+        `slots:${device?.id ?? target.ip}`,
+        target,
+        "Script.List",
+        (rpc) => listSlots(rpc, device ?? undefined),
+      );
       return c.json({ ok: true, slots });
     } catch (e) {
       return await deviceError(c, e);
-    } finally {
-      rpc.close();
     }
   });
 
@@ -255,20 +265,16 @@ export function registerDeviceRoutes(app: Router) {
     } catch (e) {
       return await deviceError(c, e);
     }
-    const rpc = new ShellyRpc(target);
     try {
-      await rpc.connect();
-      const code = await getSlotCode(rpc, slotRaw);
-      return c.json({
-        ok: true,
-        slot: slotRaw,
-        bytes: runtime.byteLength(code),
-        code,
-      });
+      const code = await withRpcRead(
+        `code:${deviceId ?? target.ip}:${slotRaw}`,
+        target,
+        "Script.GetCode",
+        (rpc) => getSlotCode(rpc, slotRaw),
+      );
+      return c.json({ ok: true, slot: slotRaw, bytes: runtime.byteLength(code), code });
     } catch (e) {
       return await deviceError(c, e);
-    } finally {
-      rpc.close();
     }
   });
 
@@ -288,15 +294,15 @@ export function registerDeviceRoutes(app: Router) {
     } catch (e) {
       return await deviceError(c, e);
     }
-    const rpc = new ShellyRpc(target);
+    const lease = await acquireRpc(target);
+    const rpc = lease.rpc;
     try {
-      await rpc.connect();
       const slot = await createSlot(rpc, body.name);
       return c.json({ ok: true, slot });
     } catch (e) {
       return await deviceError(c, e);
     } finally {
-      rpc.close();
+      lease.release();
     }
   });
 
@@ -312,15 +318,15 @@ export function registerDeviceRoutes(app: Router) {
     } catch (e) {
       return await deviceError(c, e);
     }
-    const rpc = new ShellyRpc(target);
+    const lease = await acquireRpc(target);
+    const rpc = lease.rpc;
     try {
-      await rpc.connect();
       await deleteSlot(rpc, slotRaw);
       return c.json({ ok: true });
     } catch (e) {
       return await deviceError(c, e);
     } finally {
-      rpc.close();
+      lease.release();
     }
   });
 
@@ -392,6 +398,8 @@ export function registerDeviceRoutes(app: Router) {
     const invalid = bodyError(body);
     if (invalid) return c.json({ ok: false, error: invalid }, 400);
     try {
+      const activeRun = activeProbeRun();
+      if (activeRun) throw new ProbeBusyError(activeRun);
       let lastStatus = "starting";
       const result = await deploy(
         mode,
@@ -439,6 +447,8 @@ export function registerDeviceRoutes(app: Router) {
       return c.json({ ok: false, error: "running must be a boolean" }, 400);
     }
     try {
+      const activeRun = activeProbeRun();
+      if (activeRun) throw new ProbeBusyError(activeRun);
       return c.json({ ok: true, ...(await setScriptRunning(body.running)) });
     } catch (e) {
       return deviceError(c, e);
@@ -469,6 +479,8 @@ export function registerDeviceRoutes(app: Router) {
       return c.json({ ok: false, error: "eco_mode must be a boolean" }, 400);
     }
     try {
+      const activeRun = activeProbeRun();
+      if (activeRun) throw new ProbeBusyError(activeRun);
       const result = await setEcoMode(body.eco_mode);
       return c.json({ ok: true, ...result });
     } catch (e) {
