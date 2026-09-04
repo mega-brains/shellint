@@ -20,14 +20,16 @@ export function useProbeEcoGate(
 
   const requestProbe = useCallback(
     async (run: ProbeRunner) => {
-      let eco: boolean | null = null;
-      try {
-        eco = (await api<{ eco_mode: boolean | null }>("/api/device/eco")).eco_mode;
-      } catch {
-        /* offline or no device — not a reason to block the probe */
-      }
-      if (eco === true) setPending({ run });
-      else await withBusy(() => run());
+      await withBusy(async () => {
+        let eco: boolean | null = null;
+        try {
+          eco = (await api<{ eco_mode: boolean | null }>("/api/device/eco")).eco_mode;
+        } catch {
+          /* offline or no device — not a reason to block the probe */
+        }
+        if (eco === true) setPending({ run });
+        else await run();
+      });
     },
     [withBusy],
   );

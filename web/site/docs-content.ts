@@ -165,7 +165,7 @@ export const DOC_SECTIONS: DocSection[] = [
       },
       {
         kind: "p",
-        text: "The capability probe adds `probe-absent-api` from 109 `Script.Eval` expressions run on real hardware. Severity follows provenance: an absence measured on the active device is an error, an inherited one a warning.",
+        text: "The capability probe adds `probe-absent-api` from 116 `Script.Eval` expressions run on real hardware. Severity follows provenance: an absence measured on the active device is an error, an inherited one a warning.",
       },
       {
         kind: "p",
@@ -188,7 +188,7 @@ export const DOC_SECTIONS: DocSection[] = [
           "**Telemetry** — script mem/cpu, RAM/FS, latency and RSSI, plus eco toggle and reboot.",
           "**Logs** streamed from `ws://<ip>/debug/log`. A `print(\"#m <series> <value>\")` line charts itself.",
           "**Profile** (`mise run profile`) caches `ListMethods`, components, generation and firmware — what tier 4 reads.",
-          "**Probe** (`mise run probe`) evaluates 109 expressions on the box to see what really exists.",
+          "**Probe** (`mise run probe`) evaluates 116 expressions on the box to see what really exists.",
         ],
       },
       {
@@ -212,7 +212,7 @@ export const DOC_SECTIONS: DocSection[] = [
           "mise run build            # device artifacts + web bundle",
           "mise run test             # unit + smoke; accepts a name filter",
           "mise run deploy -- debug min    # or: prod raw",
-          "mise run probe            # 109 capability probes",
+          "mise run probe            # 116 capability probes",
           "mise run profile          # cache device capabilities for tier 4",
           "mise run beforeCommit     # the full gate",
           "mise run build:static     # the offline site/ build",

@@ -61,6 +61,7 @@ export function useDeviceStatus(props: UseDeviceStatusProps): DeviceStatusState 
   const [ecoDisabled, setEcoDisabled] = useState(true);
   const [rebootBusy, setRebootBusy] = useState(false);
   const ecoBusy = useRef(false);
+  const pollBusy = useRef(false);
 
   const histories = useRef<Record<HistoryName, ReturnType<typeof createHistory>>>();
   if (!histories.current) {
@@ -89,6 +90,8 @@ export function useDeviceStatus(props: UseDeviceStatusProps): DeviceStatusState 
     };
 
     async function refresh() {
+      if (pollBusy.current) return;
+      pollBusy.current = true;
       try {
         const data = await propsRef.current.api<{ status: DeviceStatus }>(
           "/api/device/status",
@@ -131,6 +134,8 @@ export function useDeviceStatus(props: UseDeviceStatusProps): DeviceStatusState 
           state: "offline",
           memPeak: null,
         });
+      } finally {
+        pollBusy.current = false;
       }
     }
     refreshRef.current = refresh;

@@ -177,7 +177,7 @@ try {
         return {};
       },
       close() {},
-    }));
+    }), async () => { throw new Error("no HTTP in test"); });
     await setActive({ device: device.id, slot: 1, script: "main" });
 
     let createCalls = 0;

@@ -13,9 +13,16 @@ export type ProbeCapture = {
 export type UseProbe = {
   probeResults: ProbeResult[] | null;
   probeNoteText: string;
-  probeProgress: { done: number; total: number } | null;
+  probeProgress: ProbeProgress | null;
   probeCapture: ProbeCapture | null;
   probeDevice: (opts?: ProbeRunOptions) => Promise<void>;
+};
+
+export type ProbeProgress = {
+  done: number;
+  total: number;
+  phase?: string;
+  run?: { runId: string; error: string | null } | null;
 };
 
 type StoredCapture = {
@@ -41,10 +48,7 @@ export function useProbe(
 ): UseProbe {
   const [probeResults, setProbeResults] = useState<ProbeResult[] | null>(null);
   const [probeNoteText, setProbeNoteText] = useState("not run yet");
-  const [probeProgress, setProbeProgress] = useState<{
-    done: number;
-    total: number;
-  } | null>(null);
+  const [probeProgress, setProbeProgress] = useState<ProbeProgress | null>(null);
   const [probeCapture, setProbeCapture] = useState<ProbeCapture | null>(null);
 
   useEffect(() => {
@@ -89,19 +93,26 @@ export function useProbe(
   const probeDevice = useCallback(async (opts: ProbeRunOptions = {}) => {
     setProbeProgress({ done: 0, total: 0 });
     setStatus("probing…");
+    let cancelled = false;
+    let runId: string | null = null;
     const poll = setInterval(() => {
-      void api<{ done: number; total: number }>("/api/probe/progress")
+      void api<ProbeProgress>("/api/probe/progress")
         .then((p) => {
-          setProbeProgress({ done: p.done, total: p.total });
+          if (cancelled) return;
+          const nextRunId = p.run?.runId ?? null;
+          if (runId && nextRunId !== runId) return;
+          if (nextRunId) runId = nextRunId;
+          setProbeProgress(p);
+          if (p.phase === "failed") {
+            setStatus(p.run?.error ?? "probe failed", true);
+            return;
+          }
           const pct =
             p.total > 0
               ? Math.min(100, Math.round((p.done / p.total) * 100))
               : 0;
-          setStatus(
-            p.total > 0
-              ? `probing… ${p.done}/${p.total} (${pct}%)`
-              : "probing…",
-          );
+          const phase = p.phase && p.phase !== "probing" ? ` ${p.phase}` : "";
+          setStatus(p.total > 0 ? `probing…${phase} ${p.done}/${p.total} (${pct}%)` : `probing…${phase}`);
         })
         .catch(() => {});
     }, 300);
@@ -133,7 +144,11 @@ export function useProbe(
           ...lines,
         ].join("\n"),
       );
+    } catch (e) {
+      setProbeProgress(null);
+      throw e;
     } finally {
+      cancelled = true;
       clearInterval(poll);
       setProbeProgress(null);
     }

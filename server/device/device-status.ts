@@ -2,6 +2,7 @@ import { loadConfig, assertShellintCompiler } from "../core/config.ts";
 import { readDeviceProfile } from "./device-profile.ts";
 import { requireActive, toDeviceInfo, touchDeviceInfo } from "./devices.ts";
 import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
+import { acquireRpc, coalesceRead } from "./rpc-pool.ts";
 
 export type DeviceStatus = {
   deviceIp: string;
@@ -232,14 +233,23 @@ export async function fetchDeviceStatus(): Promise<DeviceStatus> {
   const cfg = await loadConfig();
   assertShellintCompiler(cfg);
   const target = await requireActive();
+  return coalesceRead(
+    `status:${target.device.id}`,
+    "Shelly.GetDeviceInfo",
+    () => fetchDeviceStatusInner(target),
+  );
+}
+
+async function fetchDeviceStatusInner(
+  target: Awaited<ReturnType<typeof requireActive>>,
+): Promise<DeviceStatus> {
   const scriptId = target.slot;
 
-  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
+  const lease = await acquireRpc({ ip: target.device.ip, auth: target.device.auth });
+  const rpc = lease.rpc;
   const rtts: number[] = [];
 
   try {
-    await rpc.connect();
-
     const info = await softRec(rpc, rtts, "Shelly.GetDeviceInfo");
     // Only on a successful answer — a failed poll must not blank out good info.
     if (info) await touchDeviceInfo(target.device.id, toDeviceInfo(info));
@@ -278,7 +288,7 @@ export async function fetchDeviceStatus(): Promise<DeviceStatus> {
       wifi: wifiBlock(wifi, sta),
     };
   } finally {
-    rpc.close();
+    lease.release();
   }
 }
 
@@ -332,12 +342,12 @@ export async function fetchEcoMode(): Promise<{ eco_mode: boolean | null }> {
   assertShellintCompiler(cfg);
   const target = await requireActive();
 
-  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
+  const lease = await acquireRpc({ ip: target.device.ip, auth: target.device.auth });
+  const rpc = lease.rpc;
   try {
-    await rpc.connect();
     return { eco_mode: await readEcoConfig(rpc) };
   } finally {
-    rpc.close();
+    lease.release();
   }
 }
 
@@ -346,12 +356,12 @@ export async function setEcoMode(eco_mode: boolean): Promise<EcoResult> {
   assertShellintCompiler(cfg);
   const target = await requireActive();
 
-  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
+  const lease = await acquireRpc({ ip: target.device.ip, auth: target.device.auth });
+  const rpc = lease.rpc;
   try {
-    await rpc.connect();
     return await applyEcoMode(rpc, eco_mode);
   } finally {
-    rpc.close();
+    lease.release();
   }
 }
 
@@ -370,9 +380,9 @@ export async function setScriptRunning(
   const target = await requireActive();
   const scriptId = target.slot;
 
-  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
+  const lease = await acquireRpc({ ip: target.device.ip, auth: target.device.auth });
+  const rpc = lease.rpc;
   try {
-    await rpc.connect();
     await rpc.call(running ? "Script.Start" : "Script.Stop", {
       id: scriptId,
     });
@@ -380,7 +390,7 @@ export async function setScriptRunning(
     const result = (status?.result ?? {}) as Record<string, unknown>;
     return { running: bool(result.running), scriptId };
   } finally {
-    rpc.close();
+    lease.release();
   }
 }
 
@@ -393,12 +403,12 @@ export async function rebootDevice(): Promise<void> {
   assertShellintCompiler(cfg);
   const target = await requireActive();
 
-  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
+  const lease = await acquireRpc({ ip: target.device.ip, auth: target.device.auth });
+  const rpc = lease.rpc;
   try {
-    await rpc.connect();
     await rpc.call("Shelly.Reboot", {});
   } finally {
-    rpc.close();
+    lease.release();
   }
 }
 

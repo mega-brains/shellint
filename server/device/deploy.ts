@@ -7,10 +7,10 @@ import { createSlot } from "./device-scripts.ts";
 import {
   AuthNotSupportedError,
   AuthFailedError,
-  ShellyRpc,
   RpcError,
   type RpcTarget,
 } from "./rpc.ts";
+import { pooledRpc } from "./rpc-pool.ts";
 
 const { fs } = runtime;
 const { join } = runtime.path;
@@ -23,7 +23,7 @@ export class ProbeRequiredError extends Error {
   ver: string | null;
   reason: ProbeState["reason"];
   constructor(deviceId: string, label: string, ver: string | null, reason: ProbeState["reason"]) {
-    super(`run Probe (or Skip) for ${label} fw ${ver ?? "unknown"} first`);
+    super(`run Probe (or Skip) for ${label}${ver ? ` fw ${ver}` : " with no reported firmware"} first`);
     this.name = "ProbeRequiredError";
     this.deviceId = deviceId;
     this.ver = ver;
@@ -67,7 +67,7 @@ export type DeployOptions = {
   createName?: string;
   /** `mise run deploy -- --no-probe-check` — bypasses the probe-required gate. */
   skipProbeCheck?: boolean;
-  /** Test-only — production always uses the real `ShellyRpc`. */
+  /** Test-only — production otherwise uses a pooled RPC lease. */
   rpcFactory?: DeployRpcFactory;
 };
 
@@ -182,7 +182,7 @@ export async function deploy(
     }
   }
 
-  const rpcFactory: DeployRpcFactory = opts.rpcFactory ?? ((t) => new ShellyRpc(t));
+  const rpcFactory: DeployRpcFactory = opts.rpcFactory ?? pooledRpc;
   const rpc = rpcFactory({ ip: device.ip, auth: device.auth });
   try {
     onProgress("connecting");

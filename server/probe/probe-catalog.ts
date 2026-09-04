@@ -29,6 +29,25 @@ function globals(group: string, paths: string[]): Probe[] {
   return paths.map((path) => ({ id: path, group, code: `typeof ${path}` }));
 }
 
+/** Dotted paths can throw when their root is absent, as Script.id did on fw 1.4.99. */
+function guardedGlobals(group: string, paths: string[]): Probe[] {
+  return paths.map((path) => ({
+    id: path,
+    group,
+    code: `(function(){try{return typeof ${path};}catch(e){return "throws:"+(e.message||e);}})()`,
+  }));
+}
+
+/** Bare namespace checks explain a guarded member's `throws:` answer. */
+function namespaceRoots(group: string, paths: string[]): Probe[] {
+  return paths.map((path) => ({
+    id: path,
+    group,
+    code: `typeof ${path}`,
+    note: `"undefined" means ${path} is missing; member probes return throws: instead.`,
+  }));
+}
+
 /** `depth` nested anonymous functions returning a marker string. */
 function nestAnon(depth: number): string {
   let code = `"d${depth}"`;
@@ -244,7 +263,8 @@ export const PROBES: Probe[] = [
     "sort",
     "reverse",
   ]),
-  ...globals("array", ["Array.isArray"]),
+  ...namespaceRoots("array", ["Array"]),
+  ...guardedGlobals("array", ["Array.isArray"]),
   ...proto("string", '""', [
     "padStart",
     "charAt",
@@ -264,7 +284,8 @@ export const PROBES: Probe[] = [
     "endsWith",
     "repeat",
   ]),
-  ...globals("string", ["String.fromCharCode"]),
+  ...namespaceRoots("string", ["String"]),
+  ...guardedGlobals("string", ["String.fromCharCode"]),
   {
     id: "string.byteLength",
     group: "string",
@@ -272,17 +293,18 @@ export const PROBES: Probe[] = [
     note: "2 = strings are UTF-8 byte arrays (plan 01 §2.4), 1 = UTF-16 code units",
   },
   // Globals the language docs leave ambiguous.
-  ...globals("global", [
+  ...namespaceRoots("global", ["JSON", "Object", "console"]),
+  ...guardedGlobals("global", [
     "JSON.parse",
     "JSON.stringify",
     "Object.keys",
     "Object.values",
     "Object.entries",
     "Object.assign",
+  ]),
+  ...globals("global", [
     "Math",
-    "Math.round",
     "Date",
-    "Date.now",
     "parseInt",
     "parseFloat",
     "isNaN",
@@ -294,13 +316,21 @@ export const PROBES: Probe[] = [
     "ArrayBuffer",
     "Uint8Array",
     "print",
-    "console.log",
     "setTimeout",
     "setInterval",
   ]),
+  ...guardedGlobals("global", ["Math.round", "Date.now", "console.log"]),
   // Device namespaces, including everything the capability gates key on.
+  ...namespaceRoots("device", ["Shelly", "Script"]),
   ...globals("device", [
     "Timer",
+    "Virtual",
+    "HTTPServer",
+    "MQTT",
+    "BLE",
+    "AES",
+  ]),
+  ...guardedGlobals("device", [
     "Timer.set",
     "Timer.clear",
     "Timer.getInfo",
@@ -317,12 +347,7 @@ export const PROBES: Probe[] = [
     "Script.storage",
     "Script.addRpcHandler",
     "Script.getVcHandle",
-    "Virtual",
     "Virtual.getHandle",
-    "HTTPServer",
-    "MQTT",
-    "BLE",
-    "AES",
   ]),
   ...NESTING,
   {

@@ -26,6 +26,7 @@ import {
   isAbsent,
   isPresent,
   probeEntries,
+  probeCoverage,
   probeOrigin,
   readProbeReport,
 } from "../probe/probe-typings.ts";
@@ -45,6 +46,7 @@ type Absences = {
   isActiveTarget: boolean;
   /** Set when the probe is for the right device but a different firmware. */
   staleNote: string | null;
+  coverage: { total: number; unevaluated: number };
 };
 
 /** `report.deviceId` first (M16 §3.2); `deviceIp` for a legacy capture that
@@ -100,6 +102,7 @@ async function readAbsences(
     origin: await probeOrigin(report),
     isActiveTarget,
     staleNote,
+    coverage: probeCoverage(report),
   };
 }
 
@@ -151,5 +154,15 @@ export async function lintProbe(
   };
 
   visit(sf);
+  if (absences.coverage.unevaluated) {
+    sink.findings.unshift({
+      severity: "warn",
+      rule: RULE,
+      file: fileName,
+      message:
+        `${absences.coverage.unevaluated} of ${absences.coverage.total} capability probes could not be evaluated ` +
+        `(host script stopped mid-run) — their absence is unknown; re-probe before trusting this check (${absences.origin})`,
+    });
+  }
   return sink.findings;
 }

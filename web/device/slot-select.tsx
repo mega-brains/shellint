@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "preact/hooks";
+import { useCallback, useEffect, useRef, useState } from "preact/hooks";
 import { api } from "../lib/api";
 
 export type SlotInfo = {
@@ -24,30 +24,58 @@ export type SlotSelectProps = {
 const NEW_OPTION = "__new__";
 const DELETE_OPTION = "__delete__";
 const IMPORT_OPTION = "__import__";
+const RETRY_OPTION = "__retry__";
+
+type SlotLoad =
+  | { phase: "loading" }
+  | { phase: "ready"; slots: SlotInfo[] }
+  | { phase: "error"; message: string };
 
 /** Header script-slot picker for the active device, plus create/delete. */
 export function SlotSelect(props: SlotSelectProps) {
-  const [slots, setSlots] = useState<SlotInfo[]>([]);
+  const [loadState, setLoadState] = useState<SlotLoad>({ phase: "loading" });
   const [reloadTick, setReloadTick] = useState(0);
+  const inFlight = useRef(false);
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retried = useRef<string | null>(null);
   const deviceId = props.deviceId;
+  const slots = loadState.phase === "ready" ? loadState.slots : [];
 
   const load = useCallback(async () => {
+    if (inFlight.current) return;
     if (!deviceId) {
-      setSlots([]);
+      setLoadState({ phase: "ready", slots: [] });
       return;
     }
+    inFlight.current = true;
+    setLoadState({ phase: "loading" });
     try {
       const data = await api<{ slots: SlotInfo[] }>(
         `/api/device/scripts?device=${encodeURIComponent(deviceId)}`,
       );
-      setSlots(data.slots);
-    } catch {
-      setSlots([]);
+      setLoadState({ phase: "ready", slots: data.slots });
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      setLoadState({ phase: "error", message });
+      props.onStatus?.(message, true);
+      const retryKey = `${deviceId}:${props.refreshKey}`;
+      if (retried.current !== retryKey) {
+        retried.current = retryKey;
+        retryTimer.current = setTimeout(() => {
+          retryTimer.current = null;
+          void load();
+        }, 3000);
+      }
+    } finally {
+      inFlight.current = false;
     }
-  }, [deviceId]);
+  }, [deviceId, props.refreshKey, props.onStatus]);
 
   useEffect(() => {
     void load();
+    return () => {
+      if (retryTimer.current) clearTimeout(retryTimer.current);
+    };
   }, [load, props.refreshKey, reloadTick]);
 
   if (!deviceId) return null;
@@ -95,6 +123,7 @@ export function SlotSelect(props: SlotSelectProps) {
       class="slot-select"
       id="slotSelect"
       aria-label="Active script slot"
+      title={loadState.phase === "error" ? loadState.message : undefined}
       value={props.activeSlot ?? ""}
       onChange={(e) => {
         const value = (e.target as HTMLSelectElement).value;
@@ -105,11 +134,29 @@ export function SlotSelect(props: SlotSelectProps) {
           if (props.activeSlot != null) void props.onImport?.(props.activeSlot);
           return;
         }
+        if (value === RETRY_OPTION) {
+          setReloadTick((t) => t + 1);
+          return;
+        }
         const n = Number(value);
         if (Number.isFinite(n)) void props.onSwitch(n);
       }}
     >
-      {slots.length === 0 ? <option value="">no slots</option> : null}
+      {loadState.phase === "loading" ? <option value="">loading slots…</option> : null}
+      {loadState.phase === "error" ? (
+        <option value={props.activeSlot ?? ""}>
+          {props.activeSlot == null
+            ? "⚠ slots unavailable"
+            : `⚠ slot ${props.activeSlot} — device did not answer`}
+        </option>
+      ) : null}
+      {loadState.phase === "ready" && slots.length === 0 ? (
+        <option value={props.activeSlot ?? ""}>
+          {props.activeSlot == null
+            ? "no slots on this device"
+            : `slot ${props.activeSlot} — not on this device`}
+        </option>
+      ) : null}
       {slots.map((s) => (
         <option key={s.id} value={s.id}>
           {s.id} · {s.name ?? "unnamed"}
@@ -123,6 +170,7 @@ export function SlotSelect(props: SlotSelectProps) {
       <option value={DELETE_OPTION} disabled={props.activeSlot == null}>
         Delete slot…
       </option>
+      {loadState.phase === "error" ? <option value={RETRY_OPTION}>↻ retry</option> : null}
     </select>
   );
 }

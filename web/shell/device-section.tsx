@@ -11,7 +11,7 @@ import { DevicePicker } from "../device/device-picker";
 import { useDevices } from "../device/use-devices";
 import { ImportBanner, useSlotImport } from "../device/use-slot-import";
 import type { DeployGate } from "../device/deploy-gate";
-import { useProbe, type ProbeCapture } from "../probe/use-probe";
+import { useProbe, type ProbeCapture, type ProbeProgress } from "../probe/use-probe";
 import { useProbeBanner } from "../probe/use-probe-banner";
 import { ProbeBanner } from "../probe/probe-banner";
 import { useProbeEcoGate } from "../probe/probe-eco-modal";
@@ -31,6 +31,7 @@ export type DeviceSectionProps = {
   viewRef: RefObject<EditorView | null>;
   setStatus: (msg: string, isError?: boolean) => void;
   withBusy: (fn: () => Promise<void>) => Promise<void>;
+  busy: boolean;
   deployGate: DeployGate;
   syncDeployReady: () => void;
   /** `/api/config`'s `deviceIp` — the pre-device-load (and no-devices) fallback for the header link. */
@@ -50,7 +51,7 @@ export type DeviceSectionResult = {
   onProbe: () => void;
   probeResults: ProbeResult[] | null;
   probeNoteText: string;
-  probeProgress: { done: number; total: number } | null;
+  probeProgress: ProbeProgress | null;
   probeCapture: ProbeCapture | null;
   onShowCapture: () => void;
   /** Readiness-rail inputs (web/shell/readiness.ts). */
@@ -83,7 +84,7 @@ export type DeviceSectionResult = {
  * constructs those components, so their timers never start.
  */
 export function useDeviceSection(props: DeviceSectionProps): DeviceSectionResult {
-  const { isStatic, viewRef, setStatus, withBusy, deployGate, syncDeployReady, deviceIp } = props;
+  const { isStatic, viewRef, setStatus, withBusy, busy, deployGate, syncDeployReady, deviceIp } = props;
 
   const [identity, setIdentity] = useState<DeviceIdentity | null>(null);
   const [deviceMeta, setDeviceMeta] = useState("—");
@@ -190,7 +191,9 @@ export function useDeviceSection(props: DeviceSectionProps): DeviceSectionResult
       ? `${activeDevice.label}:${devicesState.active?.slot ?? "?"}`
       : undefined,
     deploy,
-    onProbe: () => void requestProbe(probeDevice),
+    onProbe: () => {
+      if (!busy) void requestProbe(probeDevice);
+    },
     probeResults,
     probeNoteText,
     probeProgress,
@@ -205,9 +208,16 @@ export function useDeviceSection(props: DeviceSectionProps): DeviceSectionResult
         {activeDevice ? (
           <ProbeBanner
             state={probeState}
-            deviceLabel={activeDevice.label}
+            device={activeDevice}
+            busy={busy}
             onRunProbe={() => void requestProbe(runProbeFromBanner)}
             onSkip={() => void withBusy(skipProbeFromBanner)}
+            onRemoveDevice={() =>
+              void withBusy(async () => {
+                await devicesState.removeDevice(activeDevice.id);
+                setStatus("removed unsupported device");
+              })
+            }
           />
         ) : null}
       </>

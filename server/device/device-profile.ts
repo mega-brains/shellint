@@ -3,6 +3,7 @@ import { DEVICE_PROFILE_PATH, devicePaths } from "../core/paths.ts";
 import { loadConfig, assertShellintCompiler } from "../core/config.ts";
 import { requireActive, mirrorActiveDevice, toDeviceInfo, touchDeviceInfo } from "./devices.ts";
 import { AuthNotSupportedError, ShellyRpc } from "./rpc.ts";
+import { acquireRpc } from "./rpc-pool.ts";
 
 const { fs } = runtime;
 const { dirname } = runtime.path;
@@ -53,9 +54,9 @@ export async function fetchDeviceProfile(): Promise<DeviceProfile> {
   assertShellintCompiler(cfg);
   const target = await requireActive();
 
-  const rpc = new ShellyRpc({ ip: target.device.ip, auth: target.device.auth });
+  const lease = await acquireRpc({ ip: target.device.ip, auth: target.device.auth });
+  const rpc = lease.rpc;
   try {
-    await rpc.connect();
     const info = ((await rpc.call("Shelly.GetDeviceInfo", {})) ??
       {}) as Record<string, unknown>;
     const listed = ((await rpc.call("Shelly.ListMethods", {})) ?? {}) as {
@@ -80,7 +81,7 @@ export async function fetchDeviceProfile(): Promise<DeviceProfile> {
     await writeDeviceProfile(profile, target.device.id);
     return profile;
   } finally {
-    rpc.close();
+    lease.release();
   }
 }
 

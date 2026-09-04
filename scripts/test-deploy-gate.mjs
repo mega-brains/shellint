@@ -48,7 +48,11 @@ const offlineRpcFactory = () => ({
 try {
   writeFileSync(DEVICES_FILE, JSON.stringify({ version: 1, active: null, devices: [] }), "utf8");
   _resetCache();
-  const gated = await addDevice({ ip: "10.0.9.9", label: "Gate test" }, offlineRpcFactory);
+  const gated = await addDevice(
+    { ip: "10.0.9.9", label: "Gate test" },
+    offlineRpcFactory,
+    async () => { throw new Error("no HTTP in test"); },
+  );
   await setActive({ device: gated.id, slot: 1, script: "main" });
 
   const app = createApp();

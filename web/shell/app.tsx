@@ -108,6 +108,7 @@ export function App() {
     viewRef,
     setStatus,
     withBusy,
+    busy,
     deployGate,
     syncDeployReady,
     deviceIp,
@@ -492,7 +493,6 @@ export function App() {
         onRestore={(id) => withBusy(() => scriptHistory.restoreVersion(id))}
         onClose={scriptHistory.closeHistory}
       />
-
 
       {deviceSection.modals}
     </>

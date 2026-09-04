@@ -67,6 +67,15 @@ export function probeEntries(report: ProbeReport): ProbeEntry[] {
   );
 }
 
+/** Answers available to capability lint. Old captures have full coverage. */
+export function probeCoverage(report: ProbeReport | null | undefined): {
+  total: number;
+  unevaluated: number;
+} {
+  const entries = report ? probeEntries(report) : [];
+  return { total: entries.length, unevaluated: entries.filter((entry) => entry.unevaluated).length };
+}
+
 export function isPresent(entry: ProbeEntry): boolean {
   return (
     entry.ok === true &&

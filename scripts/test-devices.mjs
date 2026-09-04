@@ -13,6 +13,7 @@ import {
   addDevice,
   DuplicateDeviceError,
   loadDevices,
+  markUnsupportedDevice,
   NoDeviceError,
   mirrorActiveDevice,
   removeDevice,
@@ -22,6 +23,8 @@ import {
   setActive,
   touchDeviceInfo,
 } from "../server/device/devices.ts";
+import { classifyShellyBody, probeShellyHttp, UnsupportedDeviceError } from "../server/device/device-generation.ts";
+import { AuthFailedError } from "../server/device/rpc.ts";
 import {
   computeDigestResponse,
   NonceCounter,
@@ -124,6 +127,14 @@ function fakeRpcFactory({ failConnect = false, info = {} } = {}) {
   });
 }
 
+async function noHttp() {
+  throw new Error("no HTTP in test");
+}
+
+function httpBody(body, status = 200) {
+  return async () => new Response(typeof body === "string" ? body : JSON.stringify(body), { status });
+}
+
 const restoreOnce = restoreOnExit(restore);
 
 try {
@@ -220,12 +231,69 @@ try {
     if (!(e instanceof NoDeviceError)) fail(`expected NoDeviceError, got ${e}`);
   }
 
+  // --- generation classifier only rejects positive Gen1 evidence ---
+  for (const [body, kind] of [
+    [{ gen: 2 }, "gen2plus"], [{ gen: 3 }, "gen2plus"], [{ gen: 4 }, "gen2plus"],
+    [{ gen: 5 }, "gen2plus"], [{ gen: 1 }, "gen1"], [{ gen: 0 }, "gen1"],
+    [{ gen: "2" }, "unknown"], [{ gen: "2", type: "SHDM-2", fw: "1" }, "unknown"], [{ type: "SHDM-2", fw: "1" }, "gen1"],
+    [{ type: "SHDM-2" }, "unknown"], [{ fw: "1" }, "unknown"], [{}, "unknown"], [null, "unknown"], [[], "unknown"],
+  ]) {
+    if (classifyShellyBody(body).kind !== kind) fail(`bad generation verdict for ${JSON.stringify(body)}`);
+  }
+
+  // --- Gen1 HTTP fallback rejects without persisting a device ---
+  setDevicesFile({ version: 1, active: null, devices: [] });
+  _resetCache();
+  try {
+    await addDevice({ ip: "10.0.0.4", label: "Dimmer" }, fakeRpcFactory({ failConnect: true }), httpBody({ type: "SHDM-2", fw: "2023" }));
+    fail("Gen1 add should reject");
+  } catch (e) {
+    if (!(e instanceof UnsupportedDeviceError) || !e.message.includes("SHDM-2")) throw e;
+  }
+  if ((await loadDevices()).devices.length !== 0) fail("Gen1 rejection must not persist a device");
+
+  // --- HTTP fallback restores Gen2 identity when WS fails ---
+  const fallbackGen2 = await addDevice(
+    { ip: "10.0.0.7", label: "Wrong label" }, fakeRpcFactory({ failConnect: true }),
+    httpBody({ id: "shellyplus1-aabb", model: "SNSW-001X16EU", gen: 2, ver: "1.4.4", app: "Plus1" }),
+  );
+  if (fallbackGen2.id !== "shellyplus1-aabb" || fallbackGen2.info?.gen !== 2 || !fallbackGen2.lastSeen) {
+    fail("HTTP Gen2 fallback must preserve identity and info");
+  }
+  await markUnsupportedDevice(fallbackGen2.id, "SHDM-2", null);
+  if ((await sanitizeDevice((await loadDevices()).devices[0])).unsupported?.model !== "SHDM-2") {
+    fail("unsupported devices must reach clients");
+  }
+
+  let httpCalls = 0;
+  await addDevice({ ip: "10.0.0.8" }, fakeRpcFactory({ info: { id: "online", gen: 3 } }), async () => {
+    httpCalls += 1;
+    return new Response();
+  });
+  if (httpCalls !== 0) fail("successful WS probe must not call HTTP fallback");
+  let authHttpCalls = 0;
+  try {
+    await addDevice({ ip: "10.0.0.9" }, () => ({ async connect() { throw new AuthFailedError(); }, async call() { return {}; }, close() {} }), async () => {
+      authHttpCalls += 1; return new Response();
+    });
+    fail("auth failure should propagate");
+  } catch (e) { if (!(e instanceof AuthFailedError)) throw e; }
+  if (authHttpCalls !== 0) fail("auth failure must not call HTTP fallback");
+  const timeoutStart = Date.now();
+  const timeoutVerdict = await probeShellyHttp("test.invalid", async (_url, signal) =>
+    new Promise((_resolve, reject) => signal.addEventListener("abort", () => reject(new Error("aborted")))),
+  );
+  if (timeoutVerdict.kind !== "unknown" || Date.now() - timeoutStart > 3000) {
+    fail("HTTP fallback must abort stalled requests");
+  }
+
   // --- addDevice: offline add falls back to slug(ip) id ---
   setDevicesFile({ version: 1, active: null, devices: [] });
   _resetCache();
   const offlineDevice = await addDevice(
     { ip: "10.0.0.5", label: "Garage" },
     fakeRpcFactory({ failConnect: true }),
+    noHttp,
   );
   if (offlineDevice.id !== "garage") {
     fail(`expected offline add to slug the label, got id ${offlineDevice.id}`);
@@ -235,6 +303,7 @@ try {
   const onlineDevice = await addDevice(
     { ip: "10.0.0.6", label: "Kitchen" },
     fakeRpcFactory({ info: { id: "shellyplus1pm-abc123", model: "SNSW-001P16EU", gen: 2 } }),
+    noHttp,
   );
   if (onlineDevice.id !== "shellyplus1pm-abc123") {
     fail(`expected online add to use the probed device id, got ${onlineDevice.id}`);
@@ -245,7 +314,7 @@ try {
 
   // --- duplicate-ip add rejected ---
   try {
-    await addDevice({ ip: "10.0.0.5", label: "Garage 2" }, fakeRpcFactory({ failConnect: true }));
+    await addDevice({ ip: "10.0.0.5", label: "Garage 2" }, fakeRpcFactory({ failConnect: true }), noHttp);
     fail("adding a device with a duplicate ip should be rejected");
   } catch (e) {
     if (e instanceof AssertionFailed) throw e;
@@ -308,8 +377,8 @@ try {
   // profile/probe into types/, and resets the log ring generation ---
   setDevicesFile({ version: 1, active: null, devices: [] });
   _resetCache();
-  const deviceA = await addDevice({ ip: "10.0.1.1", label: "Device A" }, fakeRpcFactory({ failConnect: true }));
-  const deviceB = await addDevice({ ip: "10.0.1.2", label: "Device B" }, fakeRpcFactory({ failConnect: true }));
+  const deviceA = await addDevice({ ip: "10.0.1.1", label: "Device A" }, fakeRpcFactory({ failConnect: true }), noHttp);
+  const deviceB = await addDevice({ ip: "10.0.1.2", label: "Device B" }, fakeRpcFactory({ failConnect: true }), noHttp);
 
   // Seed device A's per-device cache directly (as if a prior profile fetch/probe ran).
   mkdirSync(dirname(devicePaths(deviceA.id).profile), { recursive: true });
@@ -388,7 +457,7 @@ try {
   // --- touchDeviceInfo: refreshes info + lastSeen, no-ops when unchanged ---
   setDevicesFile({ version: 1, active: null, devices: [] });
   _resetCache();
-  const touched = await addDevice({ ip: "10.0.2.1", label: "Touch" }, fakeRpcFactory({ failConnect: true }));
+  const touched = await addDevice({ ip: "10.0.2.1", label: "Touch" }, fakeRpcFactory({ failConnect: true }), noHttp);
   await touchDeviceInfo(touched.id, { model: "M1", gen: 2, ver: "1.0.0", app: "App" });
   let reloaded2 = (await loadDevices()).devices.find((d) => d.id === touched.id);
   if (reloaded2.info?.ver !== "1.0.0") fail("touchDeviceInfo should write a fresh info block");
@@ -409,6 +478,7 @@ try {
   const withPw = await addDevice(
     { ip: "10.0.2.2", label: "Guarded", password: "hunter2" },
     fakeRpcFactory({ failConnect: true }),
+    noHttp,
   );
   const sanitized = await sanitizeDevice((await loadDevices()).devices.find((d) => d.id === withPw.id));
   if ("auth" in sanitized || "password" in sanitized) {
