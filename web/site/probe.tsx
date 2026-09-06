@@ -27,34 +27,16 @@ import { PROBES, type Probe } from "../../server/probe/probe-catalog.ts";
  * needed one — the engine only groups to keep the list navigable.
  */
 const GROUP_LABEL: Record<string, { title: string; about: string }> = {
-  array: {
-    title: "Array methods",
-    about: "Which Array.prototype methods this firmware actually ships.",
-  },
-  string: {
-    title: "String methods",
-    about: "The String.prototype surface, plus whether a string is bytes or code units.",
-  },
-  global: {
-    title: "Globals",
-    about: "JSON, Object, Math, Date and the timer functions the language docs leave ambiguous.",
-  },
+  array: { title: "Array methods", about: "Which Array.prototype methods this firmware ships." },
+  string: { title: "String methods", about: "String.prototype, and bytes vs code units." },
+  global: { title: "Globals", about: "JSON, Object, Math, Date, timers." },
   device: {
     title: "Device namespaces",
-    about: "Shelly.*, Timer.*, Script.*, Virtual, HTTPServer, MQTT, BLE and AES.",
+    about: "Shelly.*, Timer.*, Script.*, Virtual, HTTPServer, MQTT, BLE, AES.",
   },
-  parser: {
-    title: "Parser limits",
-    about: "How deep functions may nest, and what hoisting really does here.",
-  },
-  binary: {
-    title: "Binary data",
-    about: "ArrayBuffer, typed arrays and the conversions around them.",
-  },
-  memory: {
-    title: "Memory",
-    about: "What one JsVar costs and how many of them exist.",
-  },
+  parser: { title: "Parser limits", about: "Nesting depth and hoisting." },
+  binary: { title: "Binary data", about: "ArrayBuffer, typed arrays, conversions." },
+  memory: { title: "Memory", about: "JsVar cost and count." },
 };
 
 /** Catalog order is the reading order; groups appear as they first occur. */
@@ -67,15 +49,15 @@ const GROUP_IDS: string[] = [...new Set(PROBES.map((p) => p.group))];
 const GAINS: { title: string; body: string }[] = [
   {
     title: "Typings that match the box",
-    body: "types/generated.d.ts is rewritten from the answers, so the editor stops offering APIs this firmware does not have.",
+    body: "types/generated.d.ts is rewritten from the answers, so the editor stops offering APIs this firmware lacks.",
   },
   {
-    title: "A lint rule with evidence",
-    body: "probe-absent-api reports a name the device answered \"undefined\" for, quoting the expression that measured it.",
+    title: "Lint with evidence",
+    body: "probe-absent-api quotes the expression the device answered \"undefined\" for.",
   },
   {
-    title: "Severity that tells the truth",
-    body: "An absence measured on the active device is an error. One inherited from another device, or from firmware it no longer runs, is only a warning.",
+    title: "Honest severity",
+    body: "Measured on the active device: error. Inherited from another device or older firmware: warning.",
   },
 ];
 
@@ -97,12 +79,11 @@ const AFTER = [
 
 const FAQ: { q: string; a: ComponentChildren }[] = [
   {
-    q: "Is it safe to run against a live device?",
+    q: "Safe on a live device?",
     a: (
       <>
         Every expression is a read — <code>typeof</code> or a property access,
-        never a device method call — and each one is evaluated on its own, so a
-        probe that fails takes no other probe with it.
+        never a method call — and each runs on its own.
       </>
     ),
   },
@@ -110,30 +91,22 @@ const FAQ: { q: string; a: ComponentChildren }[] = [
     q: "Do I need a device?",
     a: (
       <>
-        Yes. This is the one thing the{" "}
-        <a href="./demo/">browser demo</a> cannot fake: a probe is a measurement
-        of real hardware. Run it from the{" "}
+        Yes — a probe measures real hardware, so the{" "}
+        <a href="./demo/">browser demo</a> cannot fake it. Run it from the{" "}
         <a href="./download.html">downloadable build</a>.
       </>
     ),
   },
   {
-    q: "How often should I run one?",
-    a: (
-      <>
-        Once per device, and again after a firmware update. Answers are cached
-        per device, and a capture taken on firmware the device no longer runs
-        is demoted to a warning rather than trusted.
-      </>
-    ),
+    q: "How often?",
+    a: <>Once per device, again after a firmware update. Answers are cached per device.</>,
   },
   {
-    q: "What happens if I never run one?",
+    q: "If I never run one?",
     a: (
       <>
-        The rules that need a probe report <strong>skipped</strong> — never a
-        pass. See the <a href="./checks.html">checks reference</a> for which
-        ones those are.
+        Rules that need a probe report <strong>skipped</strong>, never a pass —
+        see the <a href="./checks.html">checks reference</a>.
       </>
     ),
   },
@@ -176,9 +149,8 @@ export function ProbePage() {
           <p class="hero-kicker">Reference</p>
           <h1>Your firmware, not the documentation.</h1>
           <p class="hero-sub">
-            A probe asks <em>this</em> Shelly what it can actually do, then
-            teaches the editor and the linter the answer. {PROBES.length} small
-            expressions, one run, no guessing.
+            A probe asks <em>this</em> Shelly what it can do, then teaches the
+            editor and the linter the answer. {PROBES.length} reads, one run.
           </p>
         </header>
 
@@ -202,9 +174,9 @@ export function ProbePage() {
               <small>before you deploy</small>
             </div>
             <p class="probe-note">
-              <code>mise run probe</code> sends each expression over the same RPC
-              connection shellint already uses, and writes the answers next to
-              the device they came from.
+              <code>mise run probe</code> sends each expression over the RPC
+              connection shellint already holds, and stores the answers per
+              device.
             </p>
           </div>
         </section>
@@ -223,10 +195,8 @@ export function ProbePage() {
           <div>
             <h2 id="probeCase">One line, one deploy saved</h2>
             <p>
-              Nothing about this code is invalid TypeScript, and nothing about
-              it fails to compile. It fails at runtime, on the device, at the
-              moment the branch is finally taken. A probe turns that into a
-              lint finding you read at your desk.
+              Valid TypeScript, compiles fine, fails on the device the moment
+              the branch is taken. A probe turns that into a lint finding.
             </p>
           </div>
           <div class="probe-pair">
@@ -257,8 +227,8 @@ export function ProbePage() {
         <section class="probe-catalog" aria-labelledby="probeCatalog">
           <h2 id="probeCatalog">Every expression it sends</h2>
           <p class="checks-tier-about">
-            The catalog below is the one the tool reads. Ids are stable — a
-            finding names the probe it came from, and that name is on this page.
+            The catalog the tool reads. Ids are stable — a finding names the
+            probe it came from.
           </p>
 
           <div class="checks-controls">
