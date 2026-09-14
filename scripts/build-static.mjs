@@ -15,6 +15,16 @@
  *   site.css              tokens.css + site-only layout CSS    (new, M26)
  *   shellint-header.png        hero screenshot, light  (from .github/assets, M26)
  *   shellint-header-dark.png   hero screenshot, dark   (from .github/assets, M26)
+ *                              — also the hero video's poster
+ *   shellint-anim.mp4          product video, H.264     (from .github/assets, M41)
+ *   shellint-anim.webm         product video, VP9 fallback            (M41)
+ *   shellint-anim-poster.png   the hero's poster, a frame of the video (M41)
+ *
+ * The two earlier cuts (shellint-tour.*, M40, and shellint-demo.*, M39) are
+ * still tracked in .github/assets and are deliberately *not* copied: both are
+ * superseded, and shipping 10 MB of media no page links to would be a real
+ * cost to every Pages visitor.
+ *   figures/                   landing tour crops, cut from the two hero shots
  *   .nojekyll              stop Pages' Jekyll step from touching `_`-prefixed
  *                          paths — applies to the whole publish, stays at root
  *   demo/
@@ -357,12 +367,19 @@ for (const page of [
   writeFileSync(join(siteDir, page), withBeacon(src));
 }
 
-// The only images the site ships (M26 plan §5) — the landing hero screenshot
-// in both themes, since web/site/landing.tsx picks one off the visitor's
-// current theme. Committed under .github/assets/ rather than under web/ so they
-// aren't mistaken for something the app bundle needs; they land flat at the
-// site root, which is the path landing.tsx asks for.
-for (const img of ["shellint-header.png", "shellint-header-dark.png"]) {
+// The media the site ships (M26 plan §5, M38 plan §5.1) — the landing hero
+// screenshot in both themes (the tour crops below pick one off the visitor's
+// current theme), plus the product video in its two encodings and its poster
+// frame. Committed under .github/assets/ rather
+// than under web/ so they aren't mistaken for something the app bundle needs;
+// they land flat at the site root, which is the path landing.tsx asks for.
+for (const img of [
+  "shellint-header.png",
+  "shellint-header-dark.png",
+  "shellint-anim.mp4",
+  "shellint-anim.webm",
+  "shellint-anim-poster.png",
+]) {
   copyFileSync(join(root, ".github", "assets", img), join(siteDir, img));
 }
 
@@ -390,6 +407,11 @@ for (const f of [
   "site.css",
   "shellint-header.png",
   "shellint-header-dark.png",
+  // A missing video would otherwise ship a hero that never moves past its
+  // poster, which looks like a working page rather than a broken build.
+  "shellint-anim.mp4",
+  "shellint-anim.webm",
+  "shellint-anim-poster.png",
   "figures/inspector-sizes.png",
   "figures/inspector-sizes-dark.png",
   ".nojekyll",

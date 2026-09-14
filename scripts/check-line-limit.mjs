@@ -59,6 +59,13 @@ const SKIP_ROOT_DIRS = new Set([
   // (`support.js`), delivered as-is by the designer. Reference material, not
   // app source — nothing imports it and it is never bundled.
   "design",
+  // The Remotion package that renders the product video (M39). It is a
+  // standalone pnpm root outside the gate: nothing here is shipped, imported or
+  // typechecked by `mise run typecheck`, and a machine that never renders the
+  // video never installs it. The files are kept small anyway — this exemption
+  // is about not making the gate depend on `video/node_modules` existing, not a
+  // licence to write a 900-line composition.
+  "video",
 ]);
 // Device script authored by the user in the editor — not app source, can't
 // use imports (compiles module:none/noLib) so it can't be split like the rest.

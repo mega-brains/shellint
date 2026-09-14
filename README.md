@@ -15,6 +15,21 @@ is built around that.
 
 ![shellint](./.github/assets/shellint-header.png)
 
+<!-- The product video. github.com only renders an inline player for media it
+     hosts itself, so a repo-relative .mp4 here would render as a link, not a
+     video: replace the line below with the bare
+     user-images.githubusercontent.com URL once the file is attached to a
+     release (see CLAUDE.md, "capture:anim"). The tracked PNG above stays as
+     the fallback for npm, forks and mirrors, which is why this is a separate
+     line rather than a replacement for it. -->
+
+**[▶ Watch the 45-second product video](https://mega-brains.github.io/shellint/)**
+— ten scenes: the editor, the build's four artifacts sized to the byte, the
+check engine, the memory estimate against the device's live peak, the three
+readiness gates, deploy, the telemetry dock and the theme switch, each pushed in
+on as it goes. Same file as
+[`.github/assets/shellint-anim.mp4`](./.github/assets/shellint-anim.mp4).
+
 **[Try it in your browser →](https://mega-brains.github.io/shellint/)** — the same
 UI, no server and no device, running the real compiler and the real check engine
 in a web worker. The 14 checks that need a device report `skipped`, never a

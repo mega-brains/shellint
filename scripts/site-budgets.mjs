@@ -35,3 +35,22 @@ export const SITE_JS_BUDGET = 92_000;
  * checks page's control strip and table rules outright).
  */
 export const SITE_CSS_BUDGET = 21_000;
+
+/**
+ * The landing hero's video (`site/shellint-anim.mp4`, M38, re-cut in M39, M40
+ * and M41), asserted by `scripts/test-static-bundle.mjs` and by the renderer
+ * that produces it (`scripts/render-anim-video.mjs`, and still
+ * `scripts/render-remotion-video.mjs` for the retired M40 tour) at the moment
+ * it is rendered — so a re-render that doubles the landing's weight fails at
+ * the render rather than three commits later.
+ *
+ * Media was unbudgeted before this: the two hero PNGs are ~250 KB each and
+ * never moved. A video can grow by a megabyte from one storyboard change — the
+ * per-beat zoom alone took the M38 screencast from 0.86 MB to 3.50 MB before
+ * the CRF was retuned — and the mp4 is the file every visitor downloads above
+ * the fold.
+ *
+ * If a re-render breaches it, cut a scene rather than raising the CRF —
+ * blurry text in a tool whose subject is code reads worse than a shorter video.
+ */
+export const SITE_MEDIA_BUDGET = 4_000_000;

@@ -171,7 +171,138 @@ extends; the gate config `testIgnore`s `capture/**` because a capture run
 overwrites tracked images). Both shots come from one helper and differ only by
 `shellint.theme` in localStorage — the earlier light shot was taken without the
 `/api/stats` mock, so its sidebar read "no stats yet" against a fully populated
-dark one. Run with `PW_CHANNEL=bundled`, like the baselines.
+dark one. Run with `PW_CHANNEL=bundled`, like the baselines. Both specs under
+`capture/` share that helper, `e2e/helpers/settled-app.ts`, and the two capture
+npm scripts each name their spec (`… capture.config.ts header` / `… demo`), so
+one capture never re-writes the other's tracked media.
+
+The landing hero's **product video** is `.github/assets/shellint-anim.{mp4,webm}`
+plus `shellint-anim-poster.png`, and it is **not a screencast of the app**. The
+source is `e2e/capture/assets/shellint-anim.html`: one self-contained authored
+composition — a React/SVG drawing of the shell, ten named scenes over 45 s at
+1920×1080, dark, with its own captions. `mise run capture:anim` runs the chain:
+
+```
+e2e/capture/anim.spec.ts     → .tmp/capture/anim/frames/*.png + meta.json
+scripts/render-anim-video.mjs → the three tracked files, then the budget assert
+```
+
+Two properties follow from the source being a composition rather than footage,
+and they are why this cut replaced the screencast:
+
+- **The capture is deterministic.** The composition renders as a pure function
+  of one authored clock and answers a synchronous seek
+  (`data-om-seek-to-time-frame`, applied under `ReactDOM.flushSync`), so the
+  spec seeks frame *n*, screenshots, and gets exactly that frame — 1350 of
+  them, identical on any machine. The screencast below had to *derive* a
+  playback rate because its pacing was whatever the capture machine managed.
+- **Nothing is composed afterwards.** No Remotion, no titles, no beat table:
+  `render-anim-video.mjs` is PNG sequence in, h264 + vp9 + a poster out. The
+  poster is one of the captured frames copied byte-for-byte, so it cannot drift
+  from what plays.
+
+Two things bit once and are commented in the spec: the frames must be a
+**viewport clip at whole pixels** (an element screenshot lands on the stage's
+flex-centred box, whose fractional top rounds out to 1920×**1081**, and libx264
+rejects an odd height outright), and the stage's fit `transform` has to be
+cleared — otherwise the capture is the scaled-to-viewport size, not the
+authored one. It gets its own Playwright config
+(`e2e/playwright.anim.config.ts`) because the subject is a `file://` page: the
+two servers the base config starts, `build:static` among them, are minutes of
+work this capture never touches.
+
+On the landing page the hero plays inline (muted, looping, no controls) and
+**expands into a `<dialog>` lightbox** — the expand chip, or a click anywhere on
+the video when it has no controls of its own. The two `<video>` elements share
+one `HeroSources`, and the playhead is handed across on open and back on close,
+so expanding 30 s in does not restart the video. Two things this depends on: a
+`currentTime` write before `loadedmetadata` is silently clamped to ~0 (hence
+`seekTo`), and a host that answers `Range` requests — without a `206` Chrome
+calls the media unseekable and every seek clamps, which is why
+`scripts/preview-static.mjs` serves partial content. Pages already does.
+
+`SITE_MEDIA_BUDGET` caps the mp4 the same way it capped the old one, asserted at
+encode time and again by `test-static-bundle.mjs`; breach it by cutting a scene
+out of the HTML, not by raising the CRF. Every re-encode adds its whole ~2.4 MB
+to git history forever, so run it on deliberate UI changes only.
+
+### The retired Remotion pipeline
+
+Everything below is the **M40 tour** (`shellint-tour.*`), superseded by the cut
+above and kept: still tracked in `.github/assets/`, still re-runnable through
+`mise run capture:video`, referenced by nothing the site or the README ships.
+
+It is two halves — footage shot by Playwright, cut by
+[Remotion](https://www.remotion.dev) in `video/`. `mise run capture:video`
+runs the whole chain:
+
+```
+e2e/capture/demo.spec.ts   → .tmp/capture/demo.webm  + demo.beats.json
+scripts/normalize-capture.mjs → video/public/demo.source.mp4 + video/src/beats.generated.ts
+scripts/render-remotion-video.mjs → the three tracked files, then the budget assert
+```
+
+The capture is **raw footage only**: no captions, no titles. Nine beats, cut
+into six chapters, cursor via `page.screencast.showActions` (with `fontSize: 1`, the only
+way to suppress the action *label* — it otherwise burns `Press
+"ControlOrMeta+End"` into the corner of a marketing frame). Each beat still
+**pushes in on the region it is about**, as a CSS transform on `#app`, so the
+page re-renders at scale and zoomed text is genuinely sharper — doing that move
+in Remotion instead would be an upscale of already-captured pixels. Three
+consequences that each bit once and are commented in the spec: a push-in must
+keep everything it clicks inside the frame, or Playwright waits on an off-screen
+target until the spec times out; the transform has to be *removed* once a move
+settles, or Playwright's stability check never passes on an element under it;
+and anything portaled to `document.body` (`web/ui/option-tip.tsx`) sits outside
+the transform, which is why the inspector beat parks the pointer instead of
+hovering a counter.
+
+Chapter order is `TOUR` order in `web/site/landing.tsx` **except chapter 03**,
+the check engine, which has no `TOUR` row: the landing tour illustrates each row
+with a crop of the hero screenshot, and the hero does not show the check pane.
+That chapter pastes deliberately broken code (`BAD_CODE` in the capture spec —
+eight findings across three tiers, every rule named in the comment above it) and
+reads the findings pane. Three properties keep it honest and are easy to break:
+the snippet **compiles**, so a parse failure does not mark the other 65 rules
+`skipped`; the chapter is **three beats**, because the build wait and the
+findings prose want different speeds, and the third (`checks-reset`, the undo
+back to 66/66) is captured and never shown, existing only so chapters 04–06 are
+not shot over a failing check; and `rule tiers` is `defaultCollapsed`, so
+`#checkRules` does not exist until its group toggle is pressed.
+
+The M39 five-chapter cut (`shellint-demo.*`) is still tracked in
+`.github/assets/` and is deliberately neither referenced nor copied into
+`site/` — superseded, kept, not shipped. `shellint-tour.*` now sits in exactly
+the same position behind `shellint-anim.*`.
+
+`video/` is **gitignored** — a local-only working directory, absent from a
+clone, so `mise run capture:video` and the `video:*` tasks only run on a
+checkout that still has it. That is the point of it being retired rather than
+deleted: the M40 files it produced stay tracked, the machinery behind them does
+not.
+
+It is a **standalone pnpm root**, not a workspace member: Remotion plus its
+headless Chrome is ~350 MB, `mise run video:install` is a separate task, and
+`beforeCommit` must stay green on a machine where `video/node_modules` has never
+existed. It is outside `oxlint`, outside `typecheck`, and root-anchored in
+`check-line-limit.mjs`'s skip list. Two rules inside it are not obvious and are
+in its README: no CSS `transition`/`animation` anywhere (Remotion renders frame
+N by seeking, so a time-based CSS animation is frozen at frame 0 in the output
+while moving fine in the studio preview — which is why the scaffold's Tailwind
+wiring was removed), and `src/beats.generated.ts` is generated, never edited —
+it is the only thing keeping a chapter's title over its own footage when the
+capture is re-paced. Chapter 02 derives a `playbackRate` from a target length
+rather than fixing one, because the beat contains a real build whose duration is
+machine speed (18.8 s and 12.0 s on two consecutive captures).
+
+That video is **dark-only and used under both site themes**, and its `poster` is
+rendered from the same composition (`remotion still --frame=45`), so the still
+cannot drift from what plays — the shipped cut keeps both properties.
+`SITE_MEDIA_BUDGET` in `scripts/site-budgets.mjs` still guards
+`render-remotion-video.mjs` at render time, but the `site/` assert now measures
+`shellint-anim.mp4`, since that is the file the landing page loads. Every
+re-render adds its whole ~3 MB to git history forever, so **run it with
+`capture:header`, on deliberate UI changes only**.
 
 The landing page's tour crops (`.github/assets/figures/*.png`) are **derived
 from that pair**, not shot: `mise run capture:figures` →

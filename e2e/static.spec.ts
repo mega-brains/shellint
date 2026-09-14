@@ -217,6 +217,72 @@ test.describe("presentation site (M26)", () => {
     await expect(page.locator("#downloadTable")).toContainText("3.59 MB");
   });
 
+  test("landing hero ships the product video with a poster and both sources", async ({ page }) => {
+    await page.goto(`${STATIC_BASE}/`);
+    const video = page.locator("#heroVideo");
+    await expect(video).toBeVisible();
+    // The poster is one of the captured frames, copied byte-for-byte (M41):
+    // it is a frame of the video, so it cannot drift from what plays, and it is
+    // dark in both themes so nothing jumps on play.
+    await expect(video).toHaveAttribute("poster", "./shellint-anim-poster.png");
+    // mp4 first, webm as the codec fallback — the order is the whole
+    // mechanism, so it is asserted positionally (see HeroShot for why).
+    const sources = video.locator("source");
+    await expect(sources).toHaveCount(2);
+    await expect(sources.nth(0)).toHaveAttribute("src", "./shellint-anim.mp4");
+    await expect(sources.nth(1)).toHaveAttribute("src", "./shellint-anim.webm");
+    // Both files must actually be served — build-static.mjs copies them by
+    // name, and a 404 here would degrade to a hero that never plays.
+    for (const name of ["shellint-anim.webm", "shellint-anim.mp4", "shellint-anim-poster.png"]) {
+      const res = await page.request.head(`${STATIC_BASE}/${name}`);
+      expect(res.status(), `${name} should be served`).toBe(200);
+    }
+    // Deliberately no playback assertion: headless video decode is not
+    // something the gate should depend on.
+  });
+
+  test("the hero expands into a lightbox and hands the playhead back on close", async ({
+    page,
+  }) => {
+    await page.goto(`${STATIC_BASE}/`);
+    const dialog = page.locator("#heroLightbox");
+    const big = page.locator("#heroLightboxVideo");
+    // `showModal()` is what makes it visible; before it the dialog is in the
+    // DOM and closed, which is also what a no-JS visitor gets.
+    await expect(big).toBeHidden();
+
+    // Seek the inline video rather than waiting for playback: headless decode
+    // is not something the gate depends on, and the handover is the behaviour
+    // under test. The landed time is read back rather than assumed — the
+    // preview server answers no Range requests, so a seek past what has
+    // buffered clamps, and asserting the number asked for would be testing the
+    // server's byte-range support instead of this component.
+    const inline = page.locator("#heroVideo");
+    const at = await inline.evaluate((v: HTMLVideoElement) => {
+      v.pause();
+      v.currentTime = 12;
+      return v.currentTime;
+    });
+    expect(at).toBeGreaterThan(0);
+    await page.locator("#heroExpand").click();
+    await expect(dialog).toHaveJSProperty("open", true);
+    await expect(big).toBeVisible();
+    await expect
+      .poll(() => big.evaluate((v: HTMLVideoElement) => v.currentTime))
+      .toBeGreaterThanOrEqual(at);
+    // Same two files as the inline hero, in the same order (HeroSources).
+    await expect(big.locator("source").nth(0)).toHaveAttribute("src", "./shellint-anim.mp4");
+    await expect(big.locator("source").nth(1)).toHaveAttribute("src", "./shellint-anim.webm");
+
+    // Esc goes through the dialog's own `close` event, not the button, so this
+    // covers the path that strands the inline video if `onClose` is dropped.
+    await page.keyboard.press("Escape");
+    await expect(dialog).toHaveJSProperty("open", false);
+    await expect
+      .poll(() => inline.evaluate((v: HTMLVideoElement) => v.currentTime))
+      .toBeGreaterThanOrEqual(at);
+  });
+
   test("theme toggled on the landing persists into the demo", { tag: "@browser-api" }, async ({ page }) => {
     // Deliberately not openStatic(): that helper's init script clears
     // localStorage on every load, which would erase the very theme choice

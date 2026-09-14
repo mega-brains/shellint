@@ -17,7 +17,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { gzipSync } from "node:zlib";
 // Shared with scripts/test-web-assets.mjs, which asserts the same two numbers.
-import { SITE_CSS_BUDGET, SITE_JS_BUDGET } from "./site-budgets.mjs";
+import { SITE_CSS_BUDGET, SITE_JS_BUDGET, SITE_MEDIA_BUDGET } from "./site-budgets.mjs";
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..");
 const SITE = join(ROOT, "site");
@@ -40,6 +40,15 @@ const REQUIRED_ROOT = [
   "probe.html",
   "site.js",
   "site.css",
+  // The hero: the video in both encodings, plus the dark screenshot that is
+  // its poster (and, with the light one, the source of the tour crops). A
+  // missing video degrades to a still that never plays — visibly fine, which
+  // is exactly why it needs asserting here.
+  "shellint-anim.mp4",
+  "shellint-anim.webm",
+  "shellint-anim-poster.png",
+  "shellint-header.png",
+  "shellint-header-dark.png",
   ".nojekyll",
 ];
 for (const f of REQUIRED_ROOT) {
@@ -107,6 +116,16 @@ if (siteCssBytes > SITE_CSS_BUDGET) {
   fail(`site/site.css is ${siteCssBytes} B, over its ${SITE_CSS_BUDGET} B budget`);
 }
 
+// Media budget (M38): the mp4 is what every Safari visitor downloads above the
+// fold, and a re-shoot can grow it by a megabyte without anything else moving.
+const heroMp4Bytes = statSync(join(SITE, "shellint-anim.mp4")).size;
+if (heroMp4Bytes > SITE_MEDIA_BUDGET) {
+  fail(
+    `site/shellint-anim.mp4 is ${heroMp4Bytes} B, over its ${SITE_MEDIA_BUDGET} B budget — ` +
+      "cut a scene out of e2e/capture/assets/shellint-anim.html rather than raising the CRF",
+  );
+}
+
 const appSource = readFileSync(join(DEMO, "app.js"), "utf8");
 const siteJsSource = readFileSync(siteJsPath, "utf8");
 
@@ -137,6 +156,7 @@ if (siteJsSource.includes("cm-content")) {
 console.log(
   `  budgets: app.js ${appBytes} B (≤700000), worker ${workerBytes} B raw / ${workerGz} B gz (≤5000000 / ≤1350000), ` +
     `site.js ${siteJsBytes} B (≤${SITE_JS_BUDGET}), site.css ${siteCssBytes} B (≤${SITE_CSS_BUDGET}), ` +
+    `shellint-anim.mp4 ${heroMp4Bytes} B (≤${SITE_MEDIA_BUDGET}), ` +
     `worker/compiler/editor not leaked into site.js`,
 );
 
