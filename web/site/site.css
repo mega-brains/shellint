@@ -259,16 +259,67 @@ button.chip-icon:hover { color: var(--ink); }
 .window-lights i:last-child { background: var(--ok); }
 .window-state { justify-self: end; color: var(--ok); }
 
+/* Holds the hero video, which is dark in both themes (see HeroShot in
+   landing.tsx) — hence a literal dark backing rather than var(--surface-3),
+   which on a light page would show as a pale sliver inside the window frame
+   for as long as the poster takes to paint. The box crops the video's bottom;
+   `aspect-ratio` comes from the component, which drops it under reduced motion
+   so the native control bar is not cropped away with it. */
 .hero-shot {
   position: relative;
   overflow: hidden;
-  background: var(--surface-3);
+  background: #10161c;
 }
 
-.hero-shot img {
+.hero-video {
   display: block;
   width: 100%;
   height: auto;
+}
+
+/* Expand affordance and the lightbox it opens (see HeroShot in landing.tsx).
+   Literal dark values rather than tokens, like .hero-shot above and for the
+   same reason: both sit on the video, which is dark under either theme. */
+.hero-expand {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  padding: 5px 9px;
+  border: 1px solid color-mix(in srgb, #e8ecf2 20%, transparent);
+  border-radius: 7px;
+  background: color-mix(in srgb, #0d0f13 62%, transparent);
+  color: #e8ecf2;
+  font-size: 11px;
+}
+
+.hero-expand:hover { background: #0d0f13; }
+
+/* Width driven off the viewport *height* so a 16:9 frame never needs
+   letterboxing or a scrollbar: the video fills whichever axis binds first. */
+.hero-lightbox {
+  width: min(94vw, calc(86vh * 16 / 9));
+  max-width: none;
+  padding: 0;
+  border: none;
+  border-radius: 12px;
+  background: #0d0f13;
+  box-shadow: var(--shadow-modal);
+  overflow: hidden;
+}
+
+.hero-lightbox::backdrop { background: var(--scrim); }
+.hero-lightbox video { display: block; width: 100%; height: auto; }
+
+.hero-lightbox-close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  padding: 2px 7px;
+  border-radius: 6px;
+  background: color-mix(in srgb, #0d0f13 62%, transparent);
+  color: #e8ecf2;
+  font-size: 13px;
+  line-height: 1.4;
 }
 
 .hero-download h1 { font-size: 28px; }

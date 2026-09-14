@@ -147,6 +147,26 @@ run = "pnpm run capture:header"
 description = "Re-cut the landing tour crops (.github/assets/figures/) out of the hero screenshots — run after capture:header, macOS only (sips)"
 run = "pnpm run capture:figures"
 
+[tasks."video:install"]
+description = "Install the Remotion package in video/ — ~350 MB with its headless Chrome, deliberately not part of `mise run install`"
+run = "pnpm run video:install"
+
+[tasks."video:studio"]
+description = "Open the Remotion studio on the product video — the iteration loop; needs capture:clips to have run"
+run = "pnpm run video:studio"
+
+[tasks."capture:clips"]
+description = "Shoot the product video's footage and normalize it (.tmp/capture → video/public) — no tracked file is written, needs ffmpeg"
+run = "pnpm run capture:clips"
+
+[tasks."capture:video"]
+description = "Re-shoot and re-render the product video (.github/assets/shellint-demo.{mp4,webm} + poster) — writes tracked media, outside the gate, needs ffmpeg and video:install"
+run = "pnpm run capture:video"
+
+[tasks."capture:anim"]
+description = "Re-shoot and re-encode the composed product video (.github/assets/shellint-anim.{mp4,webm} + poster) — writes tracked media, outside the gate, needs ffmpeg"
+run = "pnpm run capture:anim"
+
 [tasks."test:txiki"]
 description = "Typecheck and verify txiki parity"
 run = "pnpm run test:txiki"
